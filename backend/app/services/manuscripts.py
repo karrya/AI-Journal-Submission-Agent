@@ -4,20 +4,11 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
-from app.models import (
-    Manuscript,
-    ManuscriptAuthor,
-    ManuscriptVersion,
-    Role,
-    User,
-    UserRole,
-    utc_now,
-)
+from app.models import Manuscript, ManuscriptAuthor, ManuscriptVersion, User, utc_now
 from app.repositories.manuscripts import ManuscriptRepository
 from app.schemas.manuscripts import (
     ManuscriptAuthorInput,
@@ -30,8 +21,7 @@ from app.schemas.manuscripts import (
     ManuscriptVersionPage,
     ManuscriptVersionResponse,
 )
-from app.services.audit import AuditService
-from app.services.authors import AuthorService
+from app.services.authors import AuthorService, DomainService
 from app.services.permissions import Permission, require_author_permission
 
 _METADATA_FIELDS = (
@@ -85,30 +75,10 @@ def _invalid_state() -> AppError:
     return AppError(409, "INVALID_MANUSCRIPT_STATE", "稿件状态不允许此操作")
 
 
-class ManuscriptService:
+class ManuscriptService(DomainService):
     def __init__(self, db: Session, user: User, request_id: str):
-        self.db = db
-        self.user = user
-        self.request_id = request_id
+        super().__init__(db, user, request_id)
         self.repository = ManuscriptRepository(db)
-        self.audit = AuditService(db)
-
-    def _roles(self) -> set[str]:
-        return set(
-            self.db.scalars(
-                select(Role.code)
-                .join(UserRole, UserRole.role_id == Role.id)
-                .join(User, User.id == UserRole.user_id)
-                .where(
-                    UserRole.user_id == self.user.id,
-                    User.status == "active",
-                    User.deleted_at.is_(None),
-                )
-            ).all()
-        )
-
-    def _is_admin(self) -> bool:
-        return "system_admin" in self._roles()
 
     def _require_author(self, author_id: str, *permissions: Permission):
         author = None
@@ -465,7 +435,7 @@ class ManuscriptService:
         if sort not in self.repository.SORT_FIELDS:
             raise _validation("Unsupported sort field")
         roles = self._roles()
-        is_admin = "system_admin" in roles
+        is_admin = self._is_admin()
         if not is_admin and roles.isdisjoint(
             {"submission_operator", "reviewer", "author"}
         ):

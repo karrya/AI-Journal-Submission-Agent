@@ -329,16 +329,16 @@ def test_create_and_initial_version_roll_back_together_when_audit_fails(
     owner,
     monkeypatch,
 ):
-    from app.services import manuscripts as service_module
+    from app.services.audit import AuditService
 
-    original_record = service_module.AuditService.record
+    original_record = AuditService.record
 
     def fail_version_audit(self, **kwargs):
         if kwargs.get("action") == "manuscript.version.create":
             raise RuntimeError("forced version audit failure")
         return original_record(self, **kwargs)
 
-    monkeypatch.setattr(service_module.AuditService, "record", fail_version_audit)
+    monkeypatch.setattr(AuditService, "record", fail_version_audit)
     with pytest.raises(RuntimeError, match="forced version audit failure"):
         client.post("/api/v1/manuscripts", json=manuscript_payload(owner))
     db_session.expire_all()

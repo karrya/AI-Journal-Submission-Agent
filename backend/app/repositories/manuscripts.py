@@ -168,10 +168,14 @@ class ManuscriptRepository:
         self.db.flush()
 
     def next_version_number(self, manuscript_id: str) -> int:
-        return self.db.scalar(
-            select(func.coalesce(func.max(ManuscriptVersion.version_number), 0) + 1)
+        latest = self.db.scalar(
+            select(ManuscriptVersion.version_number)
             .where(ManuscriptVersion.manuscript_id == manuscript_id)
+            .order_by(ManuscriptVersion.version_number.desc())
+            .limit(1)
+            .with_for_update()
         )
+        return (latest or 0) + 1
 
     def add_version(self, version: ManuscriptVersion) -> ManuscriptVersion:
         self.db.add(version)

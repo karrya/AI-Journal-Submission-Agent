@@ -272,7 +272,7 @@ def test_integration_authorization_requires_a_strictly_later_end(db_session):
     )
     with pytest.raises(OperationalError) as exc_info:
         db_session.commit()
-    assert exc_info.value.orig.errno == 3819
+    assert exc_info.value.orig.args[0] == 3819
     assert "ck_author_authorizations_finite_validity_order" in str(exc_info.value)
     db_session.rollback()
 

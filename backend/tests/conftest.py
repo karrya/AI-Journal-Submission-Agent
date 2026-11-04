@@ -386,3 +386,52 @@ def institution(db_session):
     db_session.add(record)
     db_session.commit()
     return record
+
+
+@pytest.fixture
+def owner(db_session):
+    from app.models import Author
+
+    record = Author(display_name="File Owner", alternate_names=[])
+    db_session.add(record)
+    db_session.commit()
+    return record
+
+
+@pytest.fixture
+def owner_permissions(grant_factory, operator, owner):
+    now = datetime.now(UTC)
+    return grant_factory(
+        user=operator,
+        author=owner,
+        permissions=[
+            "manuscript:create",
+            "manuscript:read",
+            "manuscript:update",
+            "manuscript:file:manage",
+        ],
+        valid_from=now - timedelta(minutes=5),
+        valid_to=now + timedelta(hours=1),
+    )
+
+
+@pytest.fixture
+def manuscript(client, db_session, operator_context, owner_permissions, owner):
+    from app.models import Manuscript
+
+    response = client.post(
+        "/api/v1/manuscripts",
+        json={
+            "owner_author_id": owner.id,
+            "title": "File study",
+            "abstract": "Abstract",
+            "keywords": ["files"],
+            "article_type": "research",
+            "language": "en",
+        },
+    )
+    assert response.status_code == 201, response.text
+    db_session.expire_all()
+    record = db_session.get(Manuscript, response.json()["id"])
+    db_session.commit()
+    return record

@@ -16,8 +16,9 @@ class Settings(BaseSettings):
     test_database_url: str | None = None
     csrf_secret_key: str = ""
     allowed_origins: list[str] = ["http://localhost:5173"]
-    session_idle_minutes: int = 30
-    session_absolute_hours: int = 8
+    session_idle_minutes: int = Field(default=30, gt=0)
+    session_absolute_hours: int = Field(default=8, gt=0)
+    session_cookie_secure: bool | None = None
     max_upload_bytes: int = Field(default=100 * 1024 * 1024, le=500 * 1024 * 1024)
     storage_root: str = str(PROJECT_ROOT / "storage")
 

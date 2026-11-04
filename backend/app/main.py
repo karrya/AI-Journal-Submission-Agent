@@ -7,14 +7,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from app.api.v1 import readiness
+from app.api.v1 import auth, readiness
+from app.api.v1.deps import first_password_gate
 from app.core.config import get_settings
 from app.core.errors import AppError
+from app.services.auth import LoginRateLimiter
 
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Academic Submission Agent")
+app.state.login_rate_limiter = LoginRateLimiter()
 app.include_router(readiness.router)
+app.include_router(auth.router)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=get_settings().allowed_origins,
@@ -32,6 +36,9 @@ async def request_context(request: Request, call_next):
     response = await call_next(request)
     response.headers["X-Request-ID"] = request_id
     return response
+
+
+app.middleware("http")(first_password_gate)
 
 
 @app.exception_handler(AppError)

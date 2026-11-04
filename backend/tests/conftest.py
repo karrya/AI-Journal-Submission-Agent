@@ -123,3 +123,92 @@ def db_session(db_engine, test_storage_root):
             ):
                 if table in table_names:
                     connection.execute(text(f"DELETE FROM `{table}`"))
+
+
+@pytest.fixture
+def client(db_engine, db_session, monkeypatch: pytest.MonkeyPatch):
+    from fastapi.testclient import TestClient
+    from sqlalchemy.orm import sessionmaker
+
+    from app.core.config import get_settings
+    from app.core.database import get_db
+    from app.main import app
+
+    monkeypatch.setenv("ENVIRONMENT", "test")
+    monkeypatch.setenv(
+        "CSRF_SECRET_KEY", "test-only-csrf-secret-key-with-at-least-32-bytes"
+    )
+    monkeypatch.setenv("ALLOWED_ORIGINS", '["http://localhost:5173"]')
+    get_settings.cache_clear()
+
+    testing_session_local = sessionmaker(
+        bind=db_engine, autoflush=False, expire_on_commit=False
+    )
+
+    def override_get_db():
+        session = testing_session_local()
+        try:
+            yield session
+        finally:
+            session.close()
+
+    from app.core import database
+
+    monkeypatch.setattr(database, "SessionLocal", testing_session_local)
+    app.dependency_overrides[get_db] = override_get_db
+
+    if hasattr(app.state, "login_rate_limiter"):
+        app.state.login_rate_limiter = type(app.state.login_rate_limiter)()
+
+    with TestClient(app) as test_client:
+        yield test_client
+    app.dependency_overrides.clear()
+    get_settings.cache_clear()
+
+
+@pytest.fixture
+def second_client(client):
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+
+    with TestClient(app) as test_client:
+        yield test_client
+
+
+@pytest.fixture
+def admin_with_initial_password(db_session):
+    from argon2 import PasswordHasher
+
+    from app.models import Role, User, UserRole
+
+    password = "Test-Initial-Passphrase-2026!"
+    role = Role(
+        code="system_admin",
+        name="System Administrator",
+        description="Test administrator role",
+    )
+    user = User(
+        username="initial-admin",
+        normalized_username="initial-admin",
+        display_name="Initial Administrator",
+        password_hash=PasswordHasher().hash(password),
+        status="active",
+        must_change_password=True,
+    )
+    db_session.add_all([role, user])
+    db_session.flush()
+    db_session.add(UserRole(user_id=user.id, role_id=role.id))
+    db_session.commit()
+    return {"username": "initial-admin", "password": password}
+
+
+@pytest.fixture
+def login_initial_admin(client, admin_with_initial_password):
+    response = client.post(
+        "/api/v1/auth/login",
+        json=admin_with_initial_password,
+        headers={"Origin": "http://localhost:5173"},
+    )
+    assert response.status_code == 200
+    return response.json()

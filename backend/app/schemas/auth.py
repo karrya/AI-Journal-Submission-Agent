@@ -2,14 +2,21 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import Field
+from pydantic import ConfigDict, Field, field_validator
 
 from app.schemas.common import InputModel, OutputModel
 
 
 class LoginRequest(InputModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=False)
+
     username: str = Field(min_length=1, max_length=64)
     password: str = Field(min_length=1, max_length=128)
+
+    @field_validator("username", mode="before")
+    @classmethod
+    def strip_username(cls, value):
+        return value.strip() if isinstance(value, str) else value
 
 
 class UserResponse(OutputModel):
@@ -34,5 +41,7 @@ class CsrfResponse(OutputModel):
 
 
 class ChangePasswordRequest(InputModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=False)
+
     current_password: str = Field(min_length=1, max_length=128)
     new_password: str = Field(min_length=12, max_length=128)

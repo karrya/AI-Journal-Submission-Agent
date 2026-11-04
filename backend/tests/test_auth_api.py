@@ -164,7 +164,7 @@ def test_first_password_gate_blocks_business_api(client, login_initial_admin):
         {"username": "initial-admin", "password": NEW_PASSWORD},
     )
     assert logged_in.status_code == 200
-    assert client.get("/api/v1/authors").status_code == 404
+    assert client.get("/api/v1/authors").status_code == 200
 
 
 @pytest.mark.parametrize("origin", ["https://attacker.invalid", "null", None])

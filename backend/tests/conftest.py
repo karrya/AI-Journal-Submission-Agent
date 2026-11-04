@@ -324,3 +324,65 @@ def grant_factory(db_session, frozen_now):
         return grant
 
     return create
+
+
+@pytest.fixture
+def auth_context_factory(client, db_session):
+    from secrets import token_urlsafe
+    from types import SimpleNamespace
+
+    from app.core.config import get_settings
+    from app.models import AuthSession, utc_now
+    from app.security.csrf import csrf_token, token_hash
+
+    def authenticate(user, target_client=None):
+        target = target_client or client
+        raw_token = token_urlsafe(32)
+        hashed_token = token_hash(raw_token)
+        csrf = csrf_token(hashed_token, get_settings().csrf_secret_key)
+        now = utc_now()
+        session = AuthSession(
+            token_hash=hashed_token,
+            csrf_token_hash=token_hash(csrf),
+            user_id=user.id,
+            created_at=now,
+            last_seen_at=now,
+            idle_expires_at=now + timedelta(hours=1),
+            absolute_expires_at=now + timedelta(hours=8),
+        )
+        db_session.add(session)
+        db_session.commit()
+        target.cookies.set("asa_session", raw_token, path="/")
+        target.headers.update({"Origin": "http://localhost:5173", "X-CSRF-Token": csrf})
+        return SimpleNamespace(user=user, session=session, csrf_token=csrf)
+
+    return authenticate
+
+
+@pytest.fixture
+def admin_context(admin, auth_context_factory):
+    return auth_context_factory(admin)
+
+
+@pytest.fixture
+def operator_context(operator, auth_context_factory):
+    return auth_context_factory(operator)
+
+
+@pytest.fixture
+def institution(db_session):
+    from app.models import Institution
+
+    record = Institution(
+        name="Test University",
+        normalized_name="test university",
+        institution_type="university",
+        address_line1="1 Test Road",
+        city="Test City",
+        region="Test Region",
+        postal_code="123456",
+        country_code="CN",
+    )
+    db_session.add(record)
+    db_session.commit()
+    return record

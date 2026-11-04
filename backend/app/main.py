@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from app.api.v1 import auth, authorizations, authors, readiness
+from app.api.v1 import auth, authorizations, authors, manuscripts, readiness
 from app.api.v1.deps import first_password_gate
 from app.core.config import get_settings
 from app.core.errors import AppError
@@ -20,6 +20,7 @@ app.state.login_rate_limiter = LoginRateLimiter()
 app.include_router(readiness.router)
 app.include_router(auth.router)
 app.include_router(authors.router)
+app.include_router(manuscripts.router)
 app.include_router(authorizations.router)
 app.middleware("http")(first_password_gate)
 app.add_middleware(

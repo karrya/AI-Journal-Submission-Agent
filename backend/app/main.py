@@ -19,6 +19,7 @@ app = FastAPI(title="Academic Submission Agent")
 app.state.login_rate_limiter = LoginRateLimiter()
 app.include_router(readiness.router)
 app.include_router(auth.router)
+app.middleware("http")(first_password_gate)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=get_settings().allowed_origins,
@@ -36,9 +37,6 @@ async def request_context(request: Request, call_next):
     response = await call_next(request)
     response.headers["X-Request-ID"] = request_id
     return response
-
-
-app.middleware("http")(first_password_gate)
 
 
 @app.exception_handler(AppError)

@@ -55,15 +55,13 @@ def require_trusted_origin(
         raise AppError(403, "SECURITY_CHECK_FAILED", "请求来源或安全令牌校验失败")
 
 
-def get_principal(
-    request: Request, db: Annotated[Session, Depends(get_db)]
-) -> Principal:
+def _get_principal(request: Request, db: Session, *, touch: bool) -> Principal:
     settings = get_settings()
     _validate_configuration(settings)
     raw_token = request.cookies.get(SESSION_COOKIE)
     if not raw_token:
         raise AppError(401, "UNAUTHORIZED", "请先登录")
-    resolved = SessionService(db, settings).resolve(raw_token)
+    resolved = SessionService(db, settings).resolve(raw_token, touch=touch)
     if resolved is None:
         raise AppError(401, "UNAUTHORIZED", "登录已失效，请重新登录")
     principal = Principal(*resolved)
@@ -76,16 +74,31 @@ def get_principal(
     return principal
 
 
+def get_principal(
+    request: Request, db: Annotated[Session, Depends(get_db)]
+) -> Principal:
+    return _get_principal(request, db, touch=True)
+
+
+def get_mutation_principal(
+    request: Request, db: Annotated[Session, Depends(get_db)]
+) -> Principal:
+    return _get_principal(request, db, touch=False)
+
+
 def require_csrf(
     request: Request,
-    principal: Annotated[Principal, Depends(get_principal)],
+    db: Annotated[Session, Depends(get_db)],
+    principal: Annotated[Principal, Depends(get_mutation_principal)],
     origin: Annotated[str | None, Header(alias="Origin")] = None,
     supplied_token: Annotated[str | None, Header(alias="X-CSRF-Token")] = None,
 ) -> Principal:
-    if request.method in {"GET", "HEAD", "OPTIONS", "TRACE"}:
-        return principal
     settings = get_settings()
     _validate_configuration(settings)
+    sessions = SessionService(db, settings)
+    if request.method in {"GET", "HEAD", "OPTIONS", "TRACE"}:
+        sessions.refresh_activity(principal.session)
+        return principal
     expected = csrf_token(principal.session.token_hash, settings.csrf_secret_key)
     token_matches = supplied_token is not None and hmac.compare_digest(
         supplied_token, expected
@@ -97,6 +110,7 @@ def require_csrf(
         token_matches and stored_hash_matches
     ):
         raise AppError(403, "SECURITY_CHECK_FAILED", "请求来源或安全令牌校验失败")
+    sessions.refresh_activity(principal.session)
     return principal
 
 

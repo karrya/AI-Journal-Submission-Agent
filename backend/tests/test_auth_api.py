@@ -101,6 +101,42 @@ def test_session_is_hashed_and_csrf_is_stable(
     assert second.json()["csrf_token"] == body["csrf_token"]
 
 
+def test_two_tabs_share_stable_csrf_and_both_mutations_pass(
+    client, second_client, db_session, login_initial_admin
+):
+    from fastapi import Depends, Response
+
+    from app.api.v1.deps import Principal, require_csrf
+    from app.main import app
+
+    def csrf_probe(
+        principal: Principal = Depends(require_csrf),
+    ) -> Response:
+        return Response(status_code=204)
+
+    app.add_api_route(
+        "/__tests__/csrf-probe",
+        csrf_probe,
+        methods=["POST"],
+        include_in_schema=False,
+    )
+    only_user(db_session).must_change_password = False
+    db_session.commit()
+    raw_session = client.cookies.get("asa_session")
+    csrf = login_initial_admin["csrf_token"]
+    original_csrf_hash = only_session(db_session).csrf_token_hash
+    second_client.cookies.set("asa_session", raw_session, path="/")
+
+    first = client.post("/__tests__/csrf-probe", headers=mutation_headers(csrf))
+    second = second_client.post("/__tests__/csrf-probe", headers=mutation_headers(csrf))
+    assert first.status_code == 204
+    assert second.status_code == 204
+    refreshed = second_client.get("/api/v1/auth/csrf")
+    assert refreshed.status_code == 200
+    assert refreshed.json()["csrf_token"] == csrf
+    assert only_session(db_session).csrf_token_hash == original_csrf_hash
+
+
 def test_production_session_cookie_is_secure(
     client, admin_with_initial_password, monkeypatch
 ):
@@ -113,9 +149,11 @@ def test_production_session_cookie_is_secure(
 
 
 def test_first_password_gate_blocks_business_api(client, login_initial_admin):
-    response = client.get("/api/v1/authors")
+    response = client.get("/api/v1/authors", headers={"Origin": TRUSTED_ORIGIN})
     assert response.status_code == 403
     assert response.json()["code"] == "PASSWORD_CHANGE_REQUIRED"
+    assert response.headers["access-control-allow-origin"] == TRUSTED_ORIGIN
+    assert response.headers["x-request-id"] == response.json()["request_id"]
     assert client.get("/api/v1/auth/me").status_code == 200
     assert client.get("/api/v1/auth/csrf").status_code == 200
 
@@ -164,14 +202,22 @@ def test_logout_requires_csrf_and_trusted_origin(
 ):
     if use_valid_csrf:
         headers["X-CSRF-Token"] = login_initial_admin["csrf_token"]
+    before = only_session(db_session)
+    previous_activity = (before.last_seen_at, before.idle_expires_at)
+    db_session.commit()
     response = client.post("/api/v1/auth/logout", headers=headers)
     assert response.status_code == 403
     assert response.json()["code"] == "SECURITY_CHECK_FAILED"
-    assert only_session(db_session).revoked_at is None
+    after = only_session(db_session)
+    assert after.revoked_at is None
+    assert (after.last_seen_at, after.idle_expires_at) == previous_activity
 
 
 def test_change_password_requires_csrf(client, db_session, login_initial_admin):
     original_hash = only_user(db_session).password_hash
+    before = only_session(db_session)
+    previous_activity = (before.last_seen_at, before.idle_expires_at)
+    db_session.commit()
     response = client.post(
         "/api/v1/auth/change-password",
         json={
@@ -183,7 +229,9 @@ def test_change_password_requires_csrf(client, db_session, login_initial_admin):
     assert response.status_code == 403
     assert response.json()["code"] == "SECURITY_CHECK_FAILED"
     assert only_user(db_session).password_hash == original_hash
-    assert only_session(db_session).revoked_at is None
+    after = only_session(db_session)
+    assert after.revoked_at is None
+    assert (after.last_seen_at, after.idle_expires_at) == previous_activity
 
 
 def test_logout_revokes_only_the_current_session(
@@ -404,6 +452,22 @@ def test_successful_login_resets_its_rate_limit_key(
             )
         assert login(client, admin_with_initial_password).status_code == 200
         client.cookies.clear()
+
+
+def test_login_rate_limiter_sweeps_stale_keys_globally():
+    from app.services.auth import LoginRateLimiter
+
+    now = [1_000.0]
+    limiter = LoginRateLimiter(window_seconds=60, clock=lambda: now[0])
+    limiter.record_failure("stale-user", "192.0.2.1")
+    now[0] = 1_050.0
+    limiter.record_failure("recent-user", "192.0.2.2")
+    now[0] = 1_061.0
+
+    assert limiter.retry_after("probe-user", "192.0.2.3") is None
+    keys = set(limiter._attempts)
+    assert ("stale-user", "192.0.2.1") not in keys
+    assert ("recent-user", "192.0.2.2") in keys
 
 
 @pytest.mark.parametrize("secret", ["", "x" * 31])

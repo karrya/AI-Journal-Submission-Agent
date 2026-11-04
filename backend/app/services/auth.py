@@ -46,9 +46,10 @@ class LoginRateLimiter:
         self.clock = clock
         self._attempts: dict[tuple[str, str], deque[float]] = defaultdict(deque)
         self._lock = Lock()
+        self._last_sweep = self.clock()
 
     def _prune(self, key: tuple[str, str], now: float) -> deque[float]:
-        attempts = self._attempts[key]
+        attempts = self._attempts.get(key, deque())
         cutoff = now - self.window_seconds
         while attempts and attempts[0] <= cutoff:
             attempts.popleft()
@@ -57,18 +58,28 @@ class LoginRateLimiter:
             return deque()
         return attempts
 
+    def _sweep_stale(self, now: float) -> None:
+        if now - self._last_sweep < self.window_seconds:
+            return
+        for key in list(self._attempts):
+            self._prune(key, now)
+        self._last_sweep = now
+
     def retry_after(self, normalized_username: str, source_ip: str) -> int | None:
         key = (normalized_username, source_ip)
         with self._lock:
-            attempts = self._prune(key, self.clock())
+            now = self.clock()
+            self._sweep_stale(now)
+            attempts = self._prune(key, now)
             if len(attempts) < self.max_failures:
                 return None
-            return max(1, math.ceil(self.window_seconds - (self.clock() - attempts[0])))
+            return max(1, math.ceil(self.window_seconds - (now - attempts[0])))
 
     def record_failure(self, normalized_username: str, source_ip: str) -> None:
         key = (normalized_username, source_ip)
         with self._lock:
             now = self.clock()
+            self._sweep_stale(now)
             attempts = self._prune(key, now)
             if key not in self._attempts:
                 self._attempts[key] = attempts
@@ -76,6 +87,7 @@ class LoginRateLimiter:
 
     def record_success(self, normalized_username: str, source_ip: str) -> None:
         with self._lock:
+            self._sweep_stale(self.clock())
             self._attempts.pop((normalized_username, source_ip), None)
 
 

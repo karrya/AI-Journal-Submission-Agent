@@ -39,6 +39,15 @@ class SessionService:
         self.db.flush()
         return session, raw_token, csrf
 
+    def refresh_activity(self, session: AuthSession) -> None:
+        now = utc_now()
+        session.last_seen_at = now
+        session.idle_expires_at = min(
+            now + timedelta(minutes=self.settings.session_idle_minutes),
+            session.absolute_expires_at,
+        )
+        self.db.commit()
+
     def resolve(
         self, raw_token: str, *, touch: bool = True
     ) -> tuple[User, AuthSession] | None:
@@ -67,12 +76,7 @@ class SessionService:
                 self.db.commit()
             return None
         if touch:
-            session.last_seen_at = now
-            session.idle_expires_at = min(
-                now + timedelta(minutes=self.settings.session_idle_minutes),
-                session.absolute_expires_at,
-            )
-            self.db.commit()
+            self.refresh_activity(session)
         return user, session
 
     def revoke(self, session: AuthSession) -> None:

@@ -7,12 +7,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from app.api.v1 import readiness
 from app.core.config import get_settings
 from app.core.errors import AppError
 
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Academic Submission Agent")
+app.include_router(readiness.router)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=get_settings().allowed_origins,
@@ -66,8 +68,7 @@ async def not_found(request: Request, exc):
 @app.exception_handler(RequestValidationError)
 async def validation_error_handler(request: Request, exc: RequestValidationError):
     details = [
-        {"loc": list(error["loc"]), "message": error["msg"]}
-        for error in exc.errors()
+        {"loc": list(error["loc"]), "message": error["msg"]} for error in exc.errors()
     ]
     return JSONResponse(
         status_code=422,

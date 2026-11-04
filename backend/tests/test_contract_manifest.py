@@ -5,7 +5,7 @@ import pytest
 from pydantic import ValidationError
 
 from app.api.v1.contract_manifest import CONTRACTS
-from app.schemas import audit, auth, authors, files, journals, manuscripts
+from app.schemas import audit, auth, authors, common, files, journals, manuscripts
 from app.schemas.authors import (
     AuthorizationCreate,
     AuthorizationResponse,
@@ -135,14 +135,14 @@ def test_manifest_matches_the_complete_approved_route_contract():
 
 
 def test_manifest_response_names_resolve_to_schema_exports():
-    modules = (audit, auth, authors, files, journals, manuscripts)
+    modules = (audit, auth, authors, common, files, journals, manuscripts)
     exported_names = {
         name
         for module in modules
         for name in dir(module)
         if not name.startswith("_")
     }
-    exported_names.update(("FileContent", "HealthResponse", "None"))
+    exported_names.update(("FileContent", "None"))
     assert {item.response_schema for item in CONTRACTS} <= exported_names
 
 
@@ -213,6 +213,24 @@ def test_authorization_requires_a_finite_validity_period():
         )
     with pytest.raises(ValidationError):
         AuthorizationUpdate(valid_to=None)
+
+
+def test_authorization_create_rejects_mixed_timezone_awareness():
+    with pytest.raises(ValidationError, match="timezone-aware"):
+        AuthorizationCreate(
+            **valid_authorization(
+                valid_from="2026-11-04T00:00:00",
+                valid_to="2027-11-04T00:00:00Z",
+            )
+        )
+
+
+def test_authorization_update_rejects_mixed_timezone_awareness():
+    with pytest.raises(ValidationError, match="timezone-aware"):
+        AuthorizationUpdate(
+            valid_from="2026-11-04T00:00:00Z",
+            valid_to="2027-11-04T00:00:00",
+        )
 
 
 def test_authorization_permissions_are_known_nonempty_and_unique():

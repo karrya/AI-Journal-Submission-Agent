@@ -26,6 +26,15 @@ PermissionCode = Literal[
 ]
 
 
+def require_timezone_awareness(value: datetime) -> datetime:
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise ValueError("Authorization datetimes must be timezone-aware")
+    return value
+
+
+AwareDatetime = Annotated[datetime, AfterValidator(require_timezone_awareness)]
+
+
 def normalize_orcid(value: str) -> str:
     match = re.fullmatch(
         r"(?:https://orcid\.org/)?(\d{4}-\d{4}-\d{4}-[\dX]{4})",
@@ -268,8 +277,8 @@ class AuthorizationCreate(InputModel):
     author_id: UUID
     user_id: UUID
     permissions: list[PermissionCode] = Field(min_length=1, max_length=9)
-    valid_from: datetime
-    valid_to: datetime
+    valid_from: AwareDatetime
+    valid_to: AwareDatetime
     evidence_ref: str | None = Field(default=None, max_length=1024)
     notes: str | None = None
 
@@ -291,8 +300,8 @@ class AuthorizationUpdate(InputModel):
     permissions: list[PermissionCode] | None = Field(
         default=None, min_length=1, max_length=9
     )
-    valid_from: datetime | None = None
-    valid_to: datetime | None = None
+    valid_from: AwareDatetime | None = None
+    valid_to: AwareDatetime | None = None
     evidence_ref: str | None = Field(default=None, max_length=1024)
     notes: str | None = None
 
@@ -329,8 +338,8 @@ class AuthorizationResponse(OutputModel):
     author_id: UUID
     user_id: UUID
     permissions: list[PermissionCode] = Field(min_length=1, max_length=9)
-    valid_from: datetime
-    valid_to: datetime
+    valid_from: AwareDatetime
+    valid_to: AwareDatetime
     evidence_ref: str | None = Field(default=None, max_length=1024)
     notes: str | None = None
     revoked_at: datetime | None

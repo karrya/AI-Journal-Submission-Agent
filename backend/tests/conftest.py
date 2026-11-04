@@ -1,12 +1,13 @@
 import os
 import sys
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
 from alembic import command
 from alembic.config import Config
 from dotenv import load_dotenv
-from sqlalchemy import inspect, text
+from sqlalchemy import inspect, select, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
@@ -212,3 +213,114 @@ def login_initial_admin(client, admin_with_initial_password):
     )
     assert response.status_code == 200
     return response.json()
+
+
+@pytest.fixture
+def frozen_now():
+    return datetime(2026, 11, 4, 12, 0, tzinfo=UTC)
+
+
+@pytest.fixture
+def user_factory(db_session):
+    from app.models import Role, User, UserRole
+
+    def create(username: str, *, roles: tuple[str, ...], status: str = "active"):
+        user = User(
+            username=username,
+            normalized_username=username,
+            display_name=username,
+            password_hash="test-only-password-hash",
+            status=status,
+            must_change_password=False,
+        )
+        db_session.add(user)
+        db_session.flush()
+        for code in roles:
+            role = db_session.scalar(select(Role).where(Role.code == code))
+            if role is None:
+                role = Role(code=code, name=code, description=f"Test {code} role")
+                db_session.add(role)
+                db_session.flush()
+            db_session.add(UserRole(user_id=user.id, role_id=role.id))
+        db_session.commit()
+        return user
+
+    return create
+
+
+@pytest.fixture
+def operator(user_factory):
+    return user_factory("operator", roles=("submission_operator",))
+
+
+@pytest.fixture
+def reviewer(user_factory):
+    return user_factory("reviewer", roles=("reviewer",))
+
+
+@pytest.fixture
+def auditor(user_factory):
+    return user_factory("auditor", roles=("auditor",))
+
+
+@pytest.fixture
+def admin(user_factory):
+    return user_factory("admin", roles=("system_admin",))
+
+
+@pytest.fixture
+def disabled_admin(user_factory):
+    return user_factory(
+        "disabled-admin", roles=("system_admin", "reviewer"), status="disabled"
+    )
+
+
+@pytest.fixture
+def author(db_session):
+    from app.models import Author
+
+    record = Author(display_name="Permission Test Author", alternate_names=[])
+    db_session.add(record)
+    db_session.commit()
+    return record
+
+
+@pytest.fixture
+def grant_factory(db_session, frozen_now):
+    from app.models import AuthorAuthorization
+
+    def create(
+        *,
+        user,
+        author,
+        permission=None,
+        permissions=None,
+        valid_from=None,
+        valid_to=None,
+        revoked_at=None,
+    ):
+        if permission is not None and permissions is not None:
+            raise ValueError("pass permission or permissions, not both")
+        codes = permissions if permissions is not None else [permission]
+        values = [getattr(code, "value", code) for code in codes]
+        start = valid_from or frozen_now - timedelta(hours=1)
+        end = valid_to or frozen_now + timedelta(hours=1)
+        if start.tzinfo is not None:
+            start = start.astimezone(UTC).replace(tzinfo=None)
+        if end.tzinfo is not None:
+            end = end.astimezone(UTC).replace(tzinfo=None)
+        if revoked_at is not None and revoked_at.tzinfo is not None:
+            revoked_at = revoked_at.astimezone(UTC).replace(tzinfo=None)
+        grant = AuthorAuthorization(
+            user_id=user.id,
+            author_id=author.id,
+            permissions=values,
+            valid_from=start,
+            valid_to=end,
+            revoked_at=revoked_at,
+        )
+        db_session.add(grant)
+        db_session.commit()
+        return grant
+
+    return create

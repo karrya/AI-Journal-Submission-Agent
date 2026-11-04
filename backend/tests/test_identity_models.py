@@ -35,8 +35,8 @@ EXPECTED_TABLES = {
 }
 
 
-def test_first_stage_exports_exactly_nine_models_and_tables():
-    assert set(Base.metadata.tables) == EXPECTED_TABLES
+def test_first_stage_models_remain_available_after_schema_completion():
+    assert EXPECTED_TABLES.issubset(Base.metadata.tables)
     assert {
         User.__tablename__,
         Role.__tablename__,

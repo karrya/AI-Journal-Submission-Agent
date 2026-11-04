@@ -6,7 +6,7 @@ import pytest
 from alembic import command
 from alembic.config import Config
 from dotenv import load_dotenv
-from sqlalchemy import text
+from sqlalchemy import inspect, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
@@ -96,7 +96,21 @@ def db_session(db_engine, test_storage_root):
         session.rollback()
         session.close()
         with db_engine.begin() as connection:
+            table_names = set(inspect(connection).get_table_names())
+            if "manuscripts" in table_names:
+                connection.execute(
+                    text("UPDATE manuscripts SET current_version_id = NULL")
+                )
             for table in (
+                "operation_logs",
+                "manuscript_files",
+                "file_families",
+                "manuscript_authors",
+                "manuscript_versions",
+                "manuscripts",
+                "journals",
+                "journal_platforms",
+                "publishers",
                 "author_authorizations",
                 "author_institutions",
                 "author_emails",
@@ -107,4 +121,5 @@ def db_session(db_engine, test_storage_root):
                 "roles",
                 "users",
             ):
-                connection.execute(text(f"DELETE FROM `{table}`"))
+                if table in table_names:
+                    connection.execute(text(f"DELETE FROM `{table}`"))

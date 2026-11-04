@@ -4,7 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import JSON, CHAR, Computed, inspect, text
 from sqlalchemy.dialects.mysql import DATETIME
-from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, OperationalError, SQLAlchemyError
 
 from app.api.v1.readiness import get_db
 from app.main import app
@@ -270,8 +270,10 @@ def test_integration_authorization_requires_a_strictly_later_end(db_session):
             valid_to=now - timedelta(microseconds=1),
         )
     )
-    with pytest.raises(IntegrityError):
+    with pytest.raises(OperationalError) as exc_info:
         db_session.commit()
+    assert exc_info.value.orig.errno == 3819
+    assert "ck_author_authorizations_finite_validity_order" in str(exc_info.value)
     db_session.rollback()
 
 

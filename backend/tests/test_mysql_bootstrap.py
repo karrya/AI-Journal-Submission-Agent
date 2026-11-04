@@ -85,3 +85,7 @@ def test_test_fixtures_reject_non_test_databases_and_live_storage(tmp_path: Path
     assert validate_test_storage_root(temporary_storage) == temporary_storage
     with pytest.raises(RuntimeError, match="live storage"):
         validate_test_storage_root(PROJECT_ROOT / "storage")
+
+
+def test_pymysql_caching_sha2_password_dependency_is_available():
+    import cryptography  # noqa: F401

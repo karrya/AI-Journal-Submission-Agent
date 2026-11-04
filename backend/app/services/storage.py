@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import stat
 from datetime import UTC, datetime
 from pathlib import Path
 from uuid import UUID
@@ -92,6 +93,67 @@ class StorageService:
         if size != expected_size or digest.hexdigest() != expected_sha256:
             return "hash_mismatch"
         return "normal"
+
+    def open_verified(
+        self, relative_path: str | Path, expected_size: int, expected_sha256: str
+    ) -> tuple[str, int | None]:
+        """Open without symlinks and verify the exact descriptor later used for streaming."""
+        relative = Path(relative_path)
+        if relative.is_absolute() or not relative.parts or "\\" in str(relative):
+            raise ValueError("invalid relative storage path")
+        if any(part in {"", ".", ".."} for part in relative.parts):
+            raise ValueError("storage path traversal is forbidden")
+
+        directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+        file_flags = os.O_RDONLY | os.O_NOFOLLOW
+        if hasattr(os, "O_CLOEXEC"):
+            directory_flags |= os.O_CLOEXEC
+            file_flags |= os.O_CLOEXEC
+        descriptor = None
+        keep_open = False
+        directory_descriptor = os.open(self.root, directory_flags)
+        try:
+            for part in relative.parts[:-1]:
+                next_descriptor = os.open(
+                    part, directory_flags, dir_fd=directory_descriptor
+                )
+                os.close(directory_descriptor)
+                directory_descriptor = next_descriptor
+            try:
+                descriptor = os.open(
+                    relative.parts[-1], file_flags, dir_fd=directory_descriptor
+                )
+            except FileNotFoundError:
+                return "missing", None
+            before = os.fstat(descriptor)
+            if not stat.S_ISREG(before.st_mode):
+                return "missing", None
+            digest = hashlib.sha256()
+            size = 0
+            while chunk := os.read(descriptor, CHUNK_SIZE):
+                size += len(chunk)
+                digest.update(chunk)
+            after = os.fstat(descriptor)
+            stable = all(
+                getattr(before, field) == getattr(after, field)
+                for field in ("st_dev", "st_ino", "st_size", "st_mtime_ns", "st_ctime_ns")
+            )
+            if (
+                not stable
+                or size != expected_size
+                or before.st_size != expected_size
+                or digest.hexdigest() != expected_sha256
+            ):
+                return "hash_mismatch", None
+            os.lseek(descriptor, 0, os.SEEK_SET)
+            keep_open = True
+            return "normal", descriptor
+        except FileNotFoundError:
+            return "missing", None
+        finally:
+            os.close(directory_descriptor)
+            if descriptor is not None and not keep_open:
+                os.close(descriptor)
 
     def append_reconciliation(
         self,

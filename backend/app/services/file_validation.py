@@ -5,15 +5,20 @@ from __future__ import annotations
 import codecs
 import hashlib
 import io
+import lzma
 import re
+import tempfile
 import unicodedata
 import zipfile
+import zlib
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from urllib.parse import quote
-from xml.etree import ElementTree
+from xml.etree.ElementTree import ParseError
 
 import magic
+from defusedxml import ElementTree as SafeElementTree
+from defusedxml.common import DefusedXmlException
 
 from app.core.errors import AppError
 
@@ -170,11 +175,17 @@ class FileValidator:
             raise UnsupportedFileType()
         decoder = codecs.getincrementaldecoder("utf-8-sig")(errors="strict")
         carry = b""
+        at_document_start = True
         try:
             with path.open("rb") as source:
                 while chunk := source.read(CHUNK_SIZE):
                     decoder.decode(chunk)
                     scanned = carry + chunk
+                    if at_document_start:
+                        candidate = scanned.removeprefix(b"\xef\xbb\xbf").lstrip()
+                        if candidate.startswith(b"#!"):
+                            raise UnsupportedFileType()
+                        at_document_start = not candidate
                     if b"\x00" in chunk or _ACTIVE_TEXT.search(scanned):
                         raise UnsupportedFileType()
                     carry = scanned[-64:]
@@ -236,11 +247,55 @@ class FileValidator:
             raise UnsupportedFileType()
 
     @staticmethod
-    def _verify_ooxml(path: Path, extension: str, detected: str) -> None:
+    def _xml_root(archive: zipfile.ZipFile, entry: zipfile.ZipInfo, *, metadata: bool):
+        if metadata and entry.file_size > CHUNK_SIZE:
+            raise UnsupportedFileType()
+        try:
+            with archive.open(entry) as source:
+                return SafeElementTree.parse(
+                    source,
+                    forbid_dtd=True,
+                    forbid_entities=True,
+                    forbid_external=True,
+                ).getroot()
+        except OSError:
+            if entry.compress_type == zipfile.ZIP_BZIP2:
+                raise UnsupportedFileType() from None
+            raise
+
+    @staticmethod
+    def _nested_zip(entry: zipfile.ZipInfo, nested) -> bool:
+        if Path(entry.filename).suffix.lower() in _NESTED_ARCHIVE_EXTENSIONS:
+            return True
+        with tempfile.SpooledTemporaryFile(max_size=CHUNK_SIZE) as candidate:
+            try:
+                while chunk := nested.read(CHUNK_SIZE):
+                    candidate.write(chunk)
+            except OSError:
+                if entry.compress_type == zipfile.ZIP_BZIP2:
+                    raise UnsupportedFileType() from None
+                raise
+            candidate.seek(0)
+            return zipfile.is_zipfile(candidate)
+
+    @classmethod
+    def _verify_ooxml(cls, path: Path, extension: str, detected: str) -> None:
         expected_mime = DOCX_MIME if extension == ".docx" else XLSX_MIME
         if detected not in {expected_mime, "application/zip", "application/x-zip-compressed"}:
             raise UnsupportedFileType()
         required_main = "word/document.xml" if extension == ".docx" else "xl/workbook.xml"
+        expected_main_mime = (
+            "application/vnd.openxmlformats-officedocument."
+            "wordprocessingml.document.main+xml"
+            if extension == ".docx"
+            else "application/vnd.openxmlformats-officedocument."
+            "spreadsheetml.sheet.main+xml"
+        )
+        expected_main_root = (
+            "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}document"
+            if extension == ".docx"
+            else "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}workbook"
+        )
         try:
             with zipfile.ZipFile(path) as archive:
                 entries = archive.infolist()
@@ -258,41 +313,76 @@ class FileValidator:
                     ):
                         raise UnsupportedFileType("OOXML entry compression ratio exceeds 100:1")
                 names = {entry.filename for entry in entries}
-                if not {"[Content_Types].xml", "_rels/.rels", required_main} <= names:
+                required_names = {"[Content_Types].xml", "_rels/.rels", required_main}
+                if not required_names <= names or len(names) != len(entries):
                     raise UnsupportedFileType()
-                content_types_entry = archive.getinfo("[Content_Types].xml")
-                if content_types_entry.file_size > CHUNK_SIZE:
-                    raise UnsupportedFileType()
-                content_types = archive.read(content_types_entry)
-                if b"<!DOCTYPE" in content_types.upper() or b"<!ENTITY" in content_types.upper():
-                    raise UnsupportedFileType()
-                try:
-                    root = ElementTree.fromstring(content_types)
-                except ElementTree.ParseError:
-                    raise UnsupportedFileType() from None
-                expected_main_mime = (
-                    "application/vnd.openxmlformats-officedocument."
-                    "wordprocessingml.document.main+xml"
-                    if extension == ".docx"
-                    else "application/vnd.openxmlformats-officedocument."
-                    "spreadsheetml.sheet.main+xml"
+
+                content_types = cls._xml_root(
+                    archive, archive.getinfo("[Content_Types].xml"), metadata=True
                 )
-                if not any(
-                    element.tag.rsplit("}", 1)[-1] == "Override"
-                    and element.attrib.get("PartName") == f"/{required_main}"
-                    and element.attrib.get("ContentType") == expected_main_mime
-                    for element in root.iter()
+                if content_types.tag != (
+                    "{http://schemas.openxmlformats.org/package/2006/content-types}Types"
                 ):
                     raise UnsupportedFileType()
+                overrides = [
+                    element
+                    for element in content_types.iter()
+                    if element.tag.rsplit("}", 1)[-1] == "Override"
+                    and element.attrib.get("PartName") == f"/{required_main}"
+                    and element.attrib.get("ContentType") == expected_main_mime
+                ]
+                if len(overrides) != 1:
+                    raise UnsupportedFileType()
+
+                relationships = cls._xml_root(
+                    archive, archive.getinfo("_rels/.rels"), metadata=True
+                )
+                if relationships.tag != (
+                    "{http://schemas.openxmlformats.org/package/2006/relationships}"
+                    "Relationships"
+                ):
+                    raise UnsupportedFileType()
+                matching_relationships = []
+                for relationship in relationships:
+                    if relationship.tag.rsplit("}", 1)[-1] != "Relationship":
+                        continue
+                    target = relationship.attrib.get("Target", "")
+                    normalized_target = target.lstrip("/")
+                    if (
+                        relationship.attrib.get("Id", "").strip()
+                        and relationship.attrib.get("Type")
+                        == "http://schemas.openxmlformats.org/officeDocument/2006/"
+                        "relationships/officeDocument"
+                        and relationship.attrib.get("TargetMode", "Internal") == "Internal"
+                        and "\\" not in target
+                        and ".." not in PurePosixPath(normalized_target).parts
+                        and PurePosixPath(normalized_target).as_posix() == required_main
+                    ):
+                        matching_relationships.append(relationship)
+                if len(matching_relationships) != 1:
+                    raise UnsupportedFileType()
+
+                main_root = cls._xml_root(
+                    archive, archive.getinfo(required_main), metadata=False
+                )
+                if main_root.tag != expected_main_root:
+                    raise UnsupportedFileType()
+
                 for entry in entries:
                     if entry.is_dir():
                         continue
-                    suffix = Path(entry.filename).suffix.lower()
                     with archive.open(entry) as nested:
-                        magic_bytes = nested.read(4)
-                    if suffix in _NESTED_ARCHIVE_EXTENSIONS or magic_bytes.startswith(
-                        (b"PK\x03\x04", b"PK\x05\x06", b"PK\x07\x08")
-                    ):
-                        raise UnsupportedFileType("OOXML nested ZIP containers are forbidden")
-        except (zipfile.BadZipFile, KeyError, NotImplementedError, RuntimeError):
+                        if cls._nested_zip(entry, nested):
+                            raise UnsupportedFileType("OOXML nested ZIP containers are forbidden")
+        except (
+            DefusedXmlException,
+            EOFError,
+            KeyError,
+            NotImplementedError,
+            ParseError,
+            RuntimeError,
+            lzma.LZMAError,
+            zipfile.BadZipFile,
+            zlib.error,
+        ):
             raise UnsupportedFileType() from None

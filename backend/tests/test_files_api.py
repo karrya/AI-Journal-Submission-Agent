@@ -257,6 +257,33 @@ def test_overlong_original_filename_is_validation_error_without_temp_files(
     assert not list((test_storage_root / "temp").iterdir())
 
 
+def test_unauthorized_upload_is_denied_before_validation_or_storage_write(
+    client,
+    user_factory,
+    auth_context_factory,
+    grant_factory,
+    owner,
+    manuscript,
+    test_storage_root,
+):
+    manage_only = user_factory("preauthorized-file-manager", roles=("submission_operator",))
+    active_grant(
+        grant_factory,
+        user=manage_only,
+        author=owner,
+        permissions=["manuscript:file:manage"],
+    )
+    auth_context_factory(manage_only)
+    manuscript_access = client.get(f"/api/v1/manuscripts/{manuscript.id}")
+    response = post_pdf(client, manuscript, content=b"<html>unauthorized</html>")
+    assert manuscript_access.status_code == 403
+    assert response.status_code == manuscript_access.status_code
+    assert response.json()["code"] == manuscript_access.json()["code"]
+    assert response.json()["message"] == manuscript_access.json()["message"]
+    assert not list((test_storage_root / "temp").iterdir())
+    assert not (test_storage_root / "authors").exists()
+
+
 def test_upload_requires_authentication(client, manuscript):
     client.cookies.clear()
     response = post_pdf(client, manuscript)

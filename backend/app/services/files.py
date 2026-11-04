@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import unicodedata
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -23,6 +24,8 @@ from app.services.file_validation import FileValidator
 from app.services.manuscripts import ManuscriptService
 from app.services.permissions import Permission
 from app.services.storage import StorageService
+
+logger = logging.getLogger(__name__)
 
 _FILE_TYPES = frozenset(get_args(FileType))
 _AUDIT_FIELDS = frozenset(
@@ -60,7 +63,8 @@ def _utc(value: datetime) -> datetime:
 
 @dataclass(frozen=True)
 class DownloadedFile:
-    path: Path
+    descriptor: int
+    size_bytes: int
     original_filename: str
     mime_type: str
 
@@ -190,9 +194,14 @@ class FileService(DomainService):
             self.storage.append_reconciliation(
                 file_id=file_id, relative_path=relative, sha256=sha256, event=event
             )
-        except Exception:
-            # The formal file is deliberately retained even if local manifest writing fails.
-            pass
+        except Exception as exc:
+            logger.error(
+                "Reconciliation manifest append failed; formal file retained; "
+                "file_id=%s; event=%s; error_type=%s",
+                file_id,
+                event,
+                type(exc).__name__,
+            )
 
     def _record_absent_on_new_connection(self, file_id: str) -> bool:
         session = self.session_factory()
@@ -237,7 +246,6 @@ class FileService(DomainService):
     ) -> FileResponse:
         file_id = str(uuid4())
         temporary = self.storage.temporary_path(file_id)
-        original_filename = self._original_filename(filename)
         relative = None
         final = None
         moved = False
@@ -245,6 +253,12 @@ class FileService(DomainService):
         final_preexisting = False
         sha256 = ""
         try:
+            self.manuscripts.get_owned_manuscript(
+                manuscript_id,
+                Permission.MANUSCRIPT_READ,
+                Permission.MANUSCRIPT_FILE_MANAGE,
+            )
+            original_filename = self._original_filename(filename)
             self.validator.store(stream, temporary)
             inspected = self.validator.inspect(temporary, original_filename, declared_mime)
             sha256 = inspected.sha256
@@ -337,7 +351,14 @@ class FileService(DomainService):
                     )
                 raise exc
             finally:
-                temporary.unlink(missing_ok=True)
+                try:
+                    temporary.unlink(missing_ok=True)
+                except OSError as cleanup_error:
+                    logger.warning(
+                        "Temporary upload cleanup failed; file_id=%s; error_type=%s",
+                        file_id,
+                        type(cleanup_error).__name__,
+                    )
             if (
                 rollback_certain
                 and relative is not None
@@ -400,18 +421,20 @@ class FileService(DomainService):
         if record.integrity_status != "normal":
             raise _integrity_error()
         try:
-            path = self.storage.resolve(record.storage_path)
+            integrity, descriptor = self.storage.open_verified(
+                record.storage_path, record.size_bytes, record.sha256
+            )
         except (ValueError, OSError):
-            raise _integrity_error() from None
-        try:
-            integrity = self.storage.integrity(path, record.size_bytes, record.sha256)
-        except OSError:
             raise _integrity_error() from None
         if integrity != "normal":
             record.integrity_status = integrity
             self.db.commit()
             raise _integrity_error()
-        return DownloadedFile(path, record.original_filename, record.mime_type)
+        if descriptor is None:
+            raise _integrity_error()
+        return DownloadedFile(
+            descriptor, record.size_bytes, record.original_filename, record.mime_type
+        )
 
     def delete(self, file_id: str) -> None:
         try:

@@ -30,13 +30,34 @@ def make_ooxml(path: Path, *, spreadsheet: bool = False) -> None:
         if spreadsheet
         else "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"
     )
+    main_xml = (
+        '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheets/></workbook>'
+        if spreadsheet
+        else '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body/></w:document>'
+    )
     with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         archive.writestr(
             "[Content_Types].xml",
-            f'<Types><Override PartName="/{main}" ContentType="{main_mime}"/></Types>',
+            '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+            f'<Override PartName="/{main}" ContentType="{main_mime}"/></Types>',
         )
-        archive.writestr("_rels/.rels", "<Relationships/>")
-        archive.writestr(main, "<document/>")
+        archive.writestr(
+            "_rels/.rels",
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            '<Relationship Id="rId1" '
+            'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" '
+            f'Target="{main}"/></Relationships>',
+        )
+        archive.writestr(main, main_xml)
+
+
+def rewrite_ooxml_entry(path: Path, name: str, content: bytes) -> None:
+    with zipfile.ZipFile(path) as archive:
+        entries = {entry.filename: archive.read(entry) for entry in archive.infolist()}
+    entries[name] = content
+    with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for entry_name, entry_content in entries.items():
+            archive.writestr(entry_name, entry_content)
 
 
 @pytest.mark.parametrize(
@@ -229,6 +250,95 @@ def test_active_content_after_first_chunk_is_rejected(tmp_path):
     payload.write_bytes(b"a" * (1024 * 1024) + b"<html><script>alert(1)</script></html>")
     with pytest.raises(UnsupportedFileType):
         FileValidator().inspect(payload, "late-html.txt", "text/plain")
+
+
+def test_ooxml_placeholder_relationship_and_arbitrary_main_part_are_rejected(tmp_path):
+    payload = tmp_path / "placeholder.docx"
+    with zipfile.ZipFile(payload, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr(
+            "[Content_Types].xml",
+            '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+            '<Override PartName="/word/document.xml" '
+            'ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
+            '</Types>',
+        )
+        archive.writestr("_rels/.rels", "<Relationships/>")
+        archive.writestr("word/document.xml", b"not a Word document")
+    with pytest.raises(UnsupportedFileType):
+        FileValidator().inspect(payload, "placeholder.docx", DOCX_MIME)
+
+
+def test_ooxml_malicious_main_part_xml_is_rejected_safely(tmp_path):
+    payload = tmp_path / "entity.docx"
+    make_ooxml(payload)
+    rewrite_ooxml_entry(
+        payload,
+        "word/document.xml",
+        b'<!DOCTYPE x [<!ENTITY secret SYSTEM "file:///etc/passwd">]><x>&secret;</x>',
+    )
+    with pytest.raises(UnsupportedFileType):
+        FileValidator().inspect(payload, "entity.docx", DOCX_MIME)
+
+
+def test_ooxml_relationship_must_target_expected_main_document(tmp_path):
+    payload = tmp_path / "wrong-relationship.xlsx"
+    make_ooxml(payload, spreadsheet=True)
+    rewrite_ooxml_entry(
+        payload,
+        "_rels/.rels",
+        b'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        b'<Relationship Id="rId1" '
+        b'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" '
+        b'Target="word/document.xml" TargetMode="External"/></Relationships>',
+    )
+    with pytest.raises(UnsupportedFileType):
+        FileValidator().inspect(payload, "wrong-relationship.xlsx", XLSX_MIME)
+
+
+def test_ooxml_prefixed_nested_zip_is_rejected(tmp_path):
+    payload = tmp_path / "prefixed-nested.docx"
+    make_ooxml(payload)
+    nested = io.BytesIO()
+    with zipfile.ZipFile(nested, "w") as archive:
+        archive.writestr("payload", "bad")
+    with zipfile.ZipFile(payload, "a") as archive:
+        archive.writestr("nested.bin", b"MZ" + b"\x00" * 30 + nested.getvalue())
+    with pytest.raises(UnsupportedFileType, match="nested"):
+        FileValidator().inspect(payload, "prefixed-nested.docx", DOCX_MIME)
+
+
+@pytest.mark.parametrize("compression", [zipfile.ZIP_DEFLATED, zipfile.ZIP_BZIP2])
+def test_ooxml_truncated_compressed_entry_is_controlled_415(tmp_path, compression):
+    payload = tmp_path / "truncated-entry.docx"
+    make_ooxml(payload)
+    with zipfile.ZipFile(payload) as archive:
+        entries = [(entry.filename, archive.read(entry)) for entry in archive.infolist()]
+    with zipfile.ZipFile(payload, "w", compression=compression) as archive:
+        for name, content in entries:
+            archive.writestr(name, content)
+    with zipfile.ZipFile(payload) as archive:
+        entry = archive.getinfo("word/document.xml")
+        with payload.open("rb") as source:
+            source.seek(entry.header_offset)
+            header = source.read(30)
+        name_length = int.from_bytes(header[26:28], "little")
+        extra_length = int.from_bytes(header[28:30], "little")
+        data_offset = entry.header_offset + 30 + name_length + extra_length
+    corrupted = bytearray(payload.read_bytes())
+    corrupted[data_offset : data_offset + entry.compress_size] = (
+        b"\x00" * entry.compress_size
+    )
+    payload.write_bytes(corrupted)
+    with pytest.raises(UnsupportedFileType):
+        FileValidator().inspect(payload, "truncated-entry.docx", DOCX_MIME)
+
+
+@pytest.mark.parametrize("prefix", [b"\xef\xbb\xbf", b" \t"])
+def test_shebang_with_bom_or_leading_whitespace_is_rejected(tmp_path, prefix):
+    payload = tmp_path / "script.txt"
+    payload.write_bytes(prefix + b"#!/bin/sh\necho unsafe")
+    with pytest.raises(UnsupportedFileType):
+        FileValidator().inspect(payload, "script.txt", "text/plain")
 
 
 def test_ole_word_and_excel_structures_cannot_be_swapped(tmp_path):

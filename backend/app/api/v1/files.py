@@ -1,14 +1,15 @@
+import os
 from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, Query, Request, Response, UploadFile
-from fastapi.responses import FileResponse as StarletteFileResponse
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.api.v1.deps import Principal, get_principal, require_csrf
 from app.core.database import get_db
 from app.schemas.files import FilePage, FileResponse
-from app.services.file_validation import content_disposition
+from app.services.file_validation import CHUNK_SIZE, content_disposition
 from app.services.files import FileService
 
 router = APIRouter(prefix="/api/v1", tags=["files"])
@@ -16,6 +17,14 @@ router = APIRouter(prefix="/api/v1", tags=["files"])
 
 def _service(request: Request, db: Session, principal: Principal) -> FileService:
     return FileService(db, principal.user, request.state.request_id)
+
+
+def _descriptor_chunks(descriptor: int):
+    try:
+        while chunk := os.read(descriptor, CHUNK_SIZE):
+            yield chunk
+    finally:
+        os.close(descriptor)
 
 
 @router.get(
@@ -81,20 +90,21 @@ def get_file(
     return _service(request, db, principal).get(str(file_id))
 
 
-@router.get("/files/{file_id}/download", response_class=StarletteFileResponse)
+@router.get("/files/{file_id}/download", response_class=StreamingResponse)
 def download_file(
     request: Request,
     file_id: UUID,
     db: Annotated[Session, Depends(get_db)],
     principal: Annotated[Principal, Depends(get_principal)],
-) -> StarletteFileResponse:
+) -> StreamingResponse:
     downloaded = _service(request, db, principal).download(str(file_id))
-    return StarletteFileResponse(
-        downloaded.path,
+    return StreamingResponse(
+        _descriptor_chunks(downloaded.descriptor),
         media_type=downloaded.mime_type,
         headers={
             "Content-Disposition": content_disposition(downloaded.original_filename),
             "X-Content-Type-Options": "nosniff",
+            "Content-Length": str(downloaded.size_bytes),
         },
     )
 

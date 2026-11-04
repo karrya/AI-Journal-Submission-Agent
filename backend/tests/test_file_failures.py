@@ -1,7 +1,9 @@
 import io
 import json
+import os
 import threading
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from uuid import UUID, uuid4
 
 import pytest
@@ -170,6 +172,32 @@ def test_certain_rollback_removes_formal_file_only_after_absence_is_confirmed(
     assert not (test_storage_root / "reconciliation.jsonl").exists()
 
 
+def test_temporary_unlink_failure_does_not_skip_certain_formal_compensation(
+    db_session, test_storage_root, manuscript, operator, monkeypatch
+):
+    service = direct_service(db_session, operator, test_storage_root)
+    original_move = service.storage.move_into_place
+    original_unlink = Path.unlink
+    moved = []
+
+    def move_then_fail(temporary, relative):
+        moved.append(original_move(temporary, relative))
+        raise OSError("move failed after replacement")
+
+    def fail_only_temp_unlink(path, *args, **kwargs):
+        if path.suffix == ".part":
+            raise OSError("temporary cleanup failed with sensitive path")
+        return original_unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr(service.storage, "move_into_place", move_then_fail)
+    monkeypatch.setattr(Path, "unlink", fail_only_temp_unlink)
+    with pytest.raises(OSError, match="move failed after replacement"):
+        upload_direct(service, manuscript)
+    assert len(moved) == 1
+    assert not moved[0].exists()
+    assert db_session.scalar(select(func.count()).select_from(ManuscriptFile)) == 0
+
+
 def test_failed_move_never_deletes_a_preexisting_formal_file(
     db_session, test_storage_root, manuscript, operator, monkeypatch
 ):
@@ -233,6 +261,40 @@ def test_unknown_commit_outcome_preserves_file_and_appends_manifest(
         assert entries[-1]["file_id"] == record.id
         assert entries[-1]["relative_path"] == record.storage_path
         assert entries[-1]["sha256"] == record.sha256
+
+
+def test_manifest_append_failure_emits_sanitized_log_and_retains_file(
+    db_session,
+    test_storage_root,
+    manuscript,
+    operator,
+    monkeypatch,
+    caplog,
+):
+    service = direct_service(db_session, operator, test_storage_root)
+    original_commit = db_session.commit
+
+    def commit_then_disconnect():
+        original_commit()
+        raise ConnectionError("commit outcome unknown")
+
+    def fail_manifest(**kwargs):
+        raise OSError("/secret/absolute/reconciliation-path")
+
+    monkeypatch.setattr(db_session, "commit", commit_then_disconnect)
+    monkeypatch.setattr(service.storage, "append_reconciliation", fail_manifest)
+    with caplog.at_level("ERROR", logger="app.services.files"):
+        with pytest.raises(ConnectionError, match="commit outcome unknown"):
+            upload_direct(service, manuscript)
+    record = db_session.scalar(select(ManuscriptFile))
+    assert record is not None
+    assert (test_storage_root / record.storage_path).read_bytes() == PDF
+    assert not (test_storage_root / "reconciliation.jsonl").exists()
+    assert "Reconciliation manifest append failed" in caplog.text
+    assert record.id in caplog.text and "unknown_commit" in caplog.text
+    assert str(test_storage_root) not in caplog.text
+    assert record.storage_path not in caplog.text
+    assert "/secret/absolute/reconciliation-path" not in caplog.text
 
 
 def test_unknown_rollback_outcome_never_deletes_uncertain_formal_file(
@@ -302,6 +364,31 @@ def test_download_rejects_database_path_traversal_without_touching_outside_file(
     assert response.status_code == 409
     assert outside.read_bytes() == PDF
     assert str(test_storage_root) not in response.text
+
+
+def test_download_replacement_after_validation_cannot_serve_unvalidated_bytes(
+    client, db_session, test_storage_root, manuscript, monkeypatch
+):
+    uploaded = post_pdf(client, manuscript).json()
+    record = db_session.get(ManuscriptFile, uploaded["id"])
+    formal = test_storage_root / record.storage_path
+    db_session.commit()
+    original_download = FileService.download
+
+    def replace_after_validation(service, file_id):
+        downloaded = original_download(service, file_id)
+        replacement = formal.with_suffix(".replacement")
+        replacement.write_bytes(SECOND_PDF)
+        os.replace(replacement, formal)
+        return downloaded
+
+    monkeypatch.setattr(FileService, "download", replace_after_validation)
+    response = client.get(f"/api/v1/files/{uploaded['id']}/download")
+    assert response.status_code == 200
+    assert response.content == PDF
+    assert formal.read_bytes() == SECOND_PDF
+    monkeypatch.undo()
+    assert client.get(f"/api/v1/files/{uploaded['id']}/download").status_code == 409
 
 
 def test_reconcile_marks_missing_and_reports_but_never_deletes_orphans(

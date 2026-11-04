@@ -176,16 +176,27 @@ class FileValidator:
         decoder = codecs.getincrementaldecoder("utf-8-sig")(errors="strict")
         carry = b""
         at_document_start = True
+        bom_checked = False
+        shebang_candidate = b""
         try:
             with path.open("rb") as source:
                 while chunk := source.read(CHUNK_SIZE):
                     decoder.decode(chunk)
                     scanned = carry + chunk
                     if at_document_start:
-                        candidate = scanned.removeprefix(b"\xef\xbb\xbf").lstrip()
-                        if candidate.startswith(b"#!"):
-                            raise UnsupportedFileType()
-                        at_document_start = not candidate
+                        probe = chunk
+                        if not bom_checked:
+                            probe = probe.removeprefix(b"\xef\xbb\xbf")
+                            bom_checked = True
+                        for byte in probe:
+                            if not shebang_candidate and byte in b" \t\r\n\v\f":
+                                continue
+                            shebang_candidate += bytes((byte,))
+                            if shebang_candidate == b"#!":
+                                raise UnsupportedFileType()
+                            if len(shebang_candidate) >= 2 or shebang_candidate != b"#":
+                                at_document_start = False
+                                break
                     if b"\x00" in chunk or _ACTIVE_TEXT.search(scanned):
                         raise UnsupportedFileType()
                     carry = scanned[-64:]
@@ -327,7 +338,9 @@ class FileValidator:
                 overrides = [
                     element
                     for element in content_types.iter()
-                    if element.tag.rsplit("}", 1)[-1] == "Override"
+                    if element.tag == (
+                        "{http://schemas.openxmlformats.org/package/2006/content-types}Override"
+                    )
                     and element.attrib.get("PartName") == f"/{required_main}"
                     and element.attrib.get("ContentType") == expected_main_mime
                 ]
@@ -344,7 +357,10 @@ class FileValidator:
                     raise UnsupportedFileType()
                 matching_relationships = []
                 for relationship in relationships:
-                    if relationship.tag.rsplit("}", 1)[-1] != "Relationship":
+                    if relationship.tag != (
+                        "{http://schemas.openxmlformats.org/package/2006/relationships}"
+                        "Relationship"
+                    ):
                         continue
                     target = relationship.attrib.get("Target", "")
                     normalized_target = target.lstrip("/")

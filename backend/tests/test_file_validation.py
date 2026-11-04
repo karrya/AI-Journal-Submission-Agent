@@ -295,6 +295,36 @@ def test_ooxml_relationship_must_target_expected_main_document(tmp_path):
         FileValidator().inspect(payload, "wrong-relationship.xlsx", XLSX_MIME)
 
 
+def test_ooxml_foreign_namespace_override_is_rejected(tmp_path):
+    payload = tmp_path / "foreign-override.docx"
+    make_ooxml(payload)
+    rewrite_ooxml_entry(
+        payload,
+        "[Content_Types].xml",
+        b'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types" '
+        b'xmlns:evil="urn:evil"><evil:Override PartName="/word/document.xml" '
+        b'ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
+        b'</Types>',
+    )
+    with pytest.raises(UnsupportedFileType):
+        FileValidator().inspect(payload, "foreign-override.docx", DOCX_MIME)
+
+
+def test_ooxml_foreign_namespace_relationship_is_rejected(tmp_path):
+    payload = tmp_path / "foreign-relationship.docx"
+    make_ooxml(payload)
+    rewrite_ooxml_entry(
+        payload,
+        "_rels/.rels",
+        b'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships" '
+        b'xmlns:evil="urn:evil"><evil:Relationship Id="rId1" '
+        b'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" '
+        b'Target="word/document.xml"/></Relationships>',
+    )
+    with pytest.raises(UnsupportedFileType):
+        FileValidator().inspect(payload, "foreign-relationship.docx", DOCX_MIME)
+
+
 def test_ooxml_prefixed_nested_zip_is_rejected(tmp_path):
     payload = tmp_path / "prefixed-nested.docx"
     make_ooxml(payload)
@@ -339,6 +369,13 @@ def test_shebang_with_bom_or_leading_whitespace_is_rejected(tmp_path, prefix):
     payload.write_bytes(prefix + b"#!/bin/sh\necho unsafe")
     with pytest.raises(UnsupportedFileType):
         FileValidator().inspect(payload, "script.txt", "text/plain")
+
+
+def test_shebang_split_exactly_at_chunk_boundary_is_rejected(tmp_path):
+    payload = tmp_path / "boundary-script.txt"
+    payload.write_bytes(b" " * (1024 * 1024 - 1) + b"#!/bin/sh\necho unsafe")
+    with pytest.raises(UnsupportedFileType):
+        FileValidator().inspect(payload, "boundary-script.txt", "text/plain")
 
 
 def test_ole_word_and_excel_structures_cannot_be_swapped(tmp_path):

@@ -2,8 +2,9 @@
 
 Backups contain a consistent MySQL dump, manuscript storage, `.env.example`, and a
 SHA-256 manifest. The real `.env`, plaintext passwords, reusable cookies, and
-`auth_sessions` contents are excluded. Alembic recreates the empty session table
-during restore. Tar bytes are streamed directly into `age`; only an encrypted
+`auth_sessions` contents are excluded. Restore recreates only that excluded table
+from current model metadata, empty and without changing migration history, before
+Alembic verification. Tar bytes are streamed directly into `age`; only an encrypted
 `.tar.age` file is published, after its `.partial` file succeeds completely.
 
 ## Prerequisites
@@ -79,3 +80,10 @@ requires the fixed restore database to exist already. Alternatively, set
 administrative connection only to create the fixed `_test` database if absent,
 reject a non-empty one, and grant the existing test account access to it. It never
 creates, grants on, imports into, or overwrites the development database.
+
+When development storage is empty, the proof creates one exclusively named,
+clearly labeled temporary text file so the real run verifies a non-zero storage
+file count and hash. It refuses non-empty development storage, never overwrites an
+existing path, removes only its own proof file, and removes a storage root only if
+the proof created it. The encrypted backup retains the verified proof copy after
+the development file is cleaned.

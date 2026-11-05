@@ -266,7 +266,22 @@ def _run_mysql_restore(
         raise RestoreFailed("isolated database import failed")
 
 
+def _recreate_excluded_tables(engine: Engine) -> None:
+    """Recreate only intentionally omitted tables, without stamping revisions."""
+    sys.path.insert(0, str(BACKEND_DIR))
+    from app.models import Base
+
+    Base.metadata.tables["auth_sessions"].create(bind=engine, checkfirst=True)
+
+
 def _run_alembic(database_url: str) -> None:
+    engine = _create_engine(database_url)
+    try:
+        _recreate_excluded_tables(engine)
+    except Exception as exc:
+        raise RestoreFailed("Alembic verification failed") from exc
+    finally:
+        engine.dispose()
     environment = os.environ.copy()
     environment["ALEMBIC_DATABASE_URL"] = database_url
     for arguments in (("upgrade", "head"), ("check",)):

@@ -9,16 +9,19 @@ import tarfile
 from pathlib import Path
 
 import pytest
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.engine import make_url
 
 from scripts.backup import BackupFailed, create_backup
 from scripts.restore import (
     RestoreFailed,
+    _recreate_excluded_tables,
     extract_verified_backup,
     restore_backup,
     validate_age_key_file,
     validate_restore_target,
 )
+from scripts.test_backup_restore import _temporary_proof_file
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 UNIT_PASSWORD = "unit-only-password"
@@ -387,6 +390,47 @@ def test_restore_rejects_nonempty_database_before_reading_backup(tmp_path):
 
     assert target.tables == {"authors": 1}
     assert not (tmp_path / "restored-storage").exists()
+
+
+def test_alembic_recreation_creates_only_excluded_empty_session_table():
+    engine = create_engine("sqlite:///:memory:")
+    try:
+        _recreate_excluded_tables(engine)
+        assert inspect(engine).get_table_names() == ["auth_sessions"]
+        indexes = {
+            index["name"] for index in inspect(engine).get_indexes("auth_sessions")
+        }
+        assert indexes == {
+            "ix_auth_sessions_absolute_expires",
+            "ix_auth_sessions_user_revoked",
+        }
+        with engine.connect() as connection:
+            assert connection.scalar(text("SELECT COUNT(*) FROM auth_sessions")) == 0
+    finally:
+        engine.dispose()
+
+
+def test_temporary_proof_file_is_exclusive_and_fully_cleaned(tmp_path):
+    storage = tmp_path / "storage"
+    with _temporary_proof_file(storage) as proof:
+        assert proof.name.startswith(".backup-01-temporary-proof-")
+        assert "BACKUP-01 temporary proof" in proof.read_text(encoding="utf-8")
+        assert storage.is_dir()
+    assert not storage.exists()
+
+
+def test_temporary_proof_file_preserves_existing_storage_content(tmp_path):
+    storage = tmp_path / "storage"
+    storage.mkdir()
+    existing = storage / "existing.pdf"
+    existing.write_bytes(b"pre-existing content")
+
+    with pytest.raises(RuntimeError, match="not empty"):
+        with _temporary_proof_file(storage):
+            pass
+
+    assert existing.read_bytes() == b"pre-existing content"
+    assert list(storage.iterdir()) == [existing]
 
 
 def test_restore_compares_database_files_hashes_and_source_snapshot(

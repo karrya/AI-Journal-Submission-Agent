@@ -9,6 +9,9 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import uuid
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -59,6 +62,44 @@ def _require_application_stopped() -> None:
         )
         if result.returncode == 0:
             raise RuntimeError("stop application writes before BACKUP-01")
+
+
+@contextmanager
+def _temporary_proof_file(storage: Path) -> Iterator[Path]:
+    """Add one exclusive proof file only to empty storage, then remove it."""
+    if storage.is_symlink():
+        raise RuntimeError("development storage must not be a symlink")
+    created_root = not storage.exists()
+    if created_root:
+        storage.mkdir(parents=True)
+    elif not storage.is_dir():
+        raise RuntimeError("development storage is not a directory")
+    elif any(storage.iterdir()):
+        raise RuntimeError("development storage is not empty; proof file not created")
+
+    proof = storage / f".backup-01-temporary-proof-{uuid.uuid4().hex}.txt"
+    descriptor: int | None = None
+    identity: tuple[int, int] | None = None
+    try:
+        descriptor = os.open(proof, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        stat = os.fstat(descriptor)
+        identity = (stat.st_dev, stat.st_ino)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as output:
+            descriptor = None
+            output.write("BACKUP-01 temporary proof file; delete after verification.\n")
+            output.flush()
+            os.fsync(output.fileno())
+        yield proof
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+        if identity is not None:
+            current = proof.lstat()
+            if (current.st_dev, current.st_ino) != identity:
+                raise RuntimeError("temporary proof file changed during BACKUP-01")
+            proof.unlink()
+        if created_root:
+            storage.rmdir()
 
 
 def _storage_snapshot(storage: Path) -> dict[str, str]:
@@ -151,25 +192,26 @@ def main() -> None:
 
     try:
         before = _development_snapshot(source_url, storage)
-        archive = create_backup(
-            PROJECT_ROOT / "backups",
-            writes_stopped=True,
-            recipient=recipient,
-            database_url=source_url,
-            storage_root=storage,
-            config_example=PROJECT_ROOT / ".env.example",
-        )
-        print(f"Encrypted backup created: {archive}")
         restore_parent = Path(tempfile.mkdtemp(prefix="academic-agent-restore-proof-"))
         try:
-            verification = restore_backup(
-                archive,
-                source_url,
-                target_url,
-                restore_parent / "storage",
-                confirmation="RESTORE",
-                age_secret_key_file=key_file,
-            )
+            with _temporary_proof_file(storage):
+                archive = create_backup(
+                    PROJECT_ROOT / "backups",
+                    writes_stopped=True,
+                    recipient=recipient,
+                    database_url=source_url,
+                    storage_root=storage,
+                    config_example=PROJECT_ROOT / ".env.example",
+                )
+                print(f"Encrypted backup created: {archive}")
+                verification = restore_backup(
+                    archive,
+                    source_url,
+                    target_url,
+                    restore_parent / "storage",
+                    confirmation="RESTORE",
+                    age_secret_key_file=key_file,
+                )
             after = _development_snapshot(source_url, storage)
             if after != before:
                 raise RuntimeError("development data changed during BACKUP-01")
@@ -191,6 +233,7 @@ def main() -> None:
                         "restored_file_count": verification.file_count,
                         "verified_manifest_hashes": verification.verified_hash_count,
                         "development_unchanged": after == before,
+                        "temporary_proof_file_cleaned": True,
                         "isolated_restore_directory_removed": True,
                     },
                     sort_keys=True,

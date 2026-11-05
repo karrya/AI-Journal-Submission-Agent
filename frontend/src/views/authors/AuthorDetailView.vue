@@ -52,6 +52,7 @@ const showAffiliationForm = ref(false)
 const affiliationBusy = ref(false)
 const affiliationError = ref('')
 const institutionOptions = ref<InstitutionSummaryResponse[]>([])
+const institutionOptionsLoaded = ref(false)
 const showAuthorForm = ref(false)
 const authorBusy = ref(false)
 const authorMutationError = ref('')
@@ -247,7 +248,7 @@ async function openAffiliationForm(link?: AuthorInstitutionLinkResponse): Promis
   editingLink.value = link ?? null
   deletingLinkId.value = null
   affiliationError.value = ''
-  if (institutionOptions.value.length > 0) {
+  if (institutionOptionsLoaded.value) {
     preserveCurrentInstitution(link)
     return
   }
@@ -255,10 +256,12 @@ async function openAffiliationForm(link?: AuthorInstitutionLinkResponse): Promis
     const options = await listAllInstitutions()
     if (!isCurrent(sequence, authorId) || !canManage.value) return
     institutionOptions.value = options
+    institutionOptionsLoaded.value = true
     preserveCurrentInstitution(link)
   } catch (error) {
     if (!isCurrent(sequence, authorId)) return
     institutionOptions.value = []
+    institutionOptionsLoaded.value = false
     preserveCurrentInstitution(link)
     affiliationError.value = safeError(error, 'Unable to load institution choices.')
   }
@@ -382,11 +385,12 @@ watch([() => props.authorId, effectivePermissions], () => void load(), { immedia
       <h2 id="email-title">Emails</h2>
       <p v-if="emailMessage" role="status">{{ emailMessage }}</p>
       <EmailTable
-        v-if="canReadEmails && !emailMessage"
+        v-if="canReadEmails"
         :key="`${authorId}-${emailTableKey}`"
         :emails="emails"
         :can-manage="canManage"
         :busy="emailBusy"
+        :suppress-empty-state="Boolean(emailMessage)"
         @create="createEmailBinding"
         @update="updateEmailBinding"
         @delete="deleteEmailBinding"

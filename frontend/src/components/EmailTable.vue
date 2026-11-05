@@ -6,9 +6,11 @@ const props = withDefaults(defineProps<{
   emails: EmailResponse[]
   canManage?: boolean
   busy?: boolean
+  suppressEmptyState?: boolean
 }>(), {
   canManage: false,
   busy: false,
+  suppressEmptyState: false,
 })
 
 const emit = defineEmits<{
@@ -119,7 +121,7 @@ function remove(emailId: string): void {
 <template>
   <div class="email-table">
     <p v-if="errorMessage" class="form-error" role="alert">{{ errorMessage }}</p>
-    <p v-if="emails.length === 0">No emails.</p>
+    <p v-if="emails.length === 0 && !suppressEmptyState">No emails.</p>
     <table v-else>
       <thead><tr><th>Email</th><th>Purpose</th><th>Primary</th><th>Verification</th><th>Authorization</th><th v-if="canManage">Actions</th></tr></thead>
       <tbody>

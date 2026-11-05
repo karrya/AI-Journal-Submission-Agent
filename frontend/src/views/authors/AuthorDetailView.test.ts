@@ -450,6 +450,69 @@ describe('AuthorDetailView', () => {
     expect(select.text()).toContain('Current Missing Institution')
   })
 
+  it('keeps existing emails and management controls available for retry after a rejected mutation', async () => {
+    let updateAttempts = 0
+    adapter.mockImplementation(async (config) => {
+      if (config.url === '/authors/a1') return success(config, author('a1', 'Retry Author'))
+      if (config.url === '/authors/a1/emails' && config.method === 'get') {
+        return success(config, { ...emptyPage, items: [emailRecord()], total: 1 })
+      }
+      if (config.url === '/authors/a1/emails/e1' && config.method === 'patch') {
+        updateAttempts += 1
+        if (updateAttempts === 1) throw new Error('Transient update failure')
+        return success(config, emailRecord())
+      }
+      if (config.url === '/authors/a1/institutions') return success(config, emptyPage)
+      throw new Error(`Unexpected request: ${config.method} ${config.url}`)
+    })
+    const wrapper = mount(AuthorDetailView, { global: { stubs }, props: { authorId: 'a1' } })
+    await flushPromises()
+    await wrapper.get('[data-test="edit-email-e1"]').trigger('click')
+    await wrapper.get('[data-test="edit-email-confirm"]').setValue(true)
+    await wrapper.get('[data-test="edit-email-form"]').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Unable to update the email binding')
+    expect(wrapper.text()).toContain(address('author'))
+    expect(wrapper.find('[data-test="edit-email-e1"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="edit-email-form"]').exists()).toBe(true)
+
+    await wrapper.get('[data-test="edit-email-form"]').trigger('submit')
+    await flushPromises()
+    expect(updateAttempts).toBe(2)
+    expect(wrapper.text()).toContain(address('author'))
+  })
+
+  it('retries institution option loading after a preserved-fallback failure', async () => {
+    let optionAttempts = 0
+    const currentLink = { ...linkRecord(), institution_id: 'missing-i', institution_name: 'Current Missing Institution' }
+    adapter.mockImplementation(async (config) => {
+      if (config.url === '/authors/a1') return success(config, author('a1', 'Selector Author'))
+      if (config.url === '/authors/a1/emails') return success(config, emptyPage)
+      if (config.url === '/authors/a1/institutions') return success(config, { ...emptyPage, items: [currentLink], total: 1 })
+      if (config.url === '/institutions') {
+        optionAttempts += 1
+        if (optionAttempts === 1) throw new Error('Temporary selector failure')
+        return success(config, { items: [{ id: 'i1', name: 'Recovered Institution' }], page: 1, page_size: 100, total: 1 })
+      }
+      throw new Error(`Unexpected request: ${config.method} ${config.url}`)
+    })
+    const wrapper = mount(AuthorDetailView, { global: { stubs }, props: { authorId: 'a1' } })
+    await flushPromises()
+    await wrapper.get('[data-test="edit-affiliation-l1"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('Unable to load institution choices')
+    expect((wrapper.get('[data-test="institution-select"]').element as HTMLSelectElement).value).toBe('missing-i')
+
+    await wrapper.get('form[data-test="affiliation-form"] button[type="button"]').trigger('click')
+    await wrapper.get('[data-test="edit-affiliation-l1"]').trigger('click')
+    await flushPromises()
+
+    expect(optionAttempts).toBe(2)
+    expect(wrapper.get('[data-test="institution-select"]').find('option[value="i1"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('Recovered Institution')
+  })
+
   it('rechecks manage permission for emitted email mutations after access is lost', async () => {
     adapter.mockImplementation(async (config) => {
       if (config.url === '/authors/a1') return success(config, author('a1', 'Permission Author'))

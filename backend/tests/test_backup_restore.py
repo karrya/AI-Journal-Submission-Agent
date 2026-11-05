@@ -520,7 +520,13 @@ def test_exact_parser_differential_is_rejected_at_set_statement(tmp_path, age_id
 
 def test_subprocess_failure_diagnostics_are_sanitized(tmp_path, monkeypatch):
     canary = "test-only-environment-canary"
+    database_url_canary = (
+        "mysql+pymysql://round3-user:round3-password@db.invalid/round3_test"
+    )
+    token_canary = "round3-test-only-token-canary-7f3c9a"
     monkeypatch.setenv("TASK_16_SECRET_CANARY", canary)
+    monkeypatch.setenv("TASK_16_DATABASE_URL_CANARY", database_url_canary)
+    monkeypatch.setenv("TASK_16_TOKEN_CANARY", token_canary)
     executable = tmp_path / "failing-mysql.py"
     executable.write_text(
         "#!/usr/bin/env python3\nimport sys; sys.stdin.buffer.read(); sys.exit(1)",
@@ -538,6 +544,8 @@ def test_subprocess_failure_diagnostics_are_sanitized(tmp_path, monkeypatch):
         _run_mysql_restore(command, environment, dump)
     diagnostics = "".join(traceback.format_exception(exc_info.value))
     assert canary not in diagnostics
+    assert database_url_canary not in diagnostics
+    assert token_canary not in diagnostics
     assert "target-unit-password" not in diagnostics
     assert "MYSQL_PWD" not in diagnostics
     assert "AGE_SECRET_KEY_FILE" not in diagnostics

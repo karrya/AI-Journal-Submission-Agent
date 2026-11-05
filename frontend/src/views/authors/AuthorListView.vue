@@ -22,6 +22,7 @@ import {
 import { getSafeRequestId } from '../../api/client'
 import AuthorForm from '../../components/AuthorForm.vue'
 import { useAuthStore } from '../../stores/auth'
+import { safeResourceUrl } from '../../utils/url'
 
 const auth = useAuthStore()
 const isAdmin = computed(() => auth.user?.roles.includes('system_admin') ?? false)
@@ -210,9 +211,14 @@ async function saveInstitution(): Promise<void> {
     institutionError.value = 'Institution name is required.'
     return
   }
+  const websiteUrl = nullable(institutionForm.website_url)
+  if (websiteUrl && !safeResourceUrl(websiteUrl)) {
+    institutionError.value = 'Website URLs must use HTTPS or approved local HTTP without user information.'
+    return
+  }
   const fields = {
     institution_type: nullable(institutionForm.institution_type),
-    website_url: nullable(institutionForm.website_url),
+    website_url: websiteUrl,
     country_code: nullable(institutionForm.country_code)?.toUpperCase() ?? null,
     city: nullable(institutionForm.city),
   }
@@ -281,7 +287,7 @@ onMounted(() => void loadAuthors())
       <p v-if="authorError" class="form-error" role="alert">{{ authorError }}</p>
       <AuthorForm v-if="showAuthorForm" data-test="author-create-form" :submitting="authorBusy" @submit="saveAuthor" @cancel="showAuthorForm = false" />
       <p v-if="authorLoading">Loading authors…</p>
-      <p v-else-if="authors.length === 0">No authors found.</p>
+      <p v-else-if="!authorError && authors.length === 0">No authors found.</p>
       <table v-else>
         <thead><tr><th>Display name</th><th>ORCID</th><th>Status</th><th>Actions</th></tr></thead>
         <tbody><tr v-for="author in authors" :key="author.id">
@@ -327,12 +333,12 @@ onMounted(() => void loadAuthors())
         <button type="button" @click="showInstitutionForm = false">Cancel</button>
       </form>
       <p v-if="institutionLoading">Loading institutions…</p>
-      <p v-else-if="institutions.length === 0">No institutions found.</p>
+      <p v-else-if="!institutionError && institutions.length === 0">No institutions found.</p>
       <table v-else>
         <thead><tr><th>Name</th><th>Type</th><th>City</th><th>Country</th><th>Website</th><th v-if="isAdmin">Actions</th></tr></thead>
         <tbody><tr v-for="institution in institutions" :key="institution.id">
           <td>{{ institution.name }}</td><td>{{ institution.institution_type ?? '—' }}</td><td>{{ institution.city ?? '—' }}</td><td>{{ institution.country_code ?? '—' }}</td>
-          <td><a v-if="institution.website_url" :href="institution.website_url" rel="noopener noreferrer" target="_blank">Website</a><span v-else>—</span></td>
+          <td><template v-if="institution.website_url"><a v-if="safeResourceUrl(institution.website_url)" :href="safeResourceUrl(institution.website_url) ?? undefined" rel="noopener noreferrer" target="_blank">Website</a><span v-else>{{ institution.website_url }}</span></template><span v-else>—</span></td>
           <td v-if="isAdmin"><button type="button" :data-test="`edit-institution-${institution.id}`" @click="openInstitutionForm(institution)">Edit</button><button type="button" :data-test="`delete-institution-${institution.id}`" @click="requestInstitutionDelete(institution.id)">Delete</button></td>
         </tr></tbody>
       </table>

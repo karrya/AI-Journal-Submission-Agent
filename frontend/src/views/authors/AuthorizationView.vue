@@ -251,7 +251,7 @@ watch(() => props.authorId, () => {
     </section>
 
     <p v-if="loading">Loading authorizations…</p>
-    <p v-else-if="items.length === 0">No authorizations found.</p>
+    <p v-else-if="!errorMessage && items.length === 0">No authorizations found.</p>
     <table v-else>
       <thead><tr><th>Author ID</th><th>User ID</th><th>Permissions</th><th>Valid from</th><th>Valid to</th><th>Status</th><th v-if="isAdmin">Actions</th></tr></thead>
       <tbody><tr v-for="authorization in items" :key="authorization.id">

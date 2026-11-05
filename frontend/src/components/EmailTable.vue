@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { reactive, ref, watch } from 'vue'
 import type { EmailCreate, EmailResponse, EmailUpdate } from '../api/authors'
 
-withDefaults(defineProps<{
+const props = withDefaults(defineProps<{
   emails: EmailResponse[]
   canManage?: boolean
   busy?: boolean
@@ -34,7 +34,18 @@ const deletingId = ref<string | null>(null)
 const deleteConfirmed = ref(false)
 const errorMessage = ref('')
 
+watch(() => props.canManage, (allowed) => {
+  if (allowed) return
+  editingId.value = null
+  deletingId.value = null
+  deleteConfirmed.value = false
+  createForm.confirm = false
+  editForm.confirm = false
+  errorMessage.value = ''
+})
+
 function create(): void {
+  if (!props.canManage) return
   errorMessage.value = ''
   if (!createForm.email.trim()) {
     errorMessage.value = 'Email address is required.'
@@ -53,6 +64,7 @@ function create(): void {
 }
 
 function startEdit(email: EmailResponse): void {
+  if (!props.canManage) return
   editingId.value = email.id
   deletingId.value = null
   Object.assign(editForm, {
@@ -65,7 +77,7 @@ function startEdit(email: EmailResponse): void {
 }
 
 function update(): void {
-  if (!editingId.value) return
+  if (!props.canManage || !editingId.value) return
   errorMessage.value = ''
   if (!editForm.email.trim()) {
     errorMessage.value = 'Email address is required.'
@@ -87,6 +99,7 @@ function update(): void {
 }
 
 function startDelete(emailId: string): void {
+  if (!props.canManage) return
   deletingId.value = emailId
   editingId.value = null
   deleteConfirmed.value = false
@@ -94,6 +107,7 @@ function startDelete(emailId: string): void {
 }
 
 function remove(emailId: string): void {
+  if (!props.canManage) return
   if (!deleteConfirmed.value) {
     errorMessage.value = 'Confirm the email unbinding separately before deleting.'
     return
@@ -120,7 +134,7 @@ function remove(emailId: string): void {
       </tbody>
     </table>
 
-    <form v-if="editingId" data-test="edit-email-form" class="stacked-form" novalidate @submit.prevent="update">
+    <form v-if="canManage && editingId" data-test="edit-email-form" class="stacked-form" novalidate @submit.prevent="update">
       <h3>Change email binding</h3>
       <label>Email address<input v-model="editForm.email" data-test="edit-email-address" type="email" required></label>
       <label>Purpose<select v-model="editForm.purpose"><option value="communication">Communication</option><option value="registration">Registration</option><option value="backup">Backup</option></select></label>
@@ -130,7 +144,7 @@ function remove(emailId: string): void {
       <button type="button" @click="editingId = null">Cancel</button>
     </form>
 
-    <section v-if="deletingId" class="confirmation-panel" aria-label="Confirm email unbinding">
+    <section v-if="canManage && deletingId" class="confirmation-panel" aria-label="Confirm email unbinding">
       <p>Unbinding removes this email from the author. This requires separate confirmation.</p>
       <label class="confirmation-control"><input v-model="deleteConfirmed" data-test="delete-email-confirm" type="checkbox"> I confirm this email unbinding.</label>
       <button type="button" :data-test="`confirm-delete-${deletingId}`" @click="remove(deletingId)">Confirm unbinding</button>

@@ -1,4 +1,5 @@
 import { api } from './client'
+import { fetchAllPages } from './pagination'
 
 export const PERMISSION_CODES = [
   'manuscript:read',
@@ -305,10 +306,9 @@ export async function getAuthor(authorId: string): Promise<AuthorResponse> {
 }
 
 export async function listEmails(authorId: string): Promise<Page<EmailResponse>> {
-  const response = await api.get<Page<EmailResponse>>(`/authors/${authorId}/emails`, {
-    params: { page: 1, page_size: 100, sort: 'created_at', order: 'asc' },
-  })
-  return response.data
+  return fetchAllPages((page, pageSize) => api.get<Page<EmailResponse>>(`/authors/${authorId}/emails`, {
+    params: { page, page_size: pageSize, sort: 'created_at', order: 'asc' },
+  }).then((response) => response.data))
 }
 
 export async function createEmail(
@@ -337,11 +337,10 @@ export async function deleteEmail(authorId: string, emailId: string): Promise<vo
 export async function listAuthorInstitutions(
   authorId: string,
 ): Promise<Page<AuthorInstitutionLinkResponse>> {
-  const response = await api.get<Page<AuthorInstitutionLinkResponse>>(
+  return fetchAllPages((page, pageSize) => api.get<Page<AuthorInstitutionLinkResponse>>(
     `/authors/${authorId}/institutions`,
-    { params: { page: 1, page_size: 100, sort: 'display_order', order: 'asc' } },
-  )
-  return response.data
+    { params: { page, page_size: pageSize, sort: 'display_order', order: 'asc' } },
+  ).then((response) => response.data))
 }
 
 export async function updateAuthorInstitution(
@@ -367,6 +366,11 @@ export async function listInstitutions(
     params: { page: 1, page_size: 100, sort: 'name', order: 'asc', ...query },
   })
   return response.data
+}
+
+export async function listAllInstitutions(): Promise<InstitutionSummaryResponse[]> {
+  const result = await fetchAllPages((page, pageSize) => listInstitutions({ page, page_size: pageSize }))
+  return result.items
 }
 
 export async function createInstitution(

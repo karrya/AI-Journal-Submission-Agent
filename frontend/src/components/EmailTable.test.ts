@@ -66,4 +66,20 @@ describe('EmailTable', () => {
       confirm_email_binding: true,
     })
   })
+
+  it('resets edit and unbind panels when manage permission is lost', async () => {
+    const wrapper = mount(EmailTable, { props: { emails: [email], canManage: true } })
+    await wrapper.get('[data-test="edit-email-e1"]').trigger('click')
+    expect(wrapper.find('[data-test="edit-email-form"]').exists()).toBe(true)
+
+    await wrapper.setProps({ canManage: false })
+    expect(wrapper.find('[data-test="edit-email-form"]').exists()).toBe(false)
+
+    await wrapper.setProps({ canManage: true })
+    await wrapper.get('[data-test="delete-email-e1"]').trigger('click')
+    expect(wrapper.find('[data-test="delete-email-confirm"]').exists()).toBe(true)
+    await wrapper.setProps({ canManage: false })
+    expect(wrapper.find('[data-test="delete-email-confirm"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="create-email-form"]').exists()).toBe(false)
+  })
 })

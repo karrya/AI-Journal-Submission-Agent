@@ -22,25 +22,21 @@ describe('AuthorForm', () => {
     expect(wrapper.emitted('submit')?.[0]?.[0]).toMatchObject({ confirm_identity_change: true })
   })
 
-  it('uses an update payload without inventing absent response fields', async () => {
+  it('omits every absent response field from a minimal-response unrelated edit', async () => {
     const wrapper = mount(AuthorForm, { props: { author } })
-    await wrapper.get('[data-test="display-name"]').setValue('Updated Author')
+    await wrapper.get('select').setValue('inactive')
     await wrapper.get('[data-test="identity-confirm"]').setValue(true)
     await wrapper.get('form').trigger('submit')
 
-    const payload = wrapper.emitted('submit')?.[0]?.[0] as Record<string, unknown>
-    expect(payload).toMatchObject({
-      display_name: 'Updated Author',
+    expect(wrapper.emitted('submit')?.[0]?.[0]).toEqual({
+      display_name: 'Existing Author',
+      status: 'inactive',
       confirm_identity_change: true,
     })
-    expect(payload).not.toHaveProperty('id')
-    expect(payload).not.toHaveProperty('created_at')
-    expect(payload).not.toHaveProperty('updated_at')
-    expect(payload).not.toHaveProperty('phone_country_code')
-    expect(payload).not.toHaveProperty('phone_number')
-    expect(wrapper.text()).not.toContain('Phone country code')
+    expect(wrapper.text()).not.toContain('Given name')
+    expect(wrapper.text()).not.toContain('ORCID')
+    expect(wrapper.text()).not.toContain('Notes')
     expect(wrapper.text()).not.toContain('Phone number')
-    expect(wrapper.text()).not.toContain('undefined')
   })
 
   it('requires a nonblank display name even when confirmed', async () => {

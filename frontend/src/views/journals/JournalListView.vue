@@ -7,6 +7,8 @@ import {
   deleteJournal,
   deletePlatform,
   deletePublisher,
+  listAllPlatforms,
+  listAllPublishers,
   listJournals,
   listPlatforms,
   listPublishers,
@@ -23,6 +25,7 @@ import {
 import type { SortOrder } from '../../api/authors'
 import { getSafeRequestId } from '../../api/client'
 import { useAuthStore } from '../../stores/auth'
+import { safeResourceUrl } from '../../utils/url'
 
 const auth = useAuthStore()
 const isAdmin = computed(() => auth.user?.roles.includes('system_admin') ?? false)
@@ -54,8 +57,8 @@ const journalLoading = ref(false)
 const journalQuery = reactive({ page: 1, page_size: 20, name: '', sort: 'name' as NonNullable<JournalListQuery['sort']>, order: 'asc' as SortOrder })
 const showJournalForm = ref(false)
 const editingJournalId = ref<string | null>(null)
-const publisherOptions = ref<PublisherResponse[]>([])
-const platformOptions = ref<JournalPlatformResponse[]>([])
+const publisherOptions = ref<Array<{ id: string; name?: string }>>([])
+const platformOptions = ref<Array<{ id: string; name?: string; code?: string }>>([])
 const journalForm = reactive({
   publisher_id: '',
   platform_id: '',
@@ -67,7 +70,7 @@ const journalForm = reactive({
   author_guidelines_url: '',
   subject_categories: '',
   article_types: '',
-  requirements: [] as Array<{ key: string; value: string; scope: string; source_url: string; verified_at: string }>,
+  requirements: [] as Array<{ key: string; value: string; value_type: 'string' | 'number' | 'boolean'; scope: string; source_url: string; verified_at: string }>,
   requirements_source_url: '',
   requirements_verified_at: '',
   status: 'active',
@@ -131,9 +134,14 @@ async function savePublisher(): Promise<void> {
     errorMessage.value = 'Publisher name is required.'
     return
   }
+  const websiteUrl = nullable(publisherForm.website_url)
+  if (websiteUrl && !safeResourceUrl(websiteUrl)) {
+    errorMessage.value = 'Website URLs must use HTTPS or approved local HTTP without user information.'
+    return
+  }
   busy.value = true
   errorMessage.value = ''
-  const payload = { name: publisherForm.name.trim(), website_url: nullable(publisherForm.website_url), notes: nullable(publisherForm.notes) }
+  const payload = { name: publisherForm.name.trim(), website_url: websiteUrl, notes: nullable(publisherForm.notes) }
   try {
     if (editingPublisherId.value) await updatePublisher(editingPublisherId.value, payload)
     else await createPublisher(payload)
@@ -255,7 +263,9 @@ async function openJournalForm(journal?: JournalResponse): Promise<void> {
     submission_url: journal?.submission_url ?? '', author_guidelines_url: journal?.author_guidelines_url ?? '',
     subject_categories: journal?.subject_categories.join(', ') ?? '', article_types: journal?.article_types.join(', ') ?? '',
     requirements: journal?.requirements.map((requirement) => ({
-      key: requirement.key, value: String(requirement.value), scope: requirement.scope,
+      key: requirement.key, value: String(requirement.value),
+      value_type: typeof requirement.value === 'number' ? 'number' : typeof requirement.value === 'boolean' ? 'boolean' : 'string',
+      scope: requirement.scope,
       source_url: requirement.source_url, verified_at: toInputDate(requirement.verified_at),
     })) ?? [],
     requirements_source_url: journal?.requirements_source_url ?? '',
@@ -265,30 +275,34 @@ async function openJournalForm(journal?: JournalResponse): Promise<void> {
   showJournalForm.value = true
   errorMessage.value = ''
   try {
-    const [publisherPage, platformPage] = await Promise.all([
-      listPublishers({ page: 1, page_size: 100, sort: 'name', order: 'asc' }),
-      listPlatforms({ page: 1, page_size: 100, sort: 'name', order: 'asc' }),
+    const [publisherItems, platformItems] = await Promise.all([
+      listAllPublishers(),
+      listAllPlatforms(),
     ])
-    publisherOptions.value = publisherPage.items
-    platformOptions.value = platformPage.items
+    const publisherChoices: Array<{ id: string; name?: string }> = [...publisherItems]
+    const platformChoices: Array<{ id: string; name?: string; code?: string }> = [...platformItems]
+    if (journal && !publisherChoices.some((option) => option.id === journal.publisher_id)) {
+      publisherChoices.unshift({ id: journal.publisher_id })
+    }
+    if (journal?.platform_id && !platformChoices.some((option) => option.id === journal.platform_id)) {
+      platformChoices.unshift({ id: journal.platform_id })
+    }
+    publisherOptions.value = publisherChoices
+    platformOptions.value = platformChoices
   } catch (error) {
-    publisherOptions.value = []
-    platformOptions.value = []
+    publisherOptions.value = journal ? [{ id: journal.publisher_id }] : []
+    platformOptions.value = journal?.platform_id ? [{ id: journal.platform_id }] : []
     errorMessage.value = safeError(error, 'Unable to load journal relationship choices.')
   }
 }
 
 function addRequirement(): void {
-  journalForm.requirements.push({ key: '', value: '', scope: '', source_url: '', verified_at: '' })
+  journalForm.requirements.push({ key: '', value: '', value_type: 'string', scope: '', source_url: '', verified_at: '' })
 }
 
 function isHttpsUrl(value: string): boolean {
-  try {
-    const url = new URL(value)
-    return url.protocol === 'https:' && Boolean(url.hostname) && !url.username && !url.password
-  } catch {
-    return false
-  }
+  const safe = safeResourceUrl(value)
+  return safe !== null && new URL(safe).protocol === 'https:'
 }
 
 function isoDate(value: string): string | null {
@@ -301,6 +315,20 @@ function commaSeparated(value: string): string[] {
   return value.split(',').map((item) => item.trim()).filter(Boolean)
 }
 
+function requirementValue(requirement: { value: string; value_type: 'string' | 'number' | 'boolean' }): string | number | boolean | null {
+  const value = requirement.value.trim()
+  if (requirement.value_type === 'number') {
+    const numeric = Number(value)
+    return value && Number.isFinite(numeric) ? numeric : null
+  }
+  if (requirement.value_type === 'boolean') {
+    if (value === 'true') return true
+    if (value === 'false') return false
+    return null
+  }
+  return value
+}
+
 async function saveJournal(): Promise<void> {
   if (busy.value) return
   errorMessage.value = ''
@@ -308,9 +336,25 @@ async function saveJournal(): Promise<void> {
     errorMessage.value = 'Publisher and journal name are required.'
     return
   }
+  for (const value of [
+    journalForm.website_url,
+    journalForm.submission_url,
+    journalForm.author_guidelines_url,
+    journalForm.requirements_source_url,
+  ]) {
+    const url = nullable(value)
+    if (url && !safeResourceUrl(url)) {
+      errorMessage.value = 'Journal URLs must use HTTPS or approved local HTTP without user information.'
+      return
+    }
+  }
   for (const requirement of journalForm.requirements) {
     if (!requirement.key.trim() || !requirement.value.trim() || !requirement.scope.trim() || !requirement.source_url.trim() || !requirement.verified_at) {
       errorMessage.value = 'Requirement key, value, scope, HTTPS source URL, and verification time are required for every row.'
+      return
+    }
+    if (requirementValue(requirement) === null) {
+      errorMessage.value = 'Requirement values must match their selected type: finite number, true/false, or text.'
       return
     }
     if (!isHttpsUrl(requirement.source_url.trim())) {
@@ -336,7 +380,7 @@ async function saveJournal(): Promise<void> {
     subject_categories: commaSeparated(journalForm.subject_categories),
     article_types: commaSeparated(journalForm.article_types),
     requirements: journalForm.requirements.map((requirement) => ({
-      key: requirement.key.trim(), value: requirement.value.trim(), scope: requirement.scope.trim(),
+      key: requirement.key.trim(), value: requirementValue(requirement) as string | number | boolean, scope: requirement.scope.trim(),
       source_url: requirement.source_url.trim(), verified_at: isoDate(requirement.verified_at) as string,
     })),
     requirements_source_url: nullable(journalForm.requirements_source_url),
@@ -412,7 +456,7 @@ onMounted(() => void loadPublishers())
   <section class="management-page" aria-labelledby="journal-resources-title">
     <h1 id="journal-resources-title">Publishers, platforms, and journals</h1>
     <div class="tabs" role="tablist" aria-label="Journal resources">
-      <button type="button" role="tab" :aria-selected="activeTab === 'publishers'" @click="selectTab('publishers')">Publishers</button>
+      <button type="button" role="tab" data-test="publishers-tab" :aria-selected="activeTab === 'publishers'" @click="selectTab('publishers')">Publishers</button>
       <button type="button" role="tab" data-test="platforms-tab" :aria-selected="activeTab === 'platforms'" @click="selectTab('platforms')">Platforms</button>
       <button type="button" role="tab" data-test="journals-tab" :aria-selected="activeTab === 'journals'" @click="selectTab('journals')">Journals</button>
     </div>
@@ -432,10 +476,10 @@ onMounted(() => void loadPublishers())
         <label>Notes<textarea v-model="publisherForm.notes" rows="3"></textarea></label>
         <button type="submit" :disabled="busy">Save publisher</button><button type="button" @click="showPublisherForm = false">Cancel</button>
       </form>
-      <p v-if="publisherLoading">Loading publishers…</p><p v-else-if="publishers.length === 0">No publishers found.</p>
+      <p v-if="publisherLoading">Loading publishers…</p><p v-else-if="!errorMessage && publishers.length === 0">No publishers found.</p>
       <table v-else>
         <thead><tr><th>Name</th><th>Website</th><th v-if="isAdmin">Actions</th></tr></thead>
-        <tbody><tr v-for="publisher in publishers" :key="publisher.id"><td>{{ publisher.name }}</td><td><a v-if="publisher.website_url" :href="publisher.website_url" target="_blank" rel="noopener noreferrer">Website</a><span v-else>—</span></td><td v-if="isAdmin"><button type="button" :data-test="`edit-publisher-${publisher.id}`" @click="openPublisherForm(publisher)">Edit</button><button type="button" :data-test="`delete-publisher-${publisher.id}`" @click="requestDelete('publisher', publisher.id)">Delete</button></td></tr></tbody>
+        <tbody><tr v-for="publisher in publishers" :key="publisher.id"><td>{{ publisher.name }}</td><td><template v-if="publisher.website_url"><a v-if="safeResourceUrl(publisher.website_url)" :href="safeResourceUrl(publisher.website_url) ?? undefined" target="_blank" rel="noopener noreferrer">Website</a><span v-else>{{ publisher.website_url }}</span></template><span v-else>—</span></td><td v-if="isAdmin"><button type="button" :data-test="`edit-publisher-${publisher.id}`" @click="openPublisherForm(publisher)">Edit</button><button type="button" :data-test="`delete-publisher-${publisher.id}`" @click="requestDelete('publisher', publisher.id)">Delete</button></td></tr></tbody>
       </table>
       <nav class="pagination" aria-label="Publisher pages"><button type="button" :disabled="publisherQuery.page === 1 || publisherLoading" @click="publisherPage(publisherQuery.page - 1)">Previous</button><span>Page {{ publisherQuery.page }} · {{ publisherTotal }} total</span><button type="button" data-test="next-publishers" :disabled="publisherQuery.page * publisherQuery.page_size >= publisherTotal || publisherLoading" @click="publisherPage(publisherQuery.page + 1)">Next</button></nav>
     </section>
@@ -455,7 +499,7 @@ onMounted(() => void loadPublishers())
         <label>Status<select v-model="platformForm.status"><option value="active">Active</option><option value="needs_review">Needs review</option><option value="disabled">Disabled</option></select></label>
         <button type="submit" :disabled="busy">Save platform</button><button type="button" @click="showPlatformForm = false">Cancel</button>
       </form>
-      <p v-if="platformLoading">Loading platforms…</p><p v-else-if="platforms.length === 0">No platforms found.</p>
+      <p v-if="platformLoading">Loading platforms…</p><p v-else-if="!errorMessage && platforms.length === 0">No platforms found.</p>
       <table v-else>
         <thead><tr><th>Code</th><th>Name</th><th>Status</th><th v-if="isAdmin">Actions</th></tr></thead>
         <tbody><tr v-for="platform in platforms" :key="platform.id"><td>{{ platform.code }}</td><td>{{ platform.name }}</td><td>{{ platform.status }}</td><td v-if="isAdmin"><button type="button" :data-test="`edit-platform-${platform.id}`" @click="openPlatformForm(platform)">Edit</button><button type="button" :data-test="`delete-platform-${platform.id}`" @click="requestDelete('platform', platform.id)">Delete</button></td></tr></tbody>
@@ -473,8 +517,8 @@ onMounted(() => void loadPublishers())
       <form v-if="showJournalForm" data-test="journal-form" class="stacked-form" novalidate @submit.prevent="saveJournal">
         <h2>{{ editingJournalId ? 'Edit journal' : 'Add journal' }}</h2>
         <div class="form-grid">
-          <label>Publisher<select v-model="journalForm.publisher_id" data-test="journal-publisher" required><option value="" disabled>Select a publisher</option><option v-for="option in publisherOptions" :key="option.id" :value="option.id">{{ option.name }}</option></select></label>
-          <label>Platform<select v-model="journalForm.platform_id"><option value="">No platform</option><option v-for="option in platformOptions" :key="option.id" :value="option.id">{{ option.name }} ({{ option.code }})</option></select></label>
+          <label>Publisher<select v-model="journalForm.publisher_id" data-test="journal-publisher" required><option value="" disabled>Select a publisher</option><option v-for="option in publisherOptions" :key="option.id" :value="option.id">{{ option.name ?? option.id }}</option></select></label>
+          <label>Platform<select v-model="journalForm.platform_id" data-test="journal-platform"><option value="">No platform</option><option v-for="option in platformOptions" :key="option.id" :value="option.id">{{ option.name ?? option.id }}<template v-if="option.code"> ({{ option.code }})</template></option></select></label>
           <label>Name<input v-model="journalForm.name" data-test="journal-name" required maxlength="500"></label>
           <label>Status<input v-model="journalForm.status" required maxlength="32"></label>
           <label>ISSN<input v-model="journalForm.issn" placeholder="0378-5955"></label>
@@ -491,7 +535,8 @@ onMounted(() => void loadPublishers())
           <div v-for="(requirement, index) in journalForm.requirements" :key="index" class="requirement-row">
             <div class="form-grid">
               <label>Key<input v-model="requirement.key" data-test="requirement-key" required></label>
-              <label>Value<input v-model="requirement.value" data-test="requirement-value" required></label>
+              <label>Value type<select v-model="requirement.value_type" data-test="requirement-type"><option value="string">Text</option><option value="number">Number</option><option value="boolean">Boolean</option></select></label>
+              <label>Value<select v-if="requirement.value_type === 'boolean'" v-model="requirement.value" data-test="requirement-value" required><option value="true">true</option><option value="false">false</option></select><input v-else v-model="requirement.value" data-test="requirement-value" :type="requirement.value_type === 'number' ? 'number' : 'text'" required></label>
               <label>Scope<input v-model="requirement.scope" data-test="requirement-scope" required></label>
               <label>HTTPS source URL<input v-model="requirement.source_url" data-test="requirement-source" type="url" required></label>
               <label>Verified at<input v-model="requirement.verified_at" data-test="requirement-verified" type="datetime-local" required></label>
@@ -505,12 +550,12 @@ onMounted(() => void loadPublishers())
         <label>Notes<textarea v-model="journalForm.notes" rows="3"></textarea></label>
         <button type="submit" :disabled="busy">Save journal</button><button type="button" @click="showJournalForm = false">Cancel</button>
       </form>
-      <p v-if="journalLoading">Loading journals…</p><p v-else-if="journals.length === 0">No journals found.</p>
+      <p v-if="journalLoading">Loading journals…</p><p v-else-if="!errorMessage && journals.length === 0">No journals found.</p>
       <table v-else>
         <thead><tr><th>Name</th><th>ISSN</th><th>eISSN</th><th>Publisher ID</th><th>Platform ID</th><th>Status</th><th>Requirements</th><th v-if="isAdmin">Actions</th></tr></thead>
         <tbody><tr v-for="journal in journals" :key="journal.id">
           <td>{{ journal.name }}</td><td>{{ formatIssn(journal.issn) }}</td><td>{{ formatIssn(journal.eissn) }}</td><td>{{ journal.publisher_id }}</td><td>{{ journal.platform_id ?? '—' }}</td><td>{{ journal.status }}</td>
-          <td><details><summary>{{ journal.requirements.length }} requirements</summary><ul><li v-for="(requirement, index) in journal.requirements" :key="`${requirement.key}-${index}`">{{ requirement.key }}: {{ requirement.value }} ({{ requirement.scope }}) · <a :href="requirement.source_url" target="_blank" rel="noopener noreferrer">Source</a> · Verified {{ requirement.verified_at }}</li></ul></details></td>
+          <td><details><summary>{{ journal.requirements.length }} requirements</summary><ul><li v-for="(requirement, index) in journal.requirements" :key="`${requirement.key}-${index}`">{{ requirement.key }}: {{ requirement.value }} ({{ requirement.scope }}) · <template v-if="safeResourceUrl(requirement.source_url)"><a :href="safeResourceUrl(requirement.source_url) ?? undefined" target="_blank" rel="noopener noreferrer">Source</a></template><span v-else>{{ requirement.source_url }}</span> · Verified {{ requirement.verified_at }}</li></ul></details></td>
           <td v-if="isAdmin"><button type="button" :data-test="`edit-journal-${journal.id}`" @click="openJournalForm(journal)">Edit</button><button type="button" :data-test="`delete-journal-${journal.id}`" @click="requestDelete('journal', journal.id)">Delete</button></td>
         </tr></tbody>
       </table>

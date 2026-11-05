@@ -136,4 +136,38 @@ describe('AuthorListView', () => {
     await flushPromises()
     expect(adapter.mock.calls.some(([config]) => config.method === 'delete' && config.url === '/institutions/i1')).toBe(true)
   })
+
+  it('renders unsafe institution URLs as text and rejects them on submit', async () => {
+    const institution = {
+      id: 'i1', name: 'Unsafe Institution', institution_type: null,
+      website_url: 'javascript:alert(1)', country_code: null, city: null,
+    }
+    adapter.mockImplementation(async (config) => {
+      if (config.url === '/authors') return success(config, emptyPage)
+      if (config.url === '/institutions' && config.method === 'get') return success(config, { ...emptyPage, items: [institution], total: 1 })
+      if (config.method === 'patch') return success(config, institution)
+      throw new Error(`Unexpected request: ${config.method} ${config.url}`)
+    })
+    const wrapper = mountList()
+    await flushPromises()
+    await wrapper.get('[data-test="institutions-tab"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('a[href^="javascript:"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('javascript:alert(1)')
+    await wrapper.get('[data-test="edit-institution-i1"]').trigger('click')
+    await wrapper.get('[data-test="institution-form"]').trigger('submit')
+    await flushPromises()
+    expect(adapter.mock.calls.some(([config]) => config.method === 'patch')).toBe(false)
+    expect(wrapper.text()).toContain('HTTPS or approved local HTTP')
+  })
+
+  it('does not show an empty state when author loading fails', async () => {
+    adapter.mockImplementation(async () => { throw new Error('offline') })
+    const wrapper = mountList()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Unable to load authors')
+    expect(wrapper.text()).not.toContain('No authors found')
+  })
 })

@@ -92,6 +92,20 @@ describe('JournalListView', () => {
     expect(wrapper.text()).toContain('No journals found')
   })
 
+  it('suppresses empty states when resource loading fails', async () => {
+    adapter.mockImplementation(async () => { throw new Error('offline') })
+    const wrapper = mount(JournalListView)
+    await flushPromises()
+    expect(wrapper.text()).toContain('Unable to load publishers')
+    expect(wrapper.text()).not.toContain('No publishers found')
+    await wrapper.get('[data-test="platforms-tab"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).not.toContain('No platforms found')
+    await wrapper.get('[data-test="journals-tab"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).not.toContain('No journals found')
+  })
+
   it('creates and updates publishers with separate request models', async () => {
     adapter.mockImplementation(async (config) => success(config,
       ['post', 'patch'].includes(config.method ?? '') ? publisher : page([publisher]),
@@ -189,6 +203,140 @@ describe('JournalListView', () => {
     const updateCall = adapter.mock.calls.find(([config]) => config.method === 'patch')
     expect(updateCall?.[0].url).toBe('/journals/j1')
     expect(JSON.parse(String(updateCall?.[0].data))).toMatchObject({ name: 'Updated Journal' })
+  })
+
+  it('preserves numeric and boolean requirement values through editing', async () => {
+    const typedJournal = {
+      ...journal,
+      requirements: [
+        { key: 'abstract_words', value: 250, scope: 'research', source_url: 'https://journal.example/guide', verified_at: '2026-11-04T00:00:00Z' },
+        { key: 'anonymous', value: false, scope: 'research', source_url: 'https://journal.example/guide', verified_at: '2026-11-04T00:00:00Z' },
+      ],
+    }
+    adapter.mockImplementation(async (config) => {
+      if (config.url === '/publishers') return success(config, page([publisher]))
+      if (config.url === '/journal-platforms') return success(config, page([platform]))
+      if (config.url === '/journals' && config.method === 'get') return success(config, page([typedJournal]))
+      if (config.method === 'patch') return success(config, typedJournal)
+      throw new Error(`Unexpected request: ${config.method} ${config.url}`)
+    })
+    const wrapper = mount(JournalListView)
+    await flushPromises()
+    await wrapper.get('[data-test="journals-tab"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-test="edit-journal-j1"]').trigger('click')
+    await flushPromises()
+
+    const valueTypes = wrapper.findAll('[data-test="requirement-type"]')
+    expect(valueTypes.map((element) => (element.element as HTMLSelectElement).value)).toEqual(['number', 'boolean'])
+    await wrapper.get('[data-test="journal-form"]').trigger('submit')
+    await flushPromises()
+    const updateCall = adapter.mock.calls.find(([config]) => config.method === 'patch')
+    const payload = JSON.parse(String(updateCall?.[0].data)) as { requirements: Array<{ value: unknown }> }
+    expect(payload.requirements.map((requirement) => requirement.value)).toEqual([250, false])
+    expect(typeof payload.requirements[0].value).toBe('number')
+    expect(typeof payload.requirements[1].value).toBe('boolean')
+  })
+
+  it('renders unsafe API URLs as text and rejects an unsafe publisher URL', async () => {
+    const unsafePublisher = { ...publisher, website_url: 'javascript:alert(1)' }
+    const unsafeJournal = {
+      ...journal,
+      requirements: [{ key: 'abstract', value: 250, scope: 'research', source_url: 'javascript:alert(1)', verified_at: '2026-11-04T00:00:00Z' }],
+    }
+    adapter.mockImplementation(async (config) => {
+      if (config.url === '/publishers' && config.method === 'get') return success(config, page([unsafePublisher]))
+      if (config.url === '/journals') return success(config, page([unsafeJournal]))
+      if (config.url === '/journal-platforms') return success(config, page([platform]))
+      if (config.method === 'patch') return success(config, unsafePublisher)
+      throw new Error(`Unexpected request: ${config.method} ${config.url}`)
+    })
+    const wrapper = mount(JournalListView)
+    await flushPromises()
+    expect(wrapper.find('a[href^="javascript:"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('javascript:alert(1)')
+    await wrapper.get('[data-test="journals-tab"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('a[href^="javascript:"]').exists()).toBe(false)
+
+    await wrapper.get('[data-test="publishers-tab"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-test="edit-publisher-p1"]').trigger('click')
+    await wrapper.get('[data-test="publisher-form"]').trigger('submit')
+    await flushPromises()
+    expect(adapter.mock.calls.some(([config]) => config.method === 'patch')).toBe(false)
+    expect(wrapper.text()).toContain('HTTPS or approved local HTTP')
+  })
+
+  it('rejects unsafe optional journal URLs before update', async () => {
+    adapter.mockImplementation(async (config) => {
+      if (config.url === '/publishers') return success(config, page([publisher]))
+      if (config.url === '/journal-platforms') return success(config, page([platform]))
+      if (config.url === '/journals' && config.method === 'get') return success(config, page([journal]))
+      if (config.method === 'patch') return success(config, journal)
+      throw new Error(`Unexpected request: ${config.method} ${config.url}`)
+    })
+    const wrapper = mount(JournalListView)
+    await flushPromises()
+    await wrapper.get('[data-test="journals-tab"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-test="edit-journal-j1"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-test="journal-form"] input[type="url"]').setValue('javascript:alert(1)')
+    await wrapper.get('[data-test="journal-form"]').trigger('submit')
+    await flushPromises()
+
+    expect(adapter.mock.calls.some(([config]) => config.method === 'patch')).toBe(false)
+    expect(wrapper.text()).toContain('HTTPS or approved local HTTP')
+  })
+
+  it('loads every publisher and platform selector page', async () => {
+    const publisherChoices = Array.from({ length: 101 }, (_, index) => ({ ...publisher, id: `p${index}`, name: `Publisher ${index}` }))
+    const platformChoices = Array.from({ length: 101 }, (_, index) => ({ ...platform, id: `s${index}`, name: `Platform ${index}` }))
+    adapter.mockImplementation(async (config) => {
+      if (config.url === '/journals') return success(config, page([]))
+      if (config.url === '/publishers' && config.params?.page_size === 20) return success(config, page([publisher]))
+      if (config.url === '/publishers' || config.url === '/journal-platforms') {
+        const pageNumber = Number(config.params?.page ?? 1)
+        const choices = config.url === '/publishers' ? publisherChoices : platformChoices
+        return success(config, { items: choices.slice((pageNumber - 1) * 100, pageNumber * 100), page: pageNumber, page_size: 100, total: 101 })
+      }
+      throw new Error(`Unexpected request: ${config.method} ${config.url}`)
+    })
+    const wrapper = mount(JournalListView)
+    await flushPromises()
+    await wrapper.get('[data-test="journals-tab"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-test="add-journal"]').trigger('click')
+    await flushPromises()
+
+    expect(adapter.mock.calls.filter(([config]) => config.url === '/publishers' && config.params?.page_size === 100).map(([config]) => config.params.page)).toEqual([1, 2])
+    expect(adapter.mock.calls.filter(([config]) => config.url === '/journal-platforms').map(([config]) => config.params.page)).toEqual([1, 2])
+    expect(wrapper.get('[data-test="journal-publisher"]').find('option[value="p100"]').exists()).toBe(true)
+    expect(wrapper.get('[data-test="journal-platform"]').find('option[value="s100"]').exists()).toBe(true)
+  })
+
+  it('preserves selected journal relationships missing from selector results', async () => {
+    const current = { ...journal, publisher_id: 'missing-p', platform_id: 'missing-s' }
+    adapter.mockImplementation(async (config) => {
+      if (config.url === '/publishers' && config.params?.page_size === 20) return success(config, page([]))
+      if (config.url === '/journals') return success(config, page([current]))
+      if (config.url === '/publishers' || config.url === '/journal-platforms') return success(config, page([]))
+      throw new Error(`Unexpected request: ${config.method} ${config.url}`)
+    })
+    const wrapper = mount(JournalListView)
+    await flushPromises()
+    await wrapper.get('[data-test="journals-tab"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-test="edit-journal-j1"]').trigger('click')
+    await flushPromises()
+
+    const publisherSelect = wrapper.get('[data-test="journal-publisher"]')
+    const platformSelect = wrapper.get('[data-test="journal-platform"]')
+    expect((publisherSelect.element as HTMLSelectElement).value).toBe('missing-p')
+    expect((platformSelect.element as HTMLSelectElement).value).toBe('missing-s')
+    expect(publisherSelect.text()).toContain('missing-p')
+    expect(platformSelect.text()).toContain('missing-s')
   })
 
   it('requires separate soft-delete confirmation for publishers, platforms, and journals', async () => {

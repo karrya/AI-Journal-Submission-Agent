@@ -1,4 +1,5 @@
 import { api } from './client'
+import { fetchAllPages } from './pagination'
 import type { Page, SortOrder } from './authors'
 
 export interface PublisherCreate {
@@ -144,6 +145,11 @@ export async function listPublishers(
   return response.data
 }
 
+export async function listAllPublishers(): Promise<PublisherResponse[]> {
+  const result = await fetchAllPages((page, pageSize) => listPublishers({ page, page_size: pageSize }))
+  return result.items
+}
+
 export async function createPublisher(payload: PublisherCreate): Promise<PublisherResponse> {
   const response = await api.post<PublisherResponse>('/publishers', payload)
   return response.data
@@ -168,6 +174,11 @@ export async function listPlatforms(
     params: { page: 1, page_size: 20, sort: 'code', order: 'asc', ...query },
   })
   return response.data
+}
+
+export async function listAllPlatforms(): Promise<JournalPlatformResponse[]> {
+  const result = await fetchAllPages((page, pageSize) => listPlatforms({ page, page_size: pageSize }))
+  return result.items
 }
 
 export async function createPlatform(

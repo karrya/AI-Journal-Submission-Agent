@@ -133,4 +133,13 @@ describe('AuthorizationView', () => {
     await flushPromises()
     expect(adapter.mock.calls.at(-1)?.[0].params).toMatchObject({ page: 2 })
   })
+
+  it('does not show an empty state when authorization loading fails', async () => {
+    adapter.mockImplementation(async () => { throw new Error('offline') })
+    const wrapper = mountView()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Unable to load authorizations')
+    expect(wrapper.text()).not.toContain('No authorizations found')
+  })
 })

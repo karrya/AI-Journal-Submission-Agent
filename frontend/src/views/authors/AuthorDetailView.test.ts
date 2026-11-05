@@ -4,6 +4,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { api } from '../../api/client'
 import { useAuthStore, type User } from '../../stores/auth'
 import AuthorDetailView from './AuthorDetailView.vue'
+import EmailTable from '../../components/EmailTable.vue'
 
 function success(config: InternalAxiosRequestConfig, data: unknown): AxiosResponse {
   return { data, status: 200, statusText: '200', headers: {}, config }
@@ -43,9 +44,9 @@ function author(id: string, displayName: string) {
 const emptyPage = { items: [], page: 1, page_size: 100, total: 0 }
 const address = (local: string) => `${local}@example.org`
 
-function emailRecord() {
+function emailRecord(authorId = 'a1', local = 'author') {
   return {
-    id: 'e1', author_id: 'a1', email: address('author'), normalized_email: address('author'),
+    id: authorId === 'a1' && local === 'author' ? 'e1' : `e-${authorId}-${local}`, author_id: authorId, email: address(local), normalized_email: address(local),
     purpose: 'communication', is_primary: false, verification_status: 'unverified',
     authorization_status: 'unconfirmed', created_at: '2026-11-01T00:00:00Z',
     updated_at: '2026-11-01T00:00:00Z',
@@ -125,6 +126,7 @@ describe('AuthorDetailView', () => {
     expect(wrapper.text()).toContain('Second Author')
     expect(wrapper.text()).not.toContain('old@example.org')
     expect(wrapper.text()).toContain('Emails are not available for this author')
+    expect(wrapper.text()).not.toContain('No emails.')
   })
 
   it('does not render phone fields omitted by the API', async () => {
@@ -306,6 +308,171 @@ describe('AuthorDetailView', () => {
       institution_id: 'i1', department: 'Updated Department',
     })
     expect(adapter.mock.calls.some(([config]) => config.method === 'delete' && config.url === '/authors/a1/institutions/l1')).toBe(true)
+  })
+
+  it('does not apply an in-flight author save after navigating to another author', async () => {
+    let finishPatch!: (response: AxiosResponse) => void
+    adapter.mockImplementation(async (config) => {
+      if (config.url === '/authors/a1' && config.method === 'get') return success(config, author('a1', 'Author A'))
+      if (config.url === '/authors/a2' && config.method === 'get') return success(config, author('a2', 'Author B'))
+      if (config.url === '/authors/a1' && config.method === 'patch') {
+        return new Promise<AxiosResponse>((resolve) => { finishPatch = resolve })
+      }
+      if (config.url?.endsWith('/emails') || config.url?.endsWith('/institutions')) return success(config, emptyPage)
+      throw new Error(`Unexpected request: ${config.method} ${config.url}`)
+    })
+    const wrapper = mount(AuthorDetailView, { global: { stubs }, props: { authorId: 'a1' } })
+    await flushPromises()
+    await wrapper.get('[data-test="edit-author"]').trigger('click')
+    await wrapper.get('[data-test="display-name"]').setValue('Stale Author A')
+    await wrapper.get('[data-test="identity-confirm"]').setValue(true)
+    await wrapper.get('[data-test="author-edit-form"]').trigger('submit')
+    await vi.waitFor(() => expect(adapter.mock.calls.some(([config]) => config.method === 'patch')).toBe(true))
+
+    await wrapper.setProps({ authorId: 'a2' })
+    await flushPromises()
+    const patchConfig = adapter.mock.calls.find(([config]) => config.method === 'patch')?.[0]
+    finishPatch(success(patchConfig!, author('a1', 'Stale Author A')))
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Author B')
+    expect(wrapper.text()).not.toContain('Stale Author A')
+  })
+
+  it('does not restore author A emails after an in-flight refresh follows navigation to B', async () => {
+    let finishRefresh!: (response: AxiosResponse) => void
+    adapter.mockImplementation(async (config) => {
+      if (config.url === '/authors/a1') return success(config, author('a1', 'Author A'))
+      if (config.url === '/authors/a2') return success(config, author('a2', 'Author B'))
+      if (config.url === '/authors/a1/emails' && config.method === 'post') return success(config, emailRecord())
+      if (config.url === '/authors/a1/emails') {
+        const refreshCount = adapter.mock.calls.filter(([call]) => call.url === '/authors/a1/emails' && call.method === 'get').length
+        if (refreshCount > 1) return new Promise<AxiosResponse>((resolve) => { finishRefresh = resolve })
+        return success(config, emptyPage)
+      }
+      if (config.url === '/authors/a2/emails') {
+        return success(config, { ...emptyPage, items: [emailRecord('a2', 'author-b')], total: 1 })
+      }
+      if (config.url?.endsWith('/institutions')) return success(config, emptyPage)
+      throw new Error(`Unexpected request: ${config.method} ${config.url}`)
+    })
+    const wrapper = mount(AuthorDetailView, { global: { stubs }, props: { authorId: 'a1' } })
+    await flushPromises()
+    await wrapper.get('[data-test="new-email"]').setValue(address('new-a'))
+    await wrapper.get('[data-test="create-email-confirm"]').setValue(true)
+    await wrapper.get('[data-test="create-email-form"]').trigger('submit')
+    await vi.waitFor(() => expect(adapter.mock.calls.filter(([config]) => config.url === '/authors/a1/emails' && config.method === 'get')).toHaveLength(2))
+
+    await wrapper.setProps({ authorId: 'a2' })
+    await flushPromises()
+    const refreshConfig = adapter.mock.calls.filter(([config]) => config.url === '/authors/a1/emails' && config.method === 'get').at(-1)?.[0]
+    finishRefresh(success(refreshConfig!, { ...emptyPage, items: [emailRecord('a1', 'stale-a')], total: 1 }))
+    await flushPromises()
+
+    expect(wrapper.text()).toContain(address('author-b'))
+    expect(wrapper.text()).not.toContain(address('stale-a'))
+  })
+
+  it('does not restore author A affiliations after an in-flight refresh follows navigation to B', async () => {
+    let finishRefresh!: (response: AxiosResponse) => void
+    adapter.mockImplementation(async (config) => {
+      if (config.url === '/authors/a1') return success(config, author('a1', 'Author A'))
+      if (config.url === '/authors/a2') return success(config, author('a2', 'Author B'))
+      if (config.url === '/authors/a1/institutions' && config.method === 'post') return success(config, linkRecord())
+      if (config.url === '/authors/a1/institutions') {
+        const refreshCount = adapter.mock.calls.filter(([call]) => call.url === '/authors/a1/institutions' && call.method === 'get').length
+        if (refreshCount > 1) return new Promise<AxiosResponse>((resolve) => { finishRefresh = resolve })
+        return success(config, emptyPage)
+      }
+      if (config.url === '/authors/a2/institutions') {
+        return success(config, { ...emptyPage, items: [{ ...linkRecord(), id: 'b-link', author_id: 'a2', institution_name: 'B University' }], total: 1 })
+      }
+      if (config.url === '/authors/a1/emails' || config.url === '/authors/a2/emails') return success(config, emptyPage)
+      if (config.url === '/institutions') return success(config, { items: [{ id: 'i1', name: 'Summary University' }], page: 1, page_size: 100, total: 1 })
+      throw new Error(`Unexpected request: ${config.method} ${config.url}`)
+    })
+    const wrapper = mount(AuthorDetailView, { global: { stubs }, props: { authorId: 'a1' } })
+    await flushPromises()
+    await wrapper.get('[data-test="add-affiliation"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-test="institution-select"]').setValue('i1')
+    await wrapper.get('[data-test="affiliation-confirm"]').setValue(true)
+    await wrapper.get('form[data-test="affiliation-form"]').trigger('submit')
+    await vi.waitFor(() => expect(adapter.mock.calls.filter(([config]) => config.url === '/authors/a1/institutions' && config.method === 'get')).toHaveLength(2))
+
+    await wrapper.setProps({ authorId: 'a2' })
+    await flushPromises()
+    const refreshConfig = adapter.mock.calls.filter(([config]) => config.url === '/authors/a1/institutions' && config.method === 'get').at(-1)?.[0]
+    finishRefresh(success(refreshConfig!, { ...emptyPage, items: [{ ...linkRecord(), institution_name: 'Stale A University' }], total: 1 }))
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('B University')
+    expect(wrapper.text()).not.toContain('Stale A University')
+  })
+
+  it('loads every institution selector page', async () => {
+    const choices = Array.from({ length: 101 }, (_, index) => ({ id: `i${index}`, name: `Institution ${index}` }))
+    adapter.mockImplementation(async (config) => {
+      if (config.url === '/authors/a1') return success(config, author('a1', 'Selector Author'))
+      if (config.url === '/authors/a1/emails' || config.url === '/authors/a1/institutions') return success(config, emptyPage)
+      if (config.url === '/institutions') {
+        const page = Number(config.params?.page ?? 1)
+        return success(config, { items: choices.slice((page - 1) * 100, page * 100), page, page_size: 100, total: choices.length })
+      }
+      throw new Error(`Unexpected request: ${config.method} ${config.url}`)
+    })
+    const wrapper = mount(AuthorDetailView, { global: { stubs }, props: { authorId: 'a1' } })
+    await flushPromises()
+    await wrapper.get('[data-test="add-affiliation"]').trigger('click')
+    await flushPromises()
+
+    const institutionCalls = adapter.mock.calls.filter(([config]) => config.url === '/institutions')
+    expect(institutionCalls.map(([config]) => config.params.page)).toEqual([1, 2])
+    expect(wrapper.get('[data-test="institution-select"]').find('option[value="i100"]').exists()).toBe(true)
+  })
+
+  it('preserves the current affiliation when it is absent from selector pages', async () => {
+    const currentLink = { ...linkRecord(), institution_id: 'missing-i', institution_name: 'Current Missing Institution' }
+    adapter.mockImplementation(async (config) => {
+      if (config.url === '/authors/a1') return success(config, author('a1', 'Selector Author'))
+      if (config.url === '/authors/a1/emails') return success(config, emptyPage)
+      if (config.url === '/authors/a1/institutions') return success(config, { ...emptyPage, items: [currentLink], total: 1 })
+      if (config.url === '/institutions') return success(config, emptyPage)
+      throw new Error(`Unexpected request: ${config.method} ${config.url}`)
+    })
+    const wrapper = mount(AuthorDetailView, { global: { stubs }, props: { authorId: 'a1' } })
+    await flushPromises()
+    await wrapper.get('[data-test="edit-affiliation-l1"]').trigger('click')
+    await flushPromises()
+
+    const select = wrapper.get('[data-test="institution-select"]')
+    expect((select.element as HTMLSelectElement).value).toBe('missing-i')
+    expect(select.text()).toContain('Current Missing Institution')
+  })
+
+  it('rechecks manage permission for emitted email mutations after access is lost', async () => {
+    adapter.mockImplementation(async (config) => {
+      if (config.url === '/authors/a1') return success(config, author('a1', 'Permission Author'))
+      if (config.url === '/authors/a1/emails') {
+        return success(config, { ...emptyPage, items: [emailRecord()], total: 1 })
+      }
+      if (config.url === '/authors/a1/institutions') return success(config, emptyPage)
+      throw new Error(`Unexpected request: ${config.method} ${config.url}`)
+    })
+    const wrapper = mount(AuthorDetailView, { global: { stubs }, props: { authorId: 'a1' } })
+    await flushPromises()
+    await wrapper.get('[data-test="edit-email-e1"]').trigger('click')
+    await wrapper.setProps({ permissions: ['author:profile:read', 'author:email:read'] })
+    await flushPromises()
+    expect(wrapper.find('[data-test="edit-email-form"]').exists()).toBe(false)
+
+    const table = wrapper.findComponent(EmailTable)
+    table.vm.$emit('create', { email: address('blocked'), purpose: 'communication', is_primary: false, confirm_email_binding: true })
+    table.vm.$emit('update', { emailId: 'e1', payload: { purpose: 'backup', confirm_email_binding: true } })
+    table.vm.$emit('delete', { emailId: 'e1', confirm_email_binding: true })
+    await flushPromises()
+
+    expect(adapter.mock.calls.some(([config]) => ['post', 'patch', 'delete'].includes(config.method ?? ''))).toBe(false)
   })
 
   it('clears protected data when the current permission set loses email access', async () => {

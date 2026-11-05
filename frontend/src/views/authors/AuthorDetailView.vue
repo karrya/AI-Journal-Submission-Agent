@@ -8,9 +8,9 @@ import {
   deleteAuthorInstitution,
   deleteEmail,
   getAuthor,
+  listAllInstitutions,
   listAuthorInstitutions,
   listEmails,
-  listInstitutions,
   rolePermissions,
   updateAuthor,
   updateAuthorInstitution,
@@ -74,9 +74,17 @@ function isForbidden(error: unknown): boolean {
   return axios.isAxiosError(error) && error.response?.status === 403
 }
 
+function isCurrent(sequence: number, authorId: string): boolean {
+  return sequence === loadSequence && authorId === props.authorId
+}
+
 async function load(): Promise<void> {
   const sequence = ++loadSequence
+  const authorId = props.authorId
   loading.value = true
+  authorBusy.value = false
+  emailBusy.value = false
+  affiliationBusy.value = false
   author.value = null
   emails.value = []
   institutions.value = []
@@ -88,23 +96,23 @@ async function load(): Promise<void> {
   emailMessage.value = canReadEmails.value ? '' : 'Email permission is not available.'
   institutionMessage.value = canReadInstitutions.value ? '' : 'Institution permission is not available.'
   try {
-    const result = await getAuthor(props.authorId)
-    if (sequence !== loadSequence) return
+    const result = await getAuthor(authorId)
+    if (!isCurrent(sequence, authorId)) return
     author.value = result
   } catch (error) {
-    if (sequence === loadSequence) {
+    if (isCurrent(sequence, authorId)) {
       errorMessage.value = safeError(error, 'Unable to load this author.')
+      loading.value = false
     }
-    loading.value = false
     return
   }
 
   const requests: Promise<void>[] = []
   if (canReadEmails.value) {
-    requests.push(listEmails(props.authorId).then((page) => {
-      if (sequence === loadSequence) emails.value = page.items
+    requests.push(listEmails(authorId).then((page) => {
+      if (isCurrent(sequence, authorId)) emails.value = page.items
     }).catch((error: unknown) => {
-      if (sequence !== loadSequence) return
+      if (!isCurrent(sequence, authorId)) return
       emails.value = []
       emailMessage.value = isForbidden(error)
         ? 'Emails are not available for this author.'
@@ -112,10 +120,10 @@ async function load(): Promise<void> {
     }))
   }
   if (canReadInstitutions.value) {
-    requests.push(listAuthorInstitutions(props.authorId).then((page) => {
-      if (sequence === loadSequence) institutions.value = page.items
+    requests.push(listAuthorInstitutions(authorId).then((page) => {
+      if (isCurrent(sequence, authorId)) institutions.value = page.items
     }).catch((error: unknown) => {
-      if (sequence !== loadSequence) return
+      if (!isCurrent(sequence, authorId)) return
       institutions.value = []
       institutionMessage.value = isForbidden(error)
         ? 'Institutions are not available for this author.'
@@ -127,25 +135,33 @@ async function load(): Promise<void> {
 }
 
 async function saveAuthor(payload: AuthorCreate | AuthorUpdate): Promise<void> {
-  if (authorBusy.value) return
+  if (authorBusy.value || !canManage.value) return
+  const sequence = loadSequence
+  const authorId = props.authorId
   authorBusy.value = true
   authorMutationError.value = ''
   try {
-    author.value = await updateAuthor(props.authorId, payload as AuthorUpdate)
+    const result = await updateAuthor(authorId, payload as AuthorUpdate)
+    if (!isCurrent(sequence, authorId) || !canManage.value) return
+    author.value = result
     showAuthorForm.value = false
   } catch (error) {
-    authorMutationError.value = safeError(error, 'Unable to update the author.')
+    if (isCurrent(sequence, authorId)) {
+      authorMutationError.value = safeError(error, 'Unable to update the author.')
+    }
   } finally {
-    authorBusy.value = false
+    if (isCurrent(sequence, authorId)) authorBusy.value = false
   }
 }
 
-async function refreshEmails(): Promise<void> {
+async function refreshEmails(sequence: number, authorId: string): Promise<void> {
   try {
-    const page = await listEmails(props.authorId)
+    const page = await listEmails(authorId)
+    if (!isCurrent(sequence, authorId) || !canReadEmails.value) return
     emails.value = page.items
     emailMessage.value = ''
   } catch (error) {
+    if (!isCurrent(sequence, authorId)) return
     emails.value = []
     emailMessage.value = isForbidden(error)
       ? 'Emails are not available for this author.'
@@ -154,71 +170,108 @@ async function refreshEmails(): Promise<void> {
 }
 
 async function createEmailBinding(payload: EmailCreate): Promise<void> {
-  if (emailBusy.value) return
+  if (emailBusy.value || !canManage.value || !canReadEmails.value) return
+  const sequence = loadSequence
+  const authorId = props.authorId
   emailBusy.value = true
   emailMessage.value = ''
   try {
-    await createEmail(props.authorId, payload)
-    await refreshEmails()
-    emailTableKey.value += 1
+    await createEmail(authorId, payload)
+    if (!isCurrent(sequence, authorId) || !canManage.value) return
+    await refreshEmails(sequence, authorId)
+    if (isCurrent(sequence, authorId)) emailTableKey.value += 1
   } catch (error) {
-    emailMessage.value = safeError(error, 'Unable to create the email binding.')
+    if (isCurrent(sequence, authorId)) {
+      emailMessage.value = safeError(error, 'Unable to create the email binding.')
+    }
   } finally {
-    emailBusy.value = false
+    if (isCurrent(sequence, authorId)) emailBusy.value = false
   }
 }
 
 async function updateEmailBinding(change: { emailId: string; payload: EmailUpdate }): Promise<void> {
-  if (emailBusy.value) return
+  if (emailBusy.value || !canManage.value || !canReadEmails.value) return
+  const sequence = loadSequence
+  const authorId = props.authorId
   emailBusy.value = true
   emailMessage.value = ''
   try {
-    await updateEmail(props.authorId, change.emailId, change.payload)
-    await refreshEmails()
-    emailTableKey.value += 1
+    await updateEmail(authorId, change.emailId, change.payload)
+    if (!isCurrent(sequence, authorId) || !canManage.value) return
+    await refreshEmails(sequence, authorId)
+    if (isCurrent(sequence, authorId)) emailTableKey.value += 1
   } catch (error) {
-    emailMessage.value = safeError(error, 'Unable to update the email binding.')
+    if (isCurrent(sequence, authorId)) {
+      emailMessage.value = safeError(error, 'Unable to update the email binding.')
+    }
   } finally {
-    emailBusy.value = false
+    if (isCurrent(sequence, authorId)) emailBusy.value = false
   }
 }
 
 async function deleteEmailBinding(change: { emailId: string; confirm_email_binding: true }): Promise<void> {
-  if (emailBusy.value) return
+  if (emailBusy.value || !canManage.value || !canReadEmails.value) return
+  const sequence = loadSequence
+  const authorId = props.authorId
   emailBusy.value = true
   emailMessage.value = ''
   try {
-    await deleteEmail(props.authorId, change.emailId)
-    await refreshEmails()
-    emailTableKey.value += 1
+    await deleteEmail(authorId, change.emailId)
+    if (!isCurrent(sequence, authorId) || !canManage.value) return
+    await refreshEmails(sequence, authorId)
+    if (isCurrent(sequence, authorId)) emailTableKey.value += 1
   } catch (error) {
-    emailMessage.value = safeError(error, 'Unable to unbind the email.')
+    if (isCurrent(sequence, authorId)) {
+      emailMessage.value = safeError(error, 'Unable to unbind the email.')
+    }
   } finally {
-    emailBusy.value = false
+    if (isCurrent(sequence, authorId)) emailBusy.value = false
   }
 }
 
+function preserveCurrentInstitution(link?: AuthorInstitutionLinkResponse): void {
+  if (!link || institutionOptions.value.some((option) => option.id === link.institution_id)) return
+  institutionOptions.value = [...institutionOptions.value, {
+    id: link.institution_id,
+    name: link.institution_name,
+    city: link.city,
+    country_code: link.country_code,
+  }]
+}
+
 async function openAffiliationForm(link?: AuthorInstitutionLinkResponse): Promise<void> {
+  if (!canManage.value) return
+  const sequence = loadSequence
+  const authorId = props.authorId
   showAffiliationForm.value = true
   editingLink.value = link ?? null
   deletingLinkId.value = null
   affiliationError.value = ''
-  if (institutionOptions.value.length > 0) return
+  if (institutionOptions.value.length > 0) {
+    preserveCurrentInstitution(link)
+    return
+  }
   try {
-    const page = await listInstitutions()
-    institutionOptions.value = page.items
+    const options = await listAllInstitutions()
+    if (!isCurrent(sequence, authorId) || !canManage.value) return
+    institutionOptions.value = options
+    preserveCurrentInstitution(link)
   } catch (error) {
+    if (!isCurrent(sequence, authorId)) return
     institutionOptions.value = []
+    preserveCurrentInstitution(link)
     affiliationError.value = safeError(error, 'Unable to load institution choices.')
   }
 }
 
-async function refreshInstitutions(): Promise<void> {
+async function refreshInstitutions(sequence: number, authorId: string): Promise<void> {
   try {
-    const page = await listAuthorInstitutions(props.authorId)
+    const page = await listAuthorInstitutions(authorId)
+    if (!isCurrent(sequence, authorId) || !canReadInstitutions.value) return
     institutions.value = page.items
     institutionMessage.value = ''
   } catch (error) {
+    if (!isCurrent(sequence, authorId)) return
     institutions.value = []
     institutionMessage.value = isForbidden(error)
       ? 'Institutions are not available for this author.'
@@ -229,30 +282,38 @@ async function refreshInstitutions(): Promise<void> {
 async function saveAffiliation(
   payload: AuthorInstitutionLinkCreate | AuthorInstitutionLinkUpdate,
 ): Promise<void> {
-  if (affiliationBusy.value) return
+  if (affiliationBusy.value || !canManage.value) return
+  const sequence = loadSequence
+  const authorId = props.authorId
+  const linkId = editingLink.value?.id ?? null
   affiliationBusy.value = true
   affiliationError.value = ''
   try {
-    if (editingLink.value) {
+    if (linkId) {
       await updateAuthorInstitution(
-        props.authorId,
-        editingLink.value.id,
+        authorId,
+        linkId,
         payload as AuthorInstitutionLinkUpdate,
       )
     } else {
-      await createAuthorInstitution(props.authorId, payload as AuthorInstitutionLinkCreate)
+      await createAuthorInstitution(authorId, payload as AuthorInstitutionLinkCreate)
     }
-    await refreshInstitutions()
+    if (!isCurrent(sequence, authorId) || !canManage.value) return
+    await refreshInstitutions(sequence, authorId)
+    if (!isCurrent(sequence, authorId)) return
     showAffiliationForm.value = false
     editingLink.value = null
   } catch (error) {
-    affiliationError.value = safeError(error, 'Unable to save the affiliation.')
+    if (isCurrent(sequence, authorId)) {
+      affiliationError.value = safeError(error, 'Unable to save the affiliation.')
+    }
   } finally {
-    affiliationBusy.value = false
+    if (isCurrent(sequence, authorId)) affiliationBusy.value = false
   }
 }
 
 function startAffiliationDelete(linkId: string): void {
+  if (!canManage.value) return
   deletingLinkId.value = linkId
   affiliationDeleteConfirmed.value = false
   showAffiliationForm.value = false
@@ -260,21 +321,27 @@ function startAffiliationDelete(linkId: string): void {
 }
 
 async function confirmAffiliationDelete(): Promise<void> {
-  if (!deletingLinkId.value || affiliationBusy.value) return
+  if (!deletingLinkId.value || affiliationBusy.value || !canManage.value) return
   if (!affiliationDeleteConfirmed.value) {
     affiliationError.value = 'Confirm the affiliation removal separately before deleting.'
     return
   }
+  const sequence = loadSequence
+  const authorId = props.authorId
+  const linkId = deletingLinkId.value
   affiliationBusy.value = true
   affiliationError.value = ''
   try {
-    await deleteAuthorInstitution(props.authorId, deletingLinkId.value)
-    await refreshInstitutions()
-    deletingLinkId.value = null
+    await deleteAuthorInstitution(authorId, linkId)
+    if (!isCurrent(sequence, authorId) || !canManage.value) return
+    await refreshInstitutions(sequence, authorId)
+    if (isCurrent(sequence, authorId)) deletingLinkId.value = null
   } catch (error) {
-    affiliationError.value = safeError(error, 'Unable to remove the affiliation.')
+    if (isCurrent(sequence, authorId)) {
+      affiliationError.value = safeError(error, 'Unable to remove the affiliation.')
+    }
   } finally {
-    affiliationBusy.value = false
+    if (isCurrent(sequence, authorId)) affiliationBusy.value = false
   }
 }
 
@@ -302,7 +369,7 @@ watch([() => props.authorId, effectivePermissions], () => void load(), { immedia
       <button v-if="canManage && !showAuthorForm" type="button" data-test="edit-author" @click="showAuthorForm = true">Edit author</button>
       <p v-if="authorMutationError" class="form-error" role="alert">{{ authorMutationError }}</p>
       <AuthorForm
-        v-if="showAuthorForm"
+        v-if="canManage && showAuthorForm"
         data-test="author-edit-form"
         :author="author"
         :submitting="authorBusy"
@@ -315,7 +382,7 @@ watch([() => props.authorId, effectivePermissions], () => void load(), { immedia
       <h2 id="email-title">Emails</h2>
       <p v-if="emailMessage" role="status">{{ emailMessage }}</p>
       <EmailTable
-        v-if="canReadEmails"
+        v-if="canReadEmails && !emailMessage"
         :key="`${authorId}-${emailTableKey}`"
         :emails="emails"
         :can-manage="canManage"
@@ -343,14 +410,14 @@ watch([() => props.authorId, effectivePermissions], () => void load(), { immedia
       </table>
       <button v-if="canManage && !showAffiliationForm" type="button" data-test="add-affiliation" @click="openAffiliationForm()">Add affiliation</button>
       <p v-if="affiliationError" class="form-error" role="alert">{{ affiliationError }}</p>
-      <section v-if="deletingLinkId" class="confirmation-panel" aria-label="Confirm affiliation removal">
+      <section v-if="canManage && deletingLinkId" class="confirmation-panel" aria-label="Confirm affiliation removal">
         <p>Remove this affiliation from the author? This action requires separate confirmation.</p>
         <label class="confirmation-control"><input v-model="affiliationDeleteConfirmed" data-test="affiliation-delete-confirm" type="checkbox"> I confirm this affiliation removal.</label>
         <button type="button" :data-test="`confirm-delete-affiliation-${deletingLinkId}`" :disabled="affiliationBusy" @click="confirmAffiliationDelete">Confirm removal</button>
         <button type="button" @click="deletingLinkId = null">Cancel</button>
       </section>
       <InstitutionLinkForm
-        v-if="showAffiliationForm"
+        v-if="canManage && showAffiliationForm"
         data-test="affiliation-form"
         :institutions="institutionOptions"
         :link="editingLink"

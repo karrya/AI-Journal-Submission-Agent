@@ -14,9 +14,20 @@ TEST_DATABASE = "academic_submission_agent_test"
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
+def test_test_guard_requires_explicit_environment_and_host():
+    with pytest.raises(TypeError):
+        validate_test_environment(TEST_DATABASE, "/tmp/test", "storage")
+
+
 def test_test_storage_cannot_equal_live_storage():
     with pytest.raises(RuntimeError, match="live storage"):
-        validate_test_environment(TEST_DATABASE, "storage", "storage")
+        validate_test_environment(
+            TEST_DATABASE,
+            "storage",
+            "storage",
+            environment="test",
+            database_host="127.0.0.1",
+        )
 
 
 def test_test_storage_cannot_be_nested_in_live_storage(tmp_path: Path):
@@ -26,13 +37,19 @@ def test_test_storage_cannot_be_nested_in_live_storage(tmp_path: Path):
             TEST_DATABASE,
             live_storage / "pytest",
             live_storage,
+            environment="test",
+            database_host="127.0.0.1",
         )
 
 
 def test_non_test_database_is_rejected():
     with pytest.raises(RuntimeError, match="_test"):
         validate_test_environment(
-            "academic_submission_agent", "/tmp/test", "storage"
+            "academic_submission_agent",
+            "/tmp/test",
+            "storage",
+            environment="test",
+            database_host="127.0.0.1",
         )
 
 
@@ -42,6 +59,7 @@ def test_non_loopback_database_host_is_rejected():
             TEST_DATABASE,
             "/tmp/test",
             "storage",
+            environment="test",
             database_host="192.0.2.1",
         )
 
@@ -53,6 +71,7 @@ def test_non_test_environment_is_rejected():
             "/tmp/test",
             "storage",
             environment="development",
+            database_host="127.0.0.1",
         )
 
 
@@ -170,7 +189,9 @@ def test_dev_frontend_runs_vite_on_loopback(tmp_path: Path):
     )
 
     assert result.returncode == 0, result.stderr
-    assert capture.read_text(encoding="utf-8").splitlines()[-7:] == [
+    assert capture.read_text(encoding="utf-8").splitlines() == [
+        "--prefix",
+        "frontend",
         "run",
         "dev",
         "--",

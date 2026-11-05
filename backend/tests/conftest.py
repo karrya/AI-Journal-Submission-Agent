@@ -35,13 +35,20 @@ def validate_test_database_url(url: str) -> str:
         parsed.database,
         LIVE_STORAGE_ROOT.parent / "test-storage-validation",
         LIVE_STORAGE_ROOT,
+        environment=os.environ.get("ENVIRONMENT"),
         database_host=parsed.host,
     )
     return url
 
 
 def validate_test_storage_root(root: Path) -> Path:
-    validate_test_environment(TEST_DATABASE, root, LIVE_STORAGE_ROOT)
+    validate_test_environment(
+        TEST_DATABASE,
+        root,
+        LIVE_STORAGE_ROOT,
+        environment=os.environ.get("ENVIRONMENT"),
+        database_host="127.0.0.1",
+    )
     return root
 
 

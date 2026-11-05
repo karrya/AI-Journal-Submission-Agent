@@ -9,8 +9,8 @@ def validate_test_environment(
     test_storage_root: str | Path,
     live_storage_root: str | Path,
     *,
-    environment: str | None = "test",
-    database_host: str | None = "127.0.0.1",
+    environment: str | None,
+    database_host: str | None,
 ) -> None:
     """Reject unsafe configuration before tests migrate or delete data."""
     if not database_name or not database_name.endswith("_test"):

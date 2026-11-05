@@ -28,7 +28,6 @@
     "vue-tsc": "^3.3.14"
   },
   "overrides": {
-    "@faker-js/faker": "5.5.3",
     "@postman/form-data": "npm:form-data@4.0.6",
     "csv-parse": "7.0.3",
     "flatted": "3.4.4",

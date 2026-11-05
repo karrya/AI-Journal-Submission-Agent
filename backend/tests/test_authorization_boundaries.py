@@ -13,6 +13,7 @@ from sqlalchemy import func, select
 
 from app.models import (
     Author,
+    AuthorAuthorization,
     FileFamily,
     Manuscript,
     ManuscriptAuthor,
@@ -20,7 +21,7 @@ from app.models import (
     ManuscriptVersion,
     OperationLog,
 )
-from test_files_api import PDF
+from test_files_api import PDF, post_pdf
 from test_manuscripts_api import author_input, manuscript_payload
 from test_security_matrix import ERROR_FIELDS, assert_error
 
@@ -139,7 +140,7 @@ def add_manuscript_graph(db_session, test_storage_root, owner, coauthor, marker,
 
 
 @pytest.fixture
-def isolation_workspace(db_session, test_storage_root, operator, operator_context, grant_factory):
+def isolation_workspace(client, db_session, test_storage_root, operator, operator_context, grant_factory):
     owner = Author(
         display_name="Matrix Owner",
         alternate_names=[],
@@ -182,8 +183,6 @@ def isolation_workspace(db_session, test_storage_root, operator, operator_contex
             ),
         ]
     )
-    own = add_manuscript_graph(db_session, test_storage_root, owner, coauthor, "OWN", operator)
-    hidden = add_manuscript_graph(db_session, test_storage_root, other, coauthor, "HIDDEN", operator)
     grant_now(
         grant_factory,
         user=operator,
@@ -197,6 +196,48 @@ def isolation_workspace(db_session, test_storage_root, operator, operator_contex
             "manuscript:file:manage",
         ],
     )
+    coauthor_grant = grant_now(
+        grant_factory,
+        user=operator,
+        author=coauthor,
+        permissions=["author:profile:read"],
+    )
+    db_session.commit()
+
+    created = client.post(
+        "/api/v1/manuscripts",
+        json=manuscript_payload(
+            owner,
+            authors=[
+                author_input(owner, 1, corresponding=True),
+                author_input(coauthor, 2),
+            ],
+        ),
+    )
+    assert created.status_code == 201, created.text
+    db_session.expire_all()
+    manuscript = db_session.get(Manuscript, created.json()["id"])
+    assert manuscript is not None
+    version = db_session.get(ManuscriptVersion, manuscript.current_version_id)
+    assert version is not None
+    uploaded = post_pdf(client, manuscript)
+    assert uploaded.status_code == 201, uploaded.text
+    db_session.commit()
+    record = db_session.get(ManuscriptFile, uploaded.json()["id"])
+    assert record is not None
+    family = db_session.get(FileFamily, record.file_family_id)
+    assert family is not None
+    own = SimpleNamespace(
+        manuscript=manuscript,
+        version=version,
+        family=family,
+        file=record,
+        authors=created.json()["authors"],
+    )
+    # Snapshot creation used the real API; reads must remain owner-only.
+    db_session.delete(coauthor_grant)
+    db_session.flush()
+    hidden = add_manuscript_graph(db_session, test_storage_root, other, coauthor, "HIDDEN", operator)
     db_session.commit()
     return SimpleNamespace(owner=owner, coauthor=coauthor, other=other, own=own, hidden=hidden)
 
@@ -367,9 +408,14 @@ def test_iso_01_manuscript_returns_minimal_coauthor_attribution_only(
 
 
 def test_iso_02_snapshot_file_list_and_dashboard_have_no_coauthor_secrets(
-    client, isolation_workspace
+    client, db_session, isolation_workspace
 ):
     own = isolation_workspace.own
+    assert db_session.scalar(
+        select(func.count())
+        .select_from(AuthorAuthorization)
+        .where(AuthorAuthorization.author_id == isolation_workspace.coauthor.id)
+    ) == 0
     responses = [
         client.get(
             f"/api/v1/manuscripts/{own.manuscript.id}/versions/{own.version.id}"

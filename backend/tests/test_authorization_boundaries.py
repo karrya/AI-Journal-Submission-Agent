@@ -359,6 +359,55 @@ def test_role_01_reviewer_alone_remains_read_only_even_with_write_grant(
     assert db_session.get(Manuscript, isolation_workspace.own.manuscript.id).title == original_title
 
 
+def test_role_denial_audit_does_not_reveal_author_existence_to_auditor(
+    client, db_session, user_factory, auth_context_factory, author
+):
+    user = user_factory("reviewer-auditor", roles=("reviewer", "auditor"))
+    auth_context_factory(user)
+    author.notes = "known-author-lookup-success-marker"
+    db_session.commit()
+    unknown_id = str(uuid4())
+    submitted_marker = "submitted-private-display-name-marker"
+    payload = {
+        "display_name": submitted_marker,
+        "confirm_identity_change": True,
+    }
+
+    responses = [
+        client.patch(f"/api/v1/authors/{author.id}", json=payload),
+        client.patch(f"/api/v1/authors/{unknown_id}", json=payload),
+    ]
+    for response in responses:
+        assert_error(response, 403, "PERMISSION_DENIED")
+    bodies = [dict(response.json()) for response in responses]
+    request_ids = [body.pop("request_id") for body in bodies]
+    assert bodies[0] == bodies[1]
+
+    events = []
+    for request_id in request_ids:
+        audited = client.get("/api/v1/audit-logs", params={"request_id": request_id})
+        assert audited.status_code == 200, audited.text
+        assert audited.json()["total"] == 1
+        assert len(audited.json()["items"]) == 1
+        events.append(audited.json()["items"][0])
+
+    volatile_fields = {"id", "request_id", "created_at", "target_id"}
+    sanitized = [
+        {key: value for key, value in event.items() if key not in volatile_fields}
+        for event in events
+    ]
+    assert sanitized[0] == sanitized[1]
+    for event, supplied_id in zip(events, (author.id, unknown_id), strict=True):
+        assert event["action"] == "authorization.permission_denied"
+        assert event["error_code"] == "PERMISSION_DENIED"
+        assert event["after_summary"] == {"permission": "author:profile:update"}
+        assert event["target_id"] == supplied_id
+        assert "author_id" not in event
+        serialized = json.dumps(event)
+        assert submitted_marker not in serialized
+        assert "known-author-lookup-success-marker" not in serialized
+
+
 @pytest.mark.parametrize("resource", ["author", "manuscript"])
 def test_authz_01_unauthorized_and_missing_uuids_are_indistinguishable(
     client, isolation_workspace, resource

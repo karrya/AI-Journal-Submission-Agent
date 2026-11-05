@@ -102,14 +102,14 @@ def _deny_author_permission(
     permission: Permission,
     request_id: str | None,
     error_code: str,
+    established_author_relationship: bool,
 ) -> NoReturn:
-    """Persist a sanitized denial without converting unknown resources into 404s."""
+    """Persist a sanitized denial without revealing author existence."""
     message = (
         "作者授权未生效、已过期或已撤销"
         if error_code == "AUTHORIZATION_EXPIRED"
         else "当前用户无权执行此操作"
     )
-    author = db.get(Author, author_id)
     AuditService(db).record(
         actor_user_id=user.id,
         actor_type="user",
@@ -121,7 +121,7 @@ def _deny_author_permission(
         ),
         target_type="author",
         target_id=author_id,
-        author_id=author.id if author is not None else None,
+        author_id=author_id if established_author_relationship else None,
         request_id=request_id or str(uuid4()),
         result="failure",
         after={"permission": permission.value},
@@ -143,8 +143,17 @@ def require_author_permission(
 ) -> Author:
     roles = _active_role_codes(db, user)
     if not _role_allows(roles, permission):
+        established_relationship = AuthorizationRepository(db).any_record(
+            user_id=user.id, author_id=author_id
+        )
         _deny_author_permission(
-            db, user, author_id, permission, request_id, "PERMISSION_DENIED"
+            db,
+            user,
+            author_id,
+            permission,
+            request_id,
+            "PERMISSION_DENIED",
+            established_relationship,
         )
 
     if "system_admin" in roles:
@@ -167,11 +176,11 @@ def require_author_permission(
         return author
     if repository.any_current(user_id=user.id, author_id=author_id, now_utc=now):
         _deny_author_permission(
-            db, user, author_id, permission, request_id, "PERMISSION_DENIED"
+            db, user, author_id, permission, request_id, "PERMISSION_DENIED", True
         )
     if repository.any_record(user_id=user.id, author_id=author_id):
         _deny_author_permission(
-            db, user, author_id, permission, request_id, "AUTHORIZATION_EXPIRED"
+            db, user, author_id, permission, request_id, "AUTHORIZATION_EXPIRED", True
         )
     raise AppError(404, "RESOURCE_NOT_FOUND", "资源不存在")
 

@@ -1,0 +1,1315 @@
+{
+  "info": {
+    "_postman_id": "7c408ef0-833b-4f1f-a7a4-a1c97dcce7f8",
+    "name": "Academic Submission Agent v0.1 Contract",
+    "description": "Local-only Newman contract suite. Credentials, cookies and CSRF values are supplied at runtime.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "pm.request.headers.upsert({key: \"Origin\", value: \"http://localhost:5173\"});",
+          "const csrf = pm.environment.get(\"CSRF_TOKEN\");",
+          "if (csrf && !pm.request.headers.has(\"X-CSRF-Token\")) {",
+          "    pm.request.headers.upsert({key: \"X-CSRF-Token\", value: csrf});",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "operator_user_id",
+      "value": "00000000-0000-4000-8000-000000000002"
+    },
+    {
+      "key": "write_only_operator_user_id",
+      "value": "00000000-0000-4000-8000-000000000004"
+    },
+    {
+      "key": "expired_author_id",
+      "value": "00000000-0000-4000-8000-000000000005"
+    }
+  ],
+  "item": [
+    {
+      "name": "01 Authentication and setup",
+      "item": [
+        {
+          "name": "Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/health"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"health is ok\", function () { pm.expect(body.status).to.eql(\"ok\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "No session is unauthorized",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/auth/me"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401\", function () { pm.response.to.have.status(401); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"error code is UNAUTHORIZED\", function () { pm.expect(body.code).to.eql(\"UNAUTHORIZED\"); });",
+                  "pm.test(\"error contract is flat\", function () {",
+                  "    pm.expect(Object.keys(body).sort()).to.eql([\"code\", \"details\", \"message\", \"request_id\"]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Initial admin login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{admin_username}}\",\n  \"password\": \"{{ADMIN_PASSWORD}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"authenticated user and CSRF are returned\", function () {",
+                  "    pm.expect(body.user.username).to.eql(pm.environment.get(\"admin_username\"));",
+                  "    pm.expect(body.user.must_change_password).to.eql(true);",
+                  "    pm.expect(body.csrf_token).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(body).not.to.have.property(\"session_token\");",
+                  "    pm.expect(body.user).not.to.have.property(\"password_hash\");",
+                  "});",
+                  "pm.environment.set(\"CSRF_TOKEN\", body.csrf_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Save and verify CSRF",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/auth/csrf"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"CSRF is stable for the session\", function () {",
+                  "    pm.expect(body.csrf_token).to.eql(pm.environment.get(\"CSRF_TOKEN\"));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Bad CSRF is rejected",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{BAD_CSRF_TOKEN}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/auth/change-password",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"current_password\": \"{{ADMIN_PASSWORD}}\",\n  \"new_password\": \"{{NEW_ADMIN_PASSWORD}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 403\", function () { pm.response.to.have.status(403); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"error code is SECURITY_CHECK_FAILED\", function () { pm.expect(body.code).to.eql(\"SECURITY_CHECK_FAILED\"); });",
+                  "pm.test(\"error contract is flat\", function () {",
+                  "    pm.expect(Object.keys(body).sort()).to.eql([\"code\", \"details\", \"message\", \"request_id\"]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Change initial password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/auth/change-password",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"current_password\": \"{{ADMIN_PASSWORD}}\",\n  \"new_password\": \"{{NEW_ADMIN_PASSWORD}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login again with new password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{admin_username}}\",\n  \"password\": \"{{NEW_ADMIN_PASSWORD}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"authenticated user and CSRF are returned\", function () {",
+                  "    pm.expect(body.user.username).to.eql(pm.environment.get(\"admin_username\"));",
+                  "    pm.expect(body.user.must_change_password).to.eql(false);",
+                  "    pm.expect(body.csrf_token).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(body).not.to.have.property(\"session_token\");",
+                  "    pm.expect(body.user).not.to.have.property(\"password_hash\");",
+                  "});",
+                  "pm.environment.set(\"CSRF_TOKEN\", body.csrf_token);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 Authors grants and cross-author isolation",
+      "item": [
+        {
+          "name": "Create author A",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/authors",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"display_name\": \"Contract Author A\",\n  \"alternate_names\": [],\n  \"orcid\": \"0000-0002-1825-0097\",\n  \"phone_country_code\": \"+00\",\n  \"phone_number\": \"private-phone-A\",\n  \"notes\": \"author A private notes\",\n  \"confirm_identity_change\": true\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"author A is active\", function () { pm.expect(body.display_name).to.eql(\"Contract Author A\"); });",
+                  "pm.collectionVariables.set(\"author_a_id\", body.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create author B with sensitive fixture data",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/authors",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"display_name\": \"Contract Author B\",\n  \"alternate_names\": [],\n  \"phone_country_code\": \"+00\",\n  \"phone_number\": \"private-phone-B\",\n  \"notes\": \"author B private notes\",\n  \"confirm_identity_change\": true\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"author B is active\", function () { pm.expect(body.display_name).to.eql(\"Contract Author B\"); });",
+                  "pm.collectionVariables.set(\"author_b_id\", body.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Grant only author A to test operator",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/author-authorizations",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"author_id\": \"{{author_a_id}}\",\n  \"user_id\": \"{{operator_user_id}}\",\n  \"permissions\": [\n    \"author:profile:read\",\n    \"manuscript:create\",\n    \"manuscript:read\",\n    \"manuscript:update\",\n    \"manuscript:file:manage\"\n  ],\n  \"valid_from\": \"{{grant_valid_from}}\",\n  \"valid_to\": \"{{grant_valid_to}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const now = Date.now();",
+                  "pm.variables.set(\"grant_valid_from\", new Date(now - 5 * 60 * 1000).toISOString());",
+                  "pm.variables.set(\"grant_valid_to\", new Date(now + 60 * 60 * 1000).toISOString());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"operator grant is active and limited to A\", function () {",
+                  "    pm.expect(body.author_id).to.eql(pm.collectionVariables.get(\"author_a_id\"));",
+                  "    pm.expect(body.user_id).to.eql(pm.collectionVariables.get(\"operator_user_id\"));",
+                  "    pm.expect(body.validity_status).to.eql(\"active\");",
+                  "    pm.expect(body.permissions).to.not.include(\"author:phone:read\");",
+                  "    pm.expect(body.permissions).to.not.include(\"author:email:read\");",
+                  "    pm.expect(body.permissions).to.not.include(\"author:address:read\");",
+                  "});",
+                  "pm.collectionVariables.set(\"operator_grant_id\", body.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Grant write-only operator update on A",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/author-authorizations",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"author_id\": \"{{author_a_id}}\",\n  \"user_id\": \"{{write_only_operator_user_id}}\",\n  \"permissions\": [\n    \"manuscript:update\"\n  ],\n  \"valid_from\": \"{{grant_valid_from}}\",\n  \"valid_to\": \"{{grant_valid_to}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const now = Date.now();",
+                  "pm.variables.set(\"grant_valid_from\", new Date(now - 5 * 60 * 1000).toISOString());",
+                  "pm.variables.set(\"grant_valid_to\", new Date(now + 60 * 60 * 1000).toISOString());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"write-only grant has no read permission\", function () {",
+                  "    pm.expect(body.permissions).to.eql([\"manuscript:update\"]);",
+                  "    pm.expect(body.author_id).to.eql(pm.collectionVariables.get(\"author_a_id\"));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create institution with private address",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/institutions",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Contract Test University\",\n  \"institution_type\": \"university\",\n  \"address_line1\": \"1 Contract Road\",\n  \"address_line2\": \"Private Campus\",\n  \"city\": \"Contract City\",\n  \"region\": \"Contract Region\",\n  \"postal_code\": \"100000\",\n  \"country_code\": \"CN\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"admin can read the created address\", function () { pm.expect(body.address_line1).to.eql(\"1 Contract Road\"); });",
+                  "pm.collectionVariables.set(\"institution_id\", body.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create author B email",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/authors/{{author_b_id}}/emails",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{author_b_email}}\",\n  \"purpose\": \"communication\",\n  \"confirm_email_binding\": true\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set(\"author_b_email\", \"contract-b@\" + \"example.org\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set(\"author_b_email_id\", body.id);",
+                  "pm.test(\"email fixture was created\", function () { pm.expect(body.author_id).to.eql(pm.collectionVariables.get(\"author_b_id\")); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cross-author email ID is not found",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/authors/{{author_a_id}}/emails/{{author_b_email_id}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"purpose\": \"backup\",\n  \"confirm_email_binding\": true\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 404\", function () { pm.response.to.have.status(404); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"error code is RESOURCE_NOT_FOUND\", function () { pm.expect(body.code).to.eql(\"RESOURCE_NOT_FOUND\"); });",
+                  "pm.test(\"error contract is flat\", function () {",
+                  "    pm.expect(Object.keys(body).sort()).to.eql([\"code\", \"details\", \"message\", \"request_id\"]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 Manuscript version and file workflow",
+      "item": [
+        {
+          "name": "Create manuscript with B as coauthor",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/manuscripts",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"owner_author_id\": \"{{author_a_id}}\",\n  \"title\": \"Contract Workflow Manuscript\",\n  \"abstract\": \"Contract workflow abstract\",\n  \"keywords\": [\n    \"contract\",\n    \"api\"\n  ],\n  \"article_type\": \"research\",\n  \"language\": \"en\",\n  \"funding_statement\": \"No external funding\",\n  \"authors\": [\n    {\n      \"author_id\": \"{{author_a_id}}\",\n      \"position\": 1,\n      \"is_corresponding\": true\n    },\n    {\n      \"author_id\": \"{{author_b_id}}\",\n      \"position\": 2,\n      \"is_corresponding\": false\n    }\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "const serialized = JSON.stringify(body);",
+                  "pm.test(\"no sensitive coauthor fields\", function () {",
+                  "    pm.expect(serialized).not.to.match(/phone_number|phone_country_code|address_line1|postal_code|normalized_email/);",
+                  "});",
+                  "pm.test(\"coauthor data is minimal and database-owned\", function () {",
+                  "    pm.expect(body.authors).to.have.length(2);",
+                  "    pm.expect(body.authors[1].author_id).to.eql(pm.collectionVariables.get(\"author_b_id\"));",
+                  "    pm.expect(body.authors[1].display_name).to.eql(\"Contract Author B\");",
+                  "    pm.expect(Object.keys(body.authors[1]).sort()).to.eql([\"author_id\", \"display_name\", \"is_corresponding\", \"position\"]);",
+                  "});",
+                  "pm.collectionVariables.set(\"manuscript_a_id\", body.id);",
+                  "pm.collectionVariables.set(\"initial_version_a_id\", body.current_version_id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create second manuscript for cross-ID checks",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/manuscripts",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"owner_author_id\": \"{{author_b_id}}\",\n  \"title\": \"Other Contract Manuscript\",\n  \"abstract\": \"Other abstract\",\n  \"keywords\": [],\n  \"article_type\": \"research\",\n  \"language\": \"en\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "const serialized = JSON.stringify(body);",
+                  "pm.test(\"no sensitive coauthor fields\", function () {",
+                  "    pm.expect(serialized).not.to.match(/phone_number|phone_country_code|address_line1|postal_code|normalized_email/);",
+                  "});",
+                  "pm.collectionVariables.set(\"manuscript_b_id\", body.id);",
+                  "pm.collectionVariables.set(\"version_b_id\", body.current_version_id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create immutable manuscript version",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/manuscripts/{{manuscript_a_id}}/versions",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"label\": \"Contract revision\",\n  \"change_note\": \"Create version for API contract\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "const serialized = JSON.stringify(body);",
+                  "pm.test(\"no sensitive coauthor fields\", function () {",
+                  "    pm.expect(serialized).not.to.match(/phone_number|phone_country_code|address_line1|postal_code|normalized_email/);",
+                  "});",
+                  "pm.test(\"second version has a safe snapshot\", function () {",
+                  "    pm.expect(body.version_number).to.eql(2);",
+                  "    pm.expect(body.metadata_snapshot.authors[1].display_name).to.eql(\"Contract Author B\");",
+                  "});",
+                  "pm.collectionVariables.set(\"version_a_id\", body.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upload minimal PDF",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{base_url}}/api/v1/manuscripts/{{manuscript_a_id}}/versions/{{version_a_id}}/files",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "backend/tests/fixtures/minimal.pdf",
+                  "contentType": "application/pdf"
+                },
+                {
+                  "key": "file_type",
+                  "value": "main_manuscript",
+                  "type": "text"
+                },
+                {
+                  "key": "display_name",
+                  "value": "Contract main manuscript",
+                  "type": "text"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"formal file metadata hides storage internals\", function () {",
+                  "    pm.expect(body.file_type).to.eql(\"main_manuscript\");",
+                  "    pm.expect(body.file_version).to.eql(1);",
+                  "    pm.expect(body.mime_type).to.eql(\"application/pdf\");",
+                  "    pm.expect(body).not.to.have.property(\"storage_path\");",
+                  "    pm.expect(body).not.to.have.property(\"stored_filename\");",
+                  "});",
+                  "pm.collectionVariables.set(\"file_id\", body.id);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04 Operator reads and data minimization",
+      "item": [
+        {
+          "name": "Operator login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{operator_username}}\",\n  \"password\": \"{{OPERATOR_PASSWORD}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"authenticated user and CSRF are returned\", function () {",
+                  "    pm.expect(body.user.username).to.eql(pm.environment.get(\"operator_username\"));",
+                  "    pm.expect(body.user.must_change_password).to.eql(false);",
+                  "    pm.expect(body.csrf_token).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(body).not.to.have.property(\"session_token\");",
+                  "    pm.expect(body.user).not.to.have.property(\"password_hash\");",
+                  "});",
+                  "pm.environment.set(\"CSRF_TOKEN\", body.csrf_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List accessible manuscripts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/manuscripts?page=1&page_size=20"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "const serialized = JSON.stringify(body);",
+                  "pm.test(\"no sensitive coauthor fields\", function () {",
+                  "    pm.expect(serialized).not.to.match(/phone_number|phone_country_code|address_line1|postal_code|normalized_email/);",
+                  "});",
+                  "pm.test(\"only author A manuscript is listed\", function () {",
+                  "    pm.expect(body.total).to.eql(1);",
+                  "    pm.expect(body.items[0].id).to.eql(pm.collectionVariables.get(\"manuscript_a_id\"));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Read manuscript with coauthor B",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/manuscripts/{{manuscript_a_id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "const serialized = JSON.stringify(body);",
+                  "pm.test(\"no sensitive coauthor fields\", function () {",
+                  "    pm.expect(serialized).not.to.match(/phone_number|phone_country_code|address_line1|postal_code|normalized_email/);",
+                  "});",
+                  "pm.test(\"B remains a minimal coauthor\", function () {",
+                  "    pm.expect(body.authors[1].author_id).to.eql(pm.collectionVariables.get(\"author_b_id\"));",
+                  "    pm.expect(Object.keys(body.authors[1]).sort()).to.eql([\"author_id\", \"display_name\", \"is_corresponding\", \"position\"]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List manuscript coauthors",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/manuscripts/{{manuscript_a_id}}/authors"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "const serialized = JSON.stringify(body);",
+                  "pm.test(\"no sensitive coauthor fields\", function () {",
+                  "    pm.expect(serialized).not.to.match(/phone_number|phone_country_code|address_line1|postal_code|normalized_email/);",
+                  "});",
+                  "pm.test(\"coauthor list exposes only approved fields\", function () {",
+                  "    pm.expect(body).to.have.length(2);",
+                  "    pm.expect(body[1].display_name).to.eql(\"Contract Author B\");",
+                  "    pm.expect(Object.keys(body[1]).sort()).to.eql([\"author_id\", \"display_name\", \"is_corresponding\", \"position\"]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List manuscript versions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/manuscripts/{{manuscript_a_id}}/versions?page=1&page_size=20"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "const serialized = JSON.stringify(body);",
+                  "pm.test(\"no sensitive coauthor fields\", function () {",
+                  "    pm.expect(serialized).not.to.match(/phone_number|phone_country_code|address_line1|postal_code|normalized_email/);",
+                  "});",
+                  "pm.test(\"both versions are available without sensitive coauthor data\", function () {",
+                  "    pm.expect(body.total).to.eql(2);",
+                  "    pm.expect(body.items[0].id).to.eql(pm.collectionVariables.get(\"version_a_id\"));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Read manuscript version",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/manuscripts/{{manuscript_a_id}}/versions/{{version_a_id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "const serialized = JSON.stringify(body);",
+                  "pm.test(\"no sensitive coauthor fields\", function () {",
+                  "    pm.expect(serialized).not.to.match(/phone_number|phone_country_code|address_line1|postal_code|normalized_email/);",
+                  "});",
+                  "pm.test(\"snapshot retains safe coauthor identity\", function () {",
+                  "    pm.expect(body.metadata_snapshot.authors[1].display_name).to.eql(\"Contract Author B\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List manuscript version files",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/manuscripts/{{manuscript_a_id}}/versions/{{version_a_id}}/files?page=1&page_size=20"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"uploaded file is listed without storage internals\", function () {",
+                  "    pm.expect(body.total).to.eql(1);",
+                  "    pm.expect(body.items[0].id).to.eql(pm.collectionVariables.get(\"file_id\"));",
+                  "    pm.expect(JSON.stringify(body)).not.to.match(/storage_path|stored_filename/);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Download uploaded PDF",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/files/{{file_id}}/download"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"download has safe attachment headers\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/pdf\");",
+                  "    pm.expect(pm.response.headers.get(\"X-Content-Type-Options\")).to.eql(\"nosniff\");",
+                  "    pm.expect(pm.response.headers.get(\"Content-Disposition\")).to.include(\"attachment;\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Institution address is summary-only",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/institutions/{{institution_id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "const serialized = JSON.stringify(body);",
+                  "pm.test(\"institution summary omits private address fields\", function () {",
+                  "    pm.expect(body.id).to.eql(pm.collectionVariables.get(\"institution_id\"));",
+                  "    pm.expect(body.city).to.eql(\"Contract City\");",
+                  "    pm.expect(serialized).not.to.match(/address_line1|address_line2|region|postal_code/);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ungranted author B profile is not found",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/authors/{{author_b_id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 404\", function () { pm.response.to.have.status(404); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"error code is RESOURCE_NOT_FOUND\", function () { pm.expect(body.code).to.eql(\"RESOURCE_NOT_FOUND\"); });",
+                  "pm.test(\"error contract is flat\", function () {",
+                  "    pm.expect(Object.keys(body).sort()).to.eql([\"code\", \"details\", \"message\", \"request_id\"]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cross-manuscript version ID is not found",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/manuscripts/{{manuscript_a_id}}/versions/{{version_b_id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 404\", function () { pm.response.to.have.status(404); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"error code is RESOURCE_NOT_FOUND\", function () { pm.expect(body.code).to.eql(\"RESOURCE_NOT_FOUND\"); });",
+                  "pm.test(\"error contract is flat\", function () {",
+                  "    pm.expect(Object.keys(body).sort()).to.eql([\"code\", \"details\", \"message\", \"request_id\"]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "05 Expired grant and write without read",
+      "item": [
+        {
+          "name": "Expired-grant operator login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{expired_operator_username}}\",\n  \"password\": \"{{EXPIRED_OPERATOR_PASSWORD}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"authenticated user and CSRF are returned\", function () {",
+                  "    pm.expect(body.user.username).to.eql(pm.environment.get(\"expired_operator_username\"));",
+                  "    pm.expect(body.user.must_change_password).to.eql(false);",
+                  "    pm.expect(body.csrf_token).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(body).not.to.have.property(\"session_token\");",
+                  "    pm.expect(body.user).not.to.have.property(\"password_hash\");",
+                  "});",
+                  "pm.environment.set(\"CSRF_TOKEN\", body.csrf_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Expired grant is rejected",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/authors/{{expired_author_id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 403\", function () { pm.response.to.have.status(403); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"error code is AUTHORIZATION_EXPIRED\", function () { pm.expect(body.code).to.eql(\"AUTHORIZATION_EXPIRED\"); });",
+                  "pm.test(\"error contract is flat\", function () {",
+                  "    pm.expect(Object.keys(body).sort()).to.eql([\"code\", \"details\", \"message\", \"request_id\"]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Write-only operator login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{write_only_operator_username}}\",\n  \"password\": \"{{WRITE_ONLY_OPERATOR_PASSWORD}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"authenticated user and CSRF are returned\", function () {",
+                  "    pm.expect(body.user.username).to.eql(pm.environment.get(\"write_only_operator_username\"));",
+                  "    pm.expect(body.user.must_change_password).to.eql(false);",
+                  "    pm.expect(body.csrf_token).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(body).not.to.have.property(\"session_token\");",
+                  "    pm.expect(body.user).not.to.have.property(\"password_hash\");",
+                  "});",
+                  "pm.environment.set(\"CSRF_TOKEN\", body.csrf_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Write without read cannot leak manuscript",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/manuscripts/{{manuscript_a_id}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Forbidden metadata change\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 403\", function () { pm.response.to.have.status(403); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"error code is PERMISSION_DENIED\", function () { pm.expect(body.code).to.eql(\"PERMISSION_DENIED\"); });",
+                  "pm.test(\"error contract is flat\", function () {",
+                  "    pm.expect(Object.keys(body).sort()).to.eql([\"code\", \"details\", \"message\", \"request_id\"]);",
+                  "});",
+                  "pm.test(\"denied write has no manuscript representation\", function () {",
+                  "    pm.expect(body).not.to.have.property(\"title\");",
+                  "    pm.expect(body).not.to.have.property(\"authors\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "06 Audit immutability",
+      "item": [
+        {
+          "name": "Admin login for audit verification",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{admin_username}}\",\n  \"password\": \"{{NEW_ADMIN_PASSWORD}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"authenticated user and CSRF are returned\", function () {",
+                  "    pm.expect(body.user.username).to.eql(pm.environment.get(\"admin_username\"));",
+                  "    pm.expect(body.user.must_change_password).to.eql(false);",
+                  "    pm.expect(body.csrf_token).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(body).not.to.have.property(\"session_token\");",
+                  "    pm.expect(body.user).not.to.have.property(\"password_hash\");",
+                  "});",
+                  "pm.environment.set(\"CSRF_TOKEN\", body.csrf_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Find file upload audit log",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/audit-logs?target_id={{file_id}}&action=file.upload"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"file upload produced one audit record\", function () {",
+                  "    pm.expect(body.total).to.eql(1);",
+                  "    pm.expect(body.items[0].action).to.eql(\"file.upload\");",
+                  "});",
+                  "pm.collectionVariables.set(\"audit_log_id\", body.items[0].id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Snapshot audit log",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/audit-logs/{{audit_log_id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"audit log is readable\", function () { pm.expect(body.id).to.eql(pm.collectionVariables.get(\"audit_log_id\")); });",
+                  "pm.collectionVariables.set(\"audit_snapshot\", JSON.stringify(body));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Audit log cannot be patched",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/audit-logs/{{audit_log_id}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"tampered\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 405\", function () { pm.response.to.have.status(405); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Audit log cannot be deleted",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{base_url}}/api/v1/audit-logs/{{audit_log_id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 405\", function () { pm.response.to.have.status(405); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Audit log cannot be created over HTTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/audit-logs",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"tampered\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 405\", function () { pm.response.to.have.status(405); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Audit log remains unchanged",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/audit-logs/{{audit_log_id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"audit snapshot is immutable\", function () {",
+                  "    pm.expect(JSON.stringify(body)).to.eql(pm.collectionVariables.get(\"audit_snapshot\"));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -6,17 +6,17 @@ PYTHON="$ROOT_DIR/.venv/bin/python"
 TEST_DATABASE_NAME="academic_submission_agent_test"
 
 if [[ ! -x "$PYTHON" ]]; then
-    printf 'Project virtualenv Python is required: %s\n' "$PYTHON" >&2
+    printf '需要项目虚拟环境中的 Python：%s\n' "$PYTHON" >&2
     exit 1
 fi
 
-# Reuse only the provisioned test URL when the caller did not inject one.
-# The value stays in the process environment and is never written to an artifact.
+# 仅当调用方未注入测试数据库 URL 时，才复用已配置的测试 URL。
+# 该值仅保留在进程环境中，绝不写入任何生成文件。
 if [[ -z "${TEST_DATABASE_URL:-}" ]]; then
     TEST_DATABASE_URL="$(PYTHONPATH="$ROOT_DIR/backend" "$PYTHON" -c 'from app.core.config import get_settings; print(get_settings().test_database_url or "")')"
 fi
 if [[ -z "$TEST_DATABASE_URL" ]]; then
-    printf 'TEST_DATABASE_URL must be injected or provisioned for the test database.\n' >&2
+    printf '必须为测试数据库注入或配置 TEST_DATABASE_URL。\n' >&2
     exit 1
 fi
 
@@ -26,11 +26,11 @@ from sqlalchemy.engine import make_url
 
 url = make_url(sys.argv[1])
 if not url.drivername.startswith("mysql+") or url.database != sys.argv[2]:
-    raise SystemExit("Refusing to run API contracts against a non-test database")
+    raise SystemExit("拒绝针对非测试数据库运行 API 契约测试")
 if url.host not in {"localhost", "127.0.0.1", "::1"}:
     raise SystemExit(
-        "Refusing to run API contracts: TEST_DATABASE_URL host must be an "
-        "explicit loopback (localhost, 127.0.0.1, or ::1)"
+        "拒绝运行 API 契约测试：TEST_DATABASE_URL 主机必须显式指定为"
+        "回环地址（localhost、127.0.0.1 或 ::1）"
     )
 PY
 
@@ -39,7 +39,7 @@ import socket
 
 with socket.socket() as probe:
     if probe.connect_ex(("127.0.0.1", 8001)) == 0:
-        raise SystemExit("Refusing to run API contracts: 127.0.0.1:8001 is already in use")
+        raise SystemExit("拒绝运行 API 契约测试：127.0.0.1:8001 已被占用")
 PY
 
 WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/asa-api-contract.XXXXXX")"
@@ -147,13 +147,13 @@ try:
 
     roles = {}
     for code, name in (
-        ("system_admin", "System Administrator"),
-        ("submission_operator", "Submission Operator"),
-        ("reviewer", "Reviewer"),
-        ("author", "Author"),
-        ("auditor", "Auditor"),
+        ("system_admin", "系统管理员"),
+        ("submission_operator", "投稿操作员"),
+        ("reviewer", "审稿人"),
+        ("author", "作者"),
+        ("auditor", "审计员"),
     ):
-        role = Role(code=code, name=name, description=f"API contract {name}")
+        role = Role(code=code, name=name, description=f"API 契约测试角色：{name}")
         session.add(role)
         roles[code] = role
 
@@ -209,7 +209,7 @@ BACKEND_PID=$!
 ready=false
 for _ in {1..60}; do
     if ! kill -0 "$BACKEND_PID" 2>/dev/null; then
-        printf 'Isolated API backend exited before becoming ready.\n' >&2
+        printf '隔离的 API 后端在就绪前已退出。\n' >&2
         exit 1
     fi
     if curl --silent --fail --output /dev/null "http://127.0.0.1:8001/api/v1/health"; then
@@ -219,7 +219,7 @@ for _ in {1..60}; do
     sleep 1
 done
 if [[ "$ready" != true ]]; then
-    printf 'Isolated API backend did not become ready within 60 seconds.\n' >&2
+    printf '隔离的 API 后端未在 60 秒内就绪。\n' >&2
     exit 1
 fi
 

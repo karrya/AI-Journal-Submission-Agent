@@ -41,7 +41,7 @@ const remainingAuthors = computed(() => props.availableAuthors.filter(
 function addAuthor(): void {
   const author = remainingAuthors.value.find((candidate) => candidate.id === selectedAuthorId.value)
   if (!author) {
-    error.value = 'Select an authorized author to add.'
+    error.value = '请选择要添加的已授权作者。'
     return
   }
   rows.value.push({
@@ -72,15 +72,15 @@ function remove(index: number): void {
 function submit(): void {
   error.value = ''
   if (!confirmed.value) {
-    error.value = 'Confirm the ordered authorship change before saving.'
+    error.value = '保存前请确认作者名单及顺序变更。'
     return
   }
   if (!rows.value.some((author) => author.author_id === props.ownerAuthorId)) {
-    error.value = 'The manuscript owner must remain in the author list.'
+    error.value = '稿件所有者必须保留在作者名单中。'
     return
   }
   if (!rows.value.some((author) => author.is_corresponding)) {
-    error.value = 'Select at least one corresponding author.'
+    error.value = '请至少选择一位通讯作者。'
     return
   }
   const authors: ManuscriptAuthorInput[] = rows.value.map((author, index) => ({
@@ -95,22 +95,22 @@ function submit(): void {
 <template>
   <form class="stacked-form" novalidate @submit.prevent="submit">
     <div class="toolbar">
-      <label>Add authorized coauthor
+      <label>添加已授权的共同作者
         <select v-model="selectedAuthorId" data-test="new-author">
-          <option value="">Select an author</option>
+          <option value="">请选择作者</option>
           <option v-for="author in remainingAuthors" :key="author.id" :value="author.id">
             {{ author.display_name }}
           </option>
         </select>
       </label>
-      <button type="button" data-test="add-author" :disabled="!selectedAuthorId" @click="addAuthor">Add author</button>
+      <button type="button" data-test="add-author" :disabled="!selectedAuthorId" @click="addAuthor">添加作者</button>
     </div>
 
     <ol class="authorship-list">
       <li v-for="(author, index) in rows" :key="author.author_id" class="authorship-row">
         <span class="author-position">{{ index + 1 }}</span>
         <span class="author-name">{{ author.display_name }}</span>
-        <span v-if="author.author_id === ownerAuthorId">Owner</span>
+        <span v-if="author.author_id === ownerAuthorId">所有者</span>
         <label class="confirmation-control">
           <input
             v-model="author.is_corresponding"
@@ -118,19 +118,19 @@ function submit(): void {
             type="checkbox"
             @change="confirmed = false"
           >
-          Corresponding author
+          通讯作者
         </label>
-        <button type="button" :data-test="`move-up-${author.author_id}`" :disabled="index === 0" @click="move(index, -1)">Move up</button>
-        <button type="button" :data-test="`move-down-${author.author_id}`" :disabled="index === rows.length - 1" @click="move(index, 1)">Move down</button>
-        <button v-if="author.author_id !== ownerAuthorId" type="button" :data-test="`remove-${author.author_id}`" @click="remove(index)">Remove</button>
+        <button type="button" :data-test="`move-up-${author.author_id}`" :disabled="index === 0" @click="move(index, -1)">上移</button>
+        <button type="button" :data-test="`move-down-${author.author_id}`" :disabled="index === rows.length - 1" @click="move(index, 1)">下移</button>
+        <button v-if="author.author_id !== ownerAuthorId" type="button" :data-test="`remove-${author.author_id}`" @click="remove(index)">移除</button>
       </li>
     </ol>
 
     <label class="confirmation-control">
       <input v-model="confirmed" data-test="authorship-confirm" type="checkbox">
-      I confirm this ordered author list and corresponding-author selection.
+      我确认此作者名单、排列顺序及通讯作者选择。
     </label>
     <p v-if="error" class="form-error" role="alert">{{ error }}</p>
-    <button type="submit" :disabled="submitting">Save authorship</button>
+    <button type="submit" :disabled="submitting">保存作者名单</button>
   </form>
 </template>

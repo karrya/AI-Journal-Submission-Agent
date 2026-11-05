@@ -22,12 +22,12 @@ function safeDestination(): string {
 function loginError(error: unknown): string {
   const status = axios.isAxiosError(error) ? error.response?.status : undefined
   const message = status === 401
-    ? 'Invalid username or password.'
+    ? '用户名或密码错误。'
     : status === 429
-      ? 'Too many attempts. Please try again later.'
-      : 'Unable to sign in. Please try again.'
+      ? '尝试次数过多，请稍后重试。'
+      : '无法登录，请重试。'
   const requestId = getSafeRequestId(error)
-  return requestId ? `${message} Request ID: ${requestId}` : message
+  return requestId ? `${message} 请求 ID：${requestId}` : message
 }
 
 async function submit(): Promise<void> {
@@ -36,7 +36,7 @@ async function submit(): Promise<void> {
   errorMessage.value = ''
   try {
     if (!form.username || !form.password) {
-      errorMessage.value = 'Enter your username and password.'
+      errorMessage.value = '请输入用户名和密码。'
       return
     }
     const user = await auth.login(form.username, form.password)
@@ -53,9 +53,9 @@ async function submit(): Promise<void> {
 
 <template>
   <section class="auth-card" aria-labelledby="login-title">
-    <p class="auth-eyebrow">Academic Submission Agent</p>
-    <h1 id="login-title">Sign in</h1>
-    <p class="auth-intro">Use your administrator account to continue.</p>
+    <p class="auth-eyebrow">学术投稿助手</p>
+    <h1 id="login-title">登录</h1>
+    <p class="auth-intro">使用管理员账号继续。</p>
     <el-alert
       v-if="errorMessage"
       class="auth-alert"
@@ -69,7 +69,7 @@ async function submit(): Promise<void> {
       label-position="top"
       @submit.prevent="submit"
     >
-      <el-form-item label="Username" prop="username">
+      <el-form-item label="用户名" prop="username">
         <el-input
           v-model.trim="form.username"
           data-test="username"
@@ -77,7 +77,7 @@ async function submit(): Promise<void> {
           :disabled="submitting"
         />
       </el-form-item>
-      <el-form-item label="Password" prop="password">
+      <el-form-item label="密码" prop="password">
         <el-input
           v-model="form.password"
           data-test="password"
@@ -94,7 +94,7 @@ async function submit(): Promise<void> {
         :loading="submitting"
         :disabled="submitting"
       >
-        Sign in
+        登录
       </el-button>
     </el-form>
   </section>

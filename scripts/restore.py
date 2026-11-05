@@ -1,4 +1,4 @@
-"""Restore encrypted backups only to an empty, isolated test target."""
+"""仅将加密备份恢复到空的隔离测试目标。"""
 
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ SAFE_NAME = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")
 
 
 class RestoreFailed(RuntimeError):
-    """The backup or isolated restore failed verification."""
+    """备份或隔离恢复未通过验证。"""
 
 
 @dataclass
@@ -47,41 +47,41 @@ def validate_restore_target(
     *,
     live_storage: Path = PROJECT_ROOT / "storage",
 ) -> Path:
-    """Require a _test database and an empty directory outside live storage."""
+    """要求使用名称以 _test 结尾的数据库，以及正式存储目录之外的空目录。"""
     if database_name == DEVELOPMENT_DATABASE or not DATABASE_NAME.fullmatch(
         database_name
     ):
-        raise ValueError("restore database must be an isolated name ending in _test")
+        raise ValueError("恢复数据库必须使用以 _test 结尾的隔离名称")
     raw_target = Path(target_directory).expanduser()
     if raw_target.is_symlink():
-        raise ValueError("restore directory must not be a symlink")
+        raise ValueError("恢复目录不得是符号链接")
     if not raw_target.is_absolute():
         raw_target = PROJECT_ROOT / raw_target
     target = raw_target.resolve()
     live = Path(live_storage).resolve()
     if target == live or live in target.parents:
-        raise ValueError("restore directory must be outside live storage")
+        raise ValueError("恢复目录必须位于正式存储目录之外")
     if target.exists():
         if not target.is_dir():
-            raise ValueError("restore target must be a directory")
+            raise ValueError("恢复目标路径必须是目录")
         if any(target.iterdir()):
-            raise ValueError("restore directory must be empty")
+            raise ValueError("恢复目录必须为空")
     return target
 
 
 def validate_age_key_file(key_file: str | Path) -> Path:
-    """Require a restrictive private-key file outside the project."""
+    """要求使用项目外权限受限的私钥文件。"""
     raw_path = Path(key_file).expanduser()
     if raw_path.is_symlink():
-        raise ValueError("age private key must not be a symlink")
+        raise ValueError("age 私钥不得是符号链接")
     path = raw_path.resolve()
     if path == PROJECT_ROOT or PROJECT_ROOT in path.parents:
-        raise ValueError("age private key must be outside the project")
+        raise ValueError("age 私钥必须位于项目目录之外")
     if not path.is_file():
-        raise ValueError("age private key file is missing")
+        raise ValueError("缺少 age 私钥文件")
     if path.stat().st_mode & 0o077:
         raise ValueError(
-            "age private key permissions must not allow group/other access"
+            "age 私钥权限不得允许用户组或其他用户访问"
         )
     return path
 
@@ -89,7 +89,7 @@ def validate_age_key_file(key_file: str | Path) -> Path:
 def _validate_member_name(name: str) -> PurePosixPath:
     path = PurePosixPath(name)
     if path.is_absolute() or not name or ".." in path.parts or "." in path.parts:
-        raise RestoreFailed("archive contains an unsafe path")
+        raise RestoreFailed("归档文件包含不安全路径")
     return path
 
 
@@ -97,14 +97,14 @@ def _read_manifest(
     bundle: tarfile.TarFile, members: dict[str, tarfile.TarInfo]
 ) -> dict:
     if "manifest.json" not in members:
-        raise RestoreFailed("archive manifest is missing")
+        raise RestoreFailed("缺少归档清单")
     manifest_file = bundle.extractfile(members["manifest.json"])
     if manifest_file is None:
-        raise RestoreFailed("archive manifest is unreadable")
+        raise RestoreFailed("归档清单无法读取")
     try:
         manifest = json.load(manifest_file)
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise RestoreFailed("archive manifest is invalid") from exc
+        raise RestoreFailed("归档清单无效") from exc
     if (
         not isinstance(manifest, dict)
         or manifest.get("format_version") != 1
@@ -113,13 +113,13 @@ def _read_manifest(
         or not SAFE_NAME.fullmatch(manifest["source_database"])
         or not isinstance(manifest.get("files"), list)
     ):
-        raise RestoreFailed("archive manifest has an unsupported format")
+        raise RestoreFailed("归档清单格式不受支持")
 
     archived_paths = set(members) - {"manifest.json"}
     manifest_paths: set[str] = set()
     for entry in manifest["files"]:
         if not isinstance(entry, dict) or set(entry) != {"path", "sha256", "size"}:
-            raise RestoreFailed("archive manifest contains an invalid entry")
+            raise RestoreFailed("归档清单包含无效条目")
         path = entry["path"]
         if (
             not isinstance(path, str)
@@ -129,23 +129,23 @@ def _read_manifest(
             or type(entry["size"]) is not int
             or entry["size"] < 0
         ):
-            raise RestoreFailed("archive manifest contains an invalid entry")
+            raise RestoreFailed("归档清单包含无效条目")
         _validate_member_name(path)
         manifest_paths.add(path)
     if manifest_paths != archived_paths:
-        raise RestoreFailed("archive files do not match the manifest")
+        raise RestoreFailed("归档文件与清单不一致")
 
     for entry in manifest["files"]:
         extracted = bundle.extractfile(members[entry["path"]])
         if extracted is None:
-            raise RestoreFailed("archive member is unreadable")
+            raise RestoreFailed("归档成员无法读取")
         digest = hashlib.sha256()
         size = 0
         while chunk := extracted.read(1024 * 1024):
             digest.update(chunk)
             size += len(chunk)
         if size != entry["size"] or digest.hexdigest() != entry["sha256"]:
-            raise RestoreFailed("archive SHA-256 verification failed")
+            raise RestoreFailed("归档文件 SHA-256（安全散列算法 256 位）校验失败")
     return manifest
 
 
@@ -156,7 +156,7 @@ def _quoted_token(dump: str, start: int, quote: str) -> tuple[str, int]:
         char = dump[index]
         if char == "\\":
             if index + 1 >= len(dump):
-                raise RestoreFailed("database dump has an unterminated escape")
+                raise RestoreFailed("数据库导出文件包含未终止的转义序列")
             if quote != "`":
                 content.append(dump[index + 1])
             index += 2
@@ -169,11 +169,11 @@ def _quoted_token(dump: str, start: int, quote: str) -> tuple[str, int]:
             return "".join(content), index + 1
         content.append(char)
         index += 1
-    raise RestoreFailed("database dump has an unterminated quoted value")
+    raise RestoreFailed("数据库导出文件包含未终止的引用值")
 
 
 def _mysql_tokens(dump: str) -> list[tuple[str, str]]:
-    """Tokenize executable MySQL SQL, ignoring comments and literal contents."""
+    """将可执行的 MySQL SQL 分词，忽略注释和字面量内容。"""
     tokens: list[tuple[str, str]] = []
     index = 0
     while index < len(dump):
@@ -192,7 +192,7 @@ def _mysql_tokens(dump: str) -> list[tuple[str, str]]:
         if dump.startswith("/*", index):
             end = dump.find("*/", index + 2)
             if end < 0:
-                raise RestoreFailed("database dump has an unterminated comment")
+                raise RestoreFailed("数据库导出文件包含未终止的注释")
             if dump.startswith("/*!", index):
                 executable = dump[index + 3 : end]
                 if len(executable) >= 5 and executable[:5].isdigit():
@@ -295,7 +295,7 @@ def _validate_dump(dump_path: Path) -> None:
     closing_seen = False
     for statement in statements:
         if statement[0][0] != "ident":
-            raise RestoreFailed("database dump contains an unsupported statement")
+            raise RestoreFailed("数据库导出文件包含不支持的语句")
         keyword = statement[0][1].upper()
         if keyword == "SET":
             signature = _canonical_statement(statement)
@@ -305,19 +305,19 @@ def _validate_dump(dump_path: Path) -> None:
                 pass
             else:
                 raise RestoreFailed(
-                    "database dump contains unsupported mysqldump SET statement"
+                    "数据库导出文件包含不支持的 mysqldump SET 语句"
                 )
             continue
         if closing_seen:
             raise RestoreFailed(
-                "database dump contains statements after mysqldump cleanup"
+                "数据库导出文件在 mysqldump 清理语句后仍包含其他语句"
             )
         if keyword not in allowed_second_keywords:
-            raise RestoreFailed("database dump contains an unsupported statement")
+            raise RestoreFailed("数据库导出文件包含不支持的语句")
         if len(statement) < 2 or statement[1][0] != "ident":
-            raise RestoreFailed("database dump contains an unsupported statement")
+            raise RestoreFailed("数据库导出文件包含不支持的语句")
         if statement[1][1].upper() not in allowed_second_keywords[keyword]:
-            raise RestoreFailed("database dump contains an unsupported statement")
+            raise RestoreFailed("数据库导出文件包含不支持的语句")
 
     for index in range(len(tokens) - 2):
         left, dot, right = tokens[index : index + 3]
@@ -329,7 +329,7 @@ def _validate_dump(dump_path: Path) -> None:
                 left[0] == "ident" and index > 0 and tokens[index - 1] == ("punct", "@")
             )
         ):
-            raise RestoreFailed("database dump contains a schema-qualified reference")
+            raise RestoreFailed("数据库导出文件包含带数据库限定的引用")
 
 
 def extract_verified_backup(
@@ -339,14 +339,14 @@ def extract_verified_backup(
     *,
     age_binary: str = "age",
 ) -> dict:
-    """Decrypt to temporary storage, verify every hash, then extract safely."""
+    """先解密到临时存储并校验所有哈希，再安全解压。"""
     key_file = validate_age_key_file(age_secret_key_file)
     archive = Path(backup_path).resolve()
     if not archive.is_file():
-        raise RestoreFailed("encrypted backup is missing")
+        raise RestoreFailed("缺少加密备份文件")
     target = Path(destination).resolve()
     if target.exists():
-        raise RestoreFailed("verified extraction target must not already exist")
+        raise RestoreFailed("已验证解压目标不得事先存在")
 
     try:
         with tempfile.TemporaryDirectory(prefix="academic-agent-restore-") as temp:
@@ -359,14 +359,14 @@ def extract_verified_backup(
                     check=False,
                 )
             if result.returncode != 0:
-                raise RestoreFailed("age decryption failed")
+                raise RestoreFailed("age 解密失败")
 
             with tarfile.open(plaintext_tar, mode="r:") as bundle:
                 members: dict[str, tarfile.TarInfo] = {}
                 for member in bundle.getmembers():
                     name = _validate_member_name(member.name).as_posix()
                     if name in members or not member.isreg():
-                        raise RestoreFailed("archive contains an unsupported member")
+                        raise RestoreFailed("归档文件包含不支持的成员")
                     members[name] = member
                 manifest = _read_manifest(bundle, members)
                 for name, member in members.items():
@@ -375,7 +375,7 @@ def extract_verified_backup(
                     output_path.parent.mkdir(parents=True, exist_ok=True)
                     source = bundle.extractfile(member)
                     if source is None:
-                        raise RestoreFailed("archive member is unreadable")
+                        raise RestoreFailed("归档成员无法读取")
                     descriptor = os.open(
                         output_path,
                         os.O_WRONLY | os.O_CREAT | os.O_EXCL,
@@ -392,7 +392,7 @@ def extract_verified_backup(
             raise
         if isinstance(exc, (KeyboardInterrupt, SystemExit, GeneratorExit)):
             raise
-        raise RestoreFailed("encrypted backup could not be verified") from exc
+        raise RestoreFailed("加密备份无法通过验证") from exc
 
 
 def _create_engine(database_url: str) -> Engine:
@@ -407,7 +407,7 @@ def _database_snapshot(engine: Engine, expected_database: str) -> dict[str, int]
         actual_database = connection.scalar(text("SELECT DATABASE()"))
         if actual_database != expected_database:
             raise RestoreFailed(
-                "connected database does not match the requested target"
+                "已连接数据库与请求的目标不一致"
             )
         rows = connection.execute(
             text(
@@ -419,7 +419,7 @@ def _database_snapshot(engine: Engine, expected_database: str) -> dict[str, int]
         snapshot: dict[str, int] = {}
         for table in tables:
             if not SAFE_NAME.fullmatch(table):
-                raise RestoreFailed("database contains an unsupported table name")
+                raise RestoreFailed("数据库包含不支持的表名")
             count = connection.scalar(text(f"SELECT COUNT(*) FROM `{table}`"))
             snapshot[table] = int(count)
         return snapshot
@@ -432,10 +432,10 @@ def _run_mysql_restore(
         argument for argument in command if argument.startswith("--database=")
     ]
     if len(database_arguments) != 1:
-        raise RestoreFailed("isolated database import configuration is invalid")
+        raise RestoreFailed("隔离数据库导入配置无效")
     database = database_arguments[0].removeprefix("--database=")
     if not DATABASE_NAME.fullmatch(database):
-        raise RestoreFailed("isolated database import configuration is invalid")
+        raise RestoreFailed("隔离数据库导入配置无效")
     with dump_path.open("rb") as dump:
         process = subprocess.Popen(
             command,
@@ -457,11 +457,11 @@ def _run_mysql_restore(
                 process.wait()
             raise
     if return_code != 0:
-        raise RestoreFailed("isolated database import failed")
+        raise RestoreFailed("隔离数据库导入失败")
 
 
 def _recreate_excluded_tables(engine: Engine) -> None:
-    """Recreate only intentionally omitted tables, without stamping revisions."""
+    """仅重建有意排除的表，不写入迁移版本标记。"""
     sys.path.insert(0, str(BACKEND_DIR))
     from app.models import Base
 
@@ -473,7 +473,7 @@ def _run_alembic(database_url: str) -> None:
     try:
         _recreate_excluded_tables(engine)
     except Exception as exc:
-        raise RestoreFailed("Alembic verification failed") from exc
+        raise RestoreFailed("Alembic 验证失败") from exc
     finally:
         engine.dispose()
     environment = os.environ.copy()
@@ -495,7 +495,7 @@ def _run_alembic(database_url: str) -> None:
             check=False,
         )
         if result.returncode != 0:
-            raise RestoreFailed("Alembic verification failed")
+            raise RestoreFailed("Alembic 验证失败")
 
 
 def _mysql_restore_arguments(database_url: str) -> tuple[list[str], dict[str, str]]:
@@ -541,9 +541,9 @@ def restore_backup(
     ] = _run_mysql_restore,
     migration_runner: Callable[[str], None] = _run_alembic,
 ) -> RestoreVerification:
-    """Restore and compare tables, rows, files, hashes, and source count stability."""
+    """恢复并比对表、行、文件和哈希，同时确认源表数量稳定。"""
     if confirmation != "RESTORE":
-        raise ValueError("restore requires explicit --confirm RESTORE")
+        raise ValueError("恢复操作必须显式传入 --confirm RESTORE")
     source_url = make_url(source_database_url)
     target_url = make_url(target_database_url)
     if (
@@ -554,9 +554,9 @@ def restore_backup(
         or not source_url.username
         or not target_url.username
     ):
-        raise ValueError("valid source and target MySQL URLs are required")
+        raise ValueError("必须提供有效的源和目标 MySQL URL")
     if source_url.database == target_url.database:
-        raise ValueError("restore target must differ from the development database")
+        raise ValueError("恢复目标必须不同于开发数据库")
     target = validate_restore_target(
         target_url.database, target_directory, live_storage=Path(live_storage)
     )
@@ -569,7 +569,7 @@ def restore_backup(
         target_engine = engine_factory(target_database_url)
         source_before = _database_snapshot(source_engine, source_url.database)
         if _database_snapshot(target_engine, target_url.database):
-            raise RestoreFailed("restore database must be empty")
+            raise RestoreFailed("恢复目标数据库必须为空")
 
         with tempfile.TemporaryDirectory(prefix="academic-agent-verified-") as temp:
             verified = Path(temp) / "verified"
@@ -578,7 +578,7 @@ def restore_backup(
             )
             if manifest["source_database"] != source_url.database:
                 raise RestoreFailed(
-                    "backup source does not match the development database"
+                    "备份来源与开发数据库不一致"
                 )
             command, environment = _mysql_restore_arguments(target_database_url)
             mysql_runner(command, environment, verified / "database.sql")
@@ -590,12 +590,12 @@ def restore_backup(
             }
             if dumped_tables != expected_dump:
                 raise RestoreFailed(
-                    "restored dump tables or rows do not match the source"
+                    "恢复后的导出表或数据行与源数据库不一致"
                 )
             migration_runner(target_database_url)
 
             if target.exists() and any(target.iterdir()):
-                raise RestoreFailed("restore directory became non-empty")
+                raise RestoreFailed("恢复目录变为非空")
             storage_source = verified / "storage"
             storage_entries = [
                 entry
@@ -611,19 +611,19 @@ def restore_backup(
         source_after = _database_snapshot(source_engine, source_url.database)
         if source_after != source_before:
             raise RestoreFailed(
-                "development table names or row counts changed during restore"
+                "恢复期间开发数据库的表名或行数发生变化"
             )
         target_after = _database_snapshot(target_engine, target_url.database)
         if not set(source_before).issubset(target_after):
-            raise RestoreFailed("post-migration source tables are missing")
+            raise RestoreFailed("迁移后缺少源数据库中的表")
         compared = 0
         for table, source_count in source_before.items():
             if table == "auth_sessions":
                 if target_after[table] != 0:
-                    raise RestoreFailed("sessions must not be restored")
+                    raise RestoreFailed("不得恢复会话数据")
                 continue
             if target_after[table] != source_count:
-                raise RestoreFailed("restored row counts do not match the source")
+                raise RestoreFailed("恢复后的行数与源数据库不一致")
             compared += 1
 
         expected_files = {
@@ -635,7 +635,7 @@ def restore_backup(
         if target.exists():
             for path in target.rglob("*"):
                 if path.is_symlink() or not path.is_file() and not path.is_dir():
-                    raise RestoreFailed("restored storage contains an unsupported file")
+                    raise RestoreFailed("恢复后的存储目录包含不支持的文件")
                 if path.is_file():
                     digest = hashlib.sha256()
                     with path.open("rb") as restored:
@@ -645,7 +645,7 @@ def restore_backup(
                         digest.hexdigest()
                     )
         if actual_files != expected_files:
-            raise RestoreFailed("restored file counts or hashes do not match")
+            raise RestoreFailed("恢复后的文件数量或哈希不一致")
         return RestoreVerification(
             table_count=len(target_after),
             compared_row_counts=compared,
@@ -661,7 +661,7 @@ def restore_backup(
         if isinstance(exc, (KeyboardInterrupt, SystemExit, GeneratorExit)):
             raise
         raise RestoreFailed(
-            "isolated restore failed; development data was not targeted"
+            "隔离恢复失败，未将开发数据作为操作目标"
         ) from exc
     finally:
         if source_engine is not None:
@@ -689,17 +689,17 @@ def main() -> None:
     else:
         test_url = os.environ.get("TEST_DATABASE_URL")
         if not test_url:
-            raise SystemExit("RESTORE_DATABASE_URL or TEST_DATABASE_URL is required")
+            raise SystemExit("必须设置 RESTORE_DATABASE_URL 或 TEST_DATABASE_URL")
         target_url = (
             make_url(test_url)
             .set(database=args.database)
             .render_as_string(hide_password=False)
         )
     if make_url(target_url).database != args.database:
-        raise SystemExit("RESTORE_DATABASE_URL must match --database")
+        raise SystemExit("RESTORE_DATABASE_URL 必须与 --database 一致")
     key_file = os.environ.get("AGE_SECRET_KEY_FILE")
     if not key_file:
-        raise SystemExit("AGE_SECRET_KEY_FILE is required")
+        raise SystemExit("必须设置 AGE_SECRET_KEY_FILE")
     try:
         verification = restore_backup(
             args.backup,

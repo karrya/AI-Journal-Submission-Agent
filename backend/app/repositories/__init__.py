@@ -1,1 +1,1 @@
-"""Persistence-layer repositories."""
+"""持久化层仓储。"""

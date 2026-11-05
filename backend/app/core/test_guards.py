@@ -12,15 +12,15 @@ def validate_test_environment(
     environment: str | None,
     database_host: str | None,
 ) -> None:
-    """Reject unsafe configuration before tests migrate or delete data."""
+    """在测试执行迁移或删除数据前拒绝不安全的配置。"""
     if not database_name or not database_name.endswith("_test"):
-        raise RuntimeError("tests require a database name ending in _test")
+        raise RuntimeError("测试数据库名称必须以 _test 结尾")
     if database_host not in LOOPBACK_HOSTS:
-        raise RuntimeError("tests require an explicit loopback database host")
+        raise RuntimeError("测试数据库主机必须显式指定为回环地址")
     if environment != "test":
-        raise RuntimeError("tests require ENVIRONMENT=test")
+        raise RuntimeError("测试环境必须设置 ENVIRONMENT=test")
 
     test_storage = Path(test_storage_root).resolve()
     live_storage = Path(live_storage_root).resolve()
     if test_storage == live_storage or live_storage in test_storage.parents:
-        raise RuntimeError("tests cannot use the live storage directory")
+        raise RuntimeError("测试不得使用正式存储目录")

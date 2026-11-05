@@ -545,7 +545,7 @@ def test_create_admin_seeds_five_roles_and_one_initial_system_admin(db_session):
         )
     )
 
-    with pytest.raises(ValueError, match="already"):
+    with pytest.raises(ValueError, match="已经完成"):
         create_admin.initialize_admin(
             db_session,
             username="another-admin",

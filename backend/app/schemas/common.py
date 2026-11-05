@@ -13,9 +13,9 @@ def validate_secure_url(value: str) -> str:
         "localhost",
     }
     if parsed.scheme != "https" and not local_http:
-        raise ValueError("URL must use HTTPS or approved local HTTP")
+        raise ValueError("URL 必须使用 HTTPS，或使用经批准的本地 HTTP")
     if not parsed.hostname or parsed.username is not None or parsed.password is not None:
-        raise ValueError("URL must have a host and must not contain user information")
+        raise ValueError("URL 必须包含主机名，且不得包含用户凭据信息")
     return value
 
 
@@ -25,7 +25,7 @@ SecureUrl = Annotated[str, AfterValidator(validate_secure_url)]
 def require_update_fields(model: BaseModel, ignored: set[str] | None = None) -> None:
     ignored_fields = ignored or set()
     if not model.model_fields_set.difference(ignored_fields):
-        raise ValueError("At least one modifiable field is required")
+        raise ValueError("至少需要提供一个可修改字段")
 
 
 class InputModel(BaseModel):

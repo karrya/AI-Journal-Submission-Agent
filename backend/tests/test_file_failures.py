@@ -350,7 +350,7 @@ def test_manifest_append_failure_emits_sanitized_log_and_retains_file(
     assert record is not None
     assert (test_storage_root / record.storage_path).read_bytes() == PDF
     assert not (test_storage_root / "reconciliation.jsonl").exists()
-    assert "Reconciliation manifest append failed" in caplog.text
+    assert "追加核对清单失败" in caplog.text
     assert record.id in caplog.text and "unknown_commit" in caplog.text
     assert str(test_storage_root) not in caplog.text
     assert record.storage_path not in caplog.text

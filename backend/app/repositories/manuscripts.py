@@ -1,4 +1,4 @@
-"""Persistence and row-locking queries for manuscripts and immutable versions."""
+"""提供稿件和不可变版本的持久化及行锁查询。"""
 
 import json
 from datetime import datetime

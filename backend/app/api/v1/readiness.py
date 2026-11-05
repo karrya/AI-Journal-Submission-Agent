@@ -18,7 +18,7 @@ def readiness(db: Session = Depends(get_db)):
     try:
         db.execute(text("SELECT 1"))
     except SQLAlchemyError as exc:
-        logger.error("Database readiness check failed (%s)", type(exc).__name__)
+        logger.error("数据库就绪检查失败（%s）", type(exc).__name__)
         raise AppError(
             status_code=503,
             code="DATABASE_UNAVAILABLE",

@@ -32,7 +32,7 @@ def test_test_guard_requires_explicit_environment_and_host():
 
 
 def test_test_storage_cannot_equal_live_storage():
-    with pytest.raises(RuntimeError, match="live storage"):
+    with pytest.raises(RuntimeError, match="正式存储目录"):
         validate_test_environment(
             TEST_DATABASE,
             "storage",
@@ -44,7 +44,7 @@ def test_test_storage_cannot_equal_live_storage():
 
 def test_test_storage_cannot_be_nested_in_live_storage(tmp_path: Path):
     live_storage = tmp_path / "storage"
-    with pytest.raises(RuntimeError, match="live storage"):
+    with pytest.raises(RuntimeError, match="正式存储目录"):
         validate_test_environment(
             TEST_DATABASE,
             live_storage / "pytest",
@@ -66,7 +66,7 @@ def test_non_test_database_is_rejected():
 
 
 def test_non_loopback_database_host_is_rejected():
-    with pytest.raises(RuntimeError, match="loopback"):
+    with pytest.raises(RuntimeError, match="回环地址"):
         validate_test_environment(
             TEST_DATABASE,
             "/tmp/test",
@@ -88,7 +88,7 @@ def test_non_test_environment_is_rejected():
 
 
 def test_pytest_database_url_guard_rejects_remote_host():
-    with pytest.raises(RuntimeError, match="loopback"):
+    with pytest.raises(RuntimeError, match="回环地址"):
         validate_test_database_url(
             "mysql+pymysql://test@192.0.2.1/academic_submission_agent_test"
         )
@@ -140,7 +140,7 @@ def test_api_runner_rejects_live_storage_before_migration_or_newman():
     output = result.stdout + result.stderr
 
     assert result.returncode != 0
-    assert "live storage" in output
+    assert "正式存储目录" in output
     assert "alembic.runtime.migration" not in output
     assert "newman" not in output.lower()
 
@@ -240,5 +240,5 @@ def test_verify_stops_on_first_failure_with_the_command_visible(tmp_path: Path):
 
     assert result.returncode == 23
     assert "ruff check app tests" in output
-    assert "Verification failed" in output
+    assert "验证失败" in output
     assert not capture.exists()

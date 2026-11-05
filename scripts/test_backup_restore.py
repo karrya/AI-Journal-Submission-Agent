@@ -1,4 +1,4 @@
-"""Execute one real encrypted backup and isolated BACKUP-01 restore proof."""
+"""执行一次真实加密备份和隔离的 BACKUP-01 恢复验证。"""
 
 from __future__ import annotations
 
@@ -38,12 +38,12 @@ def _configure_age() -> tuple[str, Path]:
     recipient = os.environ.get("AGE_RECIPIENT")
     key_file = os.environ.get("AGE_SECRET_KEY_FILE")
     if bool(recipient) != bool(key_file):
-        raise RuntimeError("AGE_RECIPIENT and AGE_SECRET_KEY_FILE must be set together")
+        raise RuntimeError("AGE_RECIPIENT 和 AGE_SECRET_KEY_FILE 必须同时设置")
     if not recipient:
         recipient_path = AGE_DIRECTORY / "recipient.txt"
         default_key = AGE_DIRECTORY / "backup-key.txt"
         if not recipient_path.is_file() or not default_key.is_file():
-            raise RuntimeError("dedicated age key configuration is unavailable")
+            raise RuntimeError("专用 age 密钥配置不可用")
         recipient = recipient_path.read_text(encoding="utf-8").strip()
         key_file = str(default_key)
         os.environ["AGE_RECIPIENT"] = recipient
@@ -61,21 +61,21 @@ def _require_application_stopped() -> None:
             check=False,
         )
         if result.returncode == 0:
-            raise RuntimeError("stop application writes before BACKUP-01")
+            raise RuntimeError("执行 BACKUP-01 前必须停止应用写入")
 
 
 @contextmanager
 def _temporary_proof_file(storage: Path) -> Iterator[Path]:
-    """Add one exclusive proof file only to empty storage, then remove it."""
+    """仅在空存储目录中添加一个独占验证文件，随后将其删除。"""
     if storage.is_symlink():
-        raise RuntimeError("development storage must not be a symlink")
+        raise RuntimeError("开发存储目录不得是符号链接")
     created_root = not storage.exists()
     if created_root:
         storage.mkdir(parents=True)
     elif not storage.is_dir():
-        raise RuntimeError("development storage is not a directory")
+        raise RuntimeError("开发存储路径不是目录")
     elif any(storage.iterdir()):
-        raise RuntimeError("development storage is not empty; proof file not created")
+        raise RuntimeError("开发存储目录非空，未创建验证文件")
 
     proof = storage / f".backup-01-temporary-proof-{uuid.uuid4().hex}.txt"
     descriptor: int | None = None
@@ -86,7 +86,7 @@ def _temporary_proof_file(storage: Path) -> Iterator[Path]:
         identity = (stat.st_dev, stat.st_ino)
         with os.fdopen(descriptor, "w", encoding="utf-8") as output:
             descriptor = None
-            output.write("BACKUP-01 temporary proof file; delete after verification.\n")
+            output.write("BACKUP-01 临时验证文件；验证后删除。\n")
             output.flush()
             os.fsync(output.fileno())
         yield proof
@@ -96,7 +96,7 @@ def _temporary_proof_file(storage: Path) -> Iterator[Path]:
         if identity is not None:
             current = proof.lstat()
             if (current.st_dev, current.st_ino) != identity:
-                raise RuntimeError("temporary proof file changed during BACKUP-01")
+                raise RuntimeError("BACKUP-01 执行期间临时验证文件发生变化")
             proof.unlink()
         if created_root:
             storage.rmdir()
@@ -108,7 +108,7 @@ def _storage_snapshot(storage: Path) -> dict[str, str]:
         return snapshot
     for path in sorted(storage.rglob("*")):
         if path.is_symlink():
-            raise RuntimeError("development storage contains a symlink")
+            raise RuntimeError("开发存储目录包含符号链接")
         if path.is_file():
             digest = hashlib.sha256()
             with path.open("rb") as source:
@@ -123,7 +123,7 @@ def _development_snapshot(database_url: str, storage: Path) -> tuple[dict, dict]
     try:
         database_name = make_url(database_url).database
         if not database_name:
-            raise RuntimeError("development database name is missing")
+            raise RuntimeError("缺少开发数据库名称")
         row_counts = _database_snapshot(engine, database_name)
         checksums: dict[str, str] = {}
         schema_hashes: dict[str, str] = {}
@@ -149,11 +149,11 @@ def _target_url() -> str:
     configured = os.environ.get("RESTORE_DATABASE_URL")
     if configured:
         if make_url(configured).database != TARGET_DATABASE:
-            raise RuntimeError("RESTORE_DATABASE_URL has the wrong target")
+            raise RuntimeError("RESTORE_DATABASE_URL 的目标数据库不正确")
         return configured
     test_url = os.environ.get("TEST_DATABASE_URL")
     if not test_url:
-        raise RuntimeError("TEST_DATABASE_URL or RESTORE_DATABASE_URL is required")
+        raise RuntimeError("必须设置 TEST_DATABASE_URL 或 RESTORE_DATABASE_URL")
     parsed_test = make_url(test_url)
     admin_url = os.environ.get("RESTORE_ADMIN_URL")
     if admin_url:
@@ -176,7 +176,7 @@ def _target_url() -> str:
                     {"database": TARGET_DATABASE},
                 )
                 if table_count:
-                    raise RuntimeError("restore database must be empty")
+                    raise RuntimeError("恢复目标数据库必须为空")
                 connection.exec_driver_sql(
                     f"GRANT ALL PRIVILEGES ON `{TARGET_DATABASE}`.* TO %s@%s",
                     (parsed_test.username, parsed_test.host),
@@ -192,9 +192,9 @@ def _remove_restore_directory(path: Path) -> None:
     try:
         shutil.rmtree(path)
     except OSError as exc:
-        raise RuntimeError("restore directory cleanup failed") from exc
+        raise RuntimeError("恢复目录清理失败") from exc
     if path.exists():
-        raise RuntimeError("restore directory cleanup failed; plaintext remains")
+        raise RuntimeError("恢复目录清理失败，仍有明文数据残留")
 
 
 def main() -> None:
@@ -203,7 +203,7 @@ def main() -> None:
     source_url = os.environ.get("DATABASE_URL", "")
     source_database = make_url(source_url).database
     if source_database != "academic_submission_agent":
-        raise SystemExit("BACKUP-01 requires the development source database")
+        raise SystemExit("BACKUP-01 要求使用开发源数据库")
     storage = Path(os.environ.get("STORAGE_ROOT", PROJECT_ROOT / "storage")).resolve()
     recipient, key_file = _configure_age()
     target_url = _target_url()
@@ -221,7 +221,7 @@ def main() -> None:
                     storage_root=storage,
                     config_example=PROJECT_ROOT / ".env.example",
                 )
-                print(f"Encrypted backup created: {archive}")
+                print(f"加密备份已创建：{archive}")
                 verification = restore_backup(
                     archive,
                     source_url,
@@ -233,17 +233,17 @@ def main() -> None:
                 )
             after = _development_snapshot(source_url, storage)
             if after != before:
-                raise RuntimeError("development data changed during BACKUP-01")
+                raise RuntimeError("BACKUP-01 执行期间开发数据发生变化")
             with archive.open("rb") as encrypted:
                 if not encrypted.read(24).startswith(b"age-encryption.org/v1"):
-                    raise RuntimeError("final backup is not an age encrypted artifact")
+                    raise RuntimeError("最终备份不是 age 加密文件")
             unencrypted = [
                 path
                 for pattern in ("*.sql", "*.tar", "*.partial")
                 for path in (PROJECT_ROOT / "backups").rglob(pattern)
             ]
             if unencrypted:
-                raise RuntimeError("unencrypted or partial backup artifacts remain")
+                raise RuntimeError("仍有未加密或不完整的备份文件残留")
             result = {
                 "table_count_after_alembic": verification.table_count,
                 "compared_source_tables": verification.compared_row_counts,
@@ -257,7 +257,7 @@ def main() -> None:
             _remove_restore_directory(restore_parent)
         print(json.dumps(result, sort_keys=True))
     except (BackupFailed, RestoreFailed, RuntimeError) as exc:
-        raise SystemExit(f"BACKUP-01 failed: {exc}") from None
+        raise SystemExit(f"BACKUP-01 失败：{exc}") from None
 
 
 if __name__ == "__main__":

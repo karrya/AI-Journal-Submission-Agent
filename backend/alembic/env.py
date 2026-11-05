@@ -22,9 +22,9 @@ target_metadata = Base.metadata
 def database_url() -> str:
     url = os.environ.get("ALEMBIC_DATABASE_URL")
     if not url:
-        raise RuntimeError("ALEMBIC_DATABASE_URL is required for migrations")
+        raise RuntimeError("迁移必须设置 ALEMBIC_DATABASE_URL")
     if not url.startswith("mysql+"):
-        raise RuntimeError("Alembic migrations require MySQL")
+        raise RuntimeError("Alembic 迁移必须使用 MySQL")
     return url
 
 

@@ -58,7 +58,7 @@ def test_audit_persists_only_explicitly_allowlisted_summaries(db_session, operat
 
 
 def test_audit_rejects_fields_outside_explicit_allowlist(db_session, operator):
-    with pytest.raises(ValueError, match="allowlist"):
+    with pytest.raises(ValueError, match="允许列表"):
         record_business_audit(
             db_session,
             operator,
@@ -85,7 +85,7 @@ def test_audit_rejects_fields_outside_explicit_allowlist(db_session, operator):
     ],
 )
 def test_audit_rejects_sensitive_keys_recursively(db_session, operator, key):
-    with pytest.raises(ValueError, match="sensitive"):
+    with pytest.raises(ValueError, match="敏感字段键"):
         record_business_audit(
             db_session,
             operator,

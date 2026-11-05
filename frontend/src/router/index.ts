@@ -117,7 +117,7 @@ async function replaceAuthRoute(router: Router, name: 'login' | 'change-password
   try {
     await router.replace({ name })
   } catch {
-    // Preserve the original API error when navigation is duplicated or cancelled.
+    // 导航重复或取消时，保留原始 API 错误。
   }
 }
 

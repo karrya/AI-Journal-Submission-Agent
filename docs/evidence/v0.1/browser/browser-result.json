@@ -36,6 +36,14 @@
     "audit_status": 200,
     "rows_visible": true
   },
+  "chinese_ui": true,
+  "chinese_ui_scopes": [
+    "main_navigation",
+    "manuscript_workspace",
+    "operator_dashboard",
+    "admin_audit_table",
+    "auditor_audit_table"
+  ],
   "browser": "Google Chrome 156.0.8078.80 via temporary playwright-core",
   "headless": true,
   "status": "passed"

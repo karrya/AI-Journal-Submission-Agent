@@ -83,27 +83,27 @@ describe('JournalListView', () => {
     adapter.mockImplementation(async (config) => success(config, page([])))
     const wrapper = mount(JournalListView)
     await flushPromises()
-    expect(wrapper.text()).toContain('No publishers found')
+    expect(wrapper.text()).toContain('未找到出版商')
     await wrapper.get('[data-test="platforms-tab"]').trigger('click')
     await flushPromises()
-    expect(wrapper.text()).toContain('No platforms found')
+    expect(wrapper.text()).toContain('未找到平台')
     await wrapper.get('[data-test="journals-tab"]').trigger('click')
     await flushPromises()
-    expect(wrapper.text()).toContain('No journals found')
+    expect(wrapper.text()).toContain('未找到期刊')
   })
 
   it('suppresses empty states when resource loading fails', async () => {
     adapter.mockImplementation(async () => { throw new Error('offline') })
     const wrapper = mount(JournalListView)
     await flushPromises()
-    expect(wrapper.text()).toContain('Unable to load publishers')
-    expect(wrapper.text()).not.toContain('No publishers found')
+    expect(wrapper.text()).toContain('无法加载出版商')
+    expect(wrapper.text()).not.toContain('未找到出版商')
     await wrapper.get('[data-test="platforms-tab"]').trigger('click')
     await flushPromises()
-    expect(wrapper.text()).not.toContain('No platforms found')
+    expect(wrapper.text()).not.toContain('未找到平台')
     await wrapper.get('[data-test="journals-tab"]').trigger('click')
     await flushPromises()
-    expect(wrapper.text()).not.toContain('No journals found')
+    expect(wrapper.text()).not.toContain('未找到期刊')
   })
 
   it('creates and updates publishers with separate request models', async () => {
@@ -173,7 +173,7 @@ describe('JournalListView', () => {
     await wrapper.get('[data-test="add-requirement"]').trigger('click')
     await wrapper.get('[data-test="journal-form"]').trigger('submit')
     expect(adapter.mock.calls.some(([config]) => config.method === 'post')).toBe(false)
-    expect(wrapper.text()).toContain('Requirement key, value, scope, HTTPS source URL, and verification time are required')
+    expect(wrapper.text()).toContain('每一行均须填写要求键、值、适用范围、HTTPS 来源网址和核验时间')
 
     await wrapper.get('[data-test="requirement-key"]').setValue('abstract_words')
     await wrapper.get('[data-test="requirement-value"]').setValue('250')
@@ -224,6 +224,8 @@ describe('JournalListView', () => {
     await flushPromises()
     await wrapper.get('[data-test="journals-tab"]').trigger('click')
     await flushPromises()
+    expect(wrapper.text()).toContain('否')
+    expect(wrapper.text()).not.toContain('anonymous: false')
     await wrapper.get('[data-test="edit-journal-j1"]').trigger('click')
     await flushPromises()
 
@@ -265,7 +267,7 @@ describe('JournalListView', () => {
     await wrapper.get('[data-test="publisher-form"]').trigger('submit')
     await flushPromises()
     expect(adapter.mock.calls.some(([config]) => config.method === 'patch')).toBe(false)
-    expect(wrapper.text()).toContain('HTTPS or approved local HTTP')
+    expect(wrapper.text()).toContain('HTTPS，或经允许的本地 HTTP')
   })
 
   it('rejects unsafe optional journal URLs before update', async () => {
@@ -287,7 +289,7 @@ describe('JournalListView', () => {
     await flushPromises()
 
     expect(adapter.mock.calls.some(([config]) => config.method === 'patch')).toBe(false)
-    expect(wrapper.text()).toContain('HTTPS or approved local HTTP')
+    expect(wrapper.text()).toContain('HTTPS，或经允许的本地 HTTP')
   })
 
   it('loads every publisher and platform selector page', async () => {

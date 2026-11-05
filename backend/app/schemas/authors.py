@@ -28,7 +28,7 @@ PermissionCode = Literal[
 
 def require_timezone_awareness(value: datetime) -> datetime:
     if value.tzinfo is None or value.utcoffset() is None:
-        raise ValueError("Authorization datetimes must be timezone-aware")
+        raise ValueError("授权日期时间必须包含时区信息")
     return value
 
 
@@ -42,7 +42,7 @@ def normalize_orcid(value: str) -> str:
         flags=re.IGNORECASE,
     )
     if match is None:
-        raise ValueError("Invalid ORCID format")
+        raise ValueError("ORCID（开放研究者与贡献者标识）格式无效")
     orcid = match.group(1).upper()
     digits = orcid.replace("-", "")
     total = 0
@@ -51,7 +51,7 @@ def normalize_orcid(value: str) -> str:
     check_value = (12 - total % 11) % 11
     check_character = "X" if check_value == 10 else str(check_value)
     if digits[-1] != check_character:
-        raise ValueError("Invalid ORCID checksum")
+        raise ValueError("ORCID（开放研究者与贡献者标识）校验位无效")
     return orcid
 
 
@@ -137,7 +137,7 @@ class EmailUpdate(InputModel):
     def validate_change(self):
         require_update_fields(self, {"confirm_email_binding"})
         if "email" in self.model_fields_set and self.confirm_email_binding is not True:
-            raise ValueError("Email changes require explicit binding confirmation")
+            raise ValueError("修改邮箱时必须明确确认邮箱绑定关系")
         return self
 
 
@@ -223,7 +223,7 @@ class AuthorInstitutionLinkCreate(InputModel):
             and self.valid_to is not None
             and self.valid_to < self.valid_from
         ):
-            raise ValueError("valid_to must not be earlier than valid_from")
+            raise ValueError("valid_to 不得早于 valid_from")
         return self
 
 
@@ -244,7 +244,7 @@ class AuthorInstitutionLinkUpdate(InputModel):
             and self.valid_to is not None
             and self.valid_to < self.valid_from
         ):
-            raise ValueError("valid_to must not be earlier than valid_from")
+            raise ValueError("valid_to 不得早于 valid_from")
         return self
 
 
@@ -286,13 +286,13 @@ class AuthorizationCreate(InputModel):
     @classmethod
     def validate_permissions(cls, value: list[PermissionCode]):
         if len(value) != len(set(value)):
-            raise ValueError("Duplicate permissions are not allowed")
+            raise ValueError("不允许重复的权限")
         return sorted(value)
 
     @model_validator(mode="after")
     def validate_dates(self):
         if self.valid_to <= self.valid_from:
-            raise ValueError("valid_to must be later than valid_from")
+            raise ValueError("valid_to 必须晚于 valid_from")
         return self
 
 
@@ -309,9 +309,9 @@ class AuthorizationUpdate(InputModel):
     @classmethod
     def validate_permissions(cls, value: list[PermissionCode] | None):
         if value is None:
-            raise ValueError("permissions cannot be null")
+            raise ValueError("permissions 不能为空")
         if len(value) != len(set(value)):
-            raise ValueError("Duplicate permissions are not allowed")
+            raise ValueError("不允许重复的权限")
         return sorted(value)
 
     @model_validator(mode="after")
@@ -319,13 +319,13 @@ class AuthorizationUpdate(InputModel):
         require_update_fields(self)
         for field_name in ("valid_from", "valid_to"):
             if field_name in self.model_fields_set and getattr(self, field_name) is None:
-                raise ValueError(f"{field_name} cannot be null")
+                raise ValueError(f"{field_name} 不能为空")
         if (
             self.valid_from is not None
             and self.valid_to is not None
             and self.valid_to <= self.valid_from
         ):
-            raise ValueError("valid_to must be later than valid_from")
+            raise ValueError("valid_to 必须晚于 valid_from")
         return self
 
 
@@ -359,7 +359,7 @@ class AuthorizationResponse(OutputModel):
     @model_validator(mode="after")
     def validate_dates(self):
         if self.valid_to <= self.valid_from:
-            raise ValueError("valid_to must be later than valid_from")
+            raise ValueError("valid_to 必须晚于 valid_from")
         return self
 
 

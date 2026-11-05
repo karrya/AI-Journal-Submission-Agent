@@ -1,4 +1,4 @@
-"""Server-controlled paths, atomic moves, integrity checks, and recovery records."""
+"""提供服务端控制的路径、原子移动、完整性校验和恢复记录。"""
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ class StorageService:
     def _identifier(value: str) -> str:
         parsed = str(UUID(value))
         if parsed != value.lower():
-            raise ValueError("storage identifiers must be canonical UUIDs")
+            raise ValueError("存储标识符必须是规范格式的 UUID")
         return parsed
 
     def temporary_path(self, file_id: str) -> Path:
@@ -44,7 +44,7 @@ class StorageService:
             for value in (author_id, manuscript_id, version_id, file_id)
         ]
         if extension not in ALLOWED_EXTENSIONS:
-            raise ValueError("unsupported storage extension")
+            raise ValueError("不支持的存储文件扩展名")
         return (
             Path("authors")
             / identifiers[0]
@@ -58,18 +58,18 @@ class StorageService:
     def resolve(self, relative_path: str | Path) -> Path:
         relative = Path(relative_path)
         if relative.is_absolute() or not relative.parts or "\\" in str(relative):
-            raise ValueError("invalid relative storage path")
+            raise ValueError("无效的相对存储路径")
         if any(part in {"", ".", ".."} for part in relative.parts):
-            raise ValueError("storage path traversal is forbidden")
+            raise ValueError("禁止存储路径穿越")
         resolved = (self.root / relative).resolve(strict=False)
         if not resolved.is_relative_to(self.root):
-            raise ValueError("storage path escapes the storage root")
+            raise ValueError("存储路径不得超出存储根目录")
         return resolved
 
     def move_into_place(self, temporary: Path, relative_path: Path) -> Path:
         final = self.resolve(relative_path)
         if final.exists():
-            raise FileExistsError("formal file already exists")
+            raise FileExistsError("正式文件已存在")
         final.parent.mkdir(parents=True, exist_ok=True)
         os.link(temporary, final)
         os.unlink(temporary)
@@ -98,12 +98,12 @@ class StorageService:
     def open_verified(
         self, relative_path: str | Path, expected_size: int, expected_sha256: str
     ) -> tuple[str, int | None]:
-        """Open without symlinks and verify the exact descriptor later used for streaming."""
+        """打开文件时禁止符号链接，并校验后续用于流式传输的同一文件描述符。"""
         relative = Path(relative_path)
         if relative.is_absolute() or not relative.parts or "\\" in str(relative):
-            raise ValueError("invalid relative storage path")
+            raise ValueError("无效的相对存储路径")
         if any(part in {"", ".", ".."} for part in relative.parts):
-            raise ValueError("storage path traversal is forbidden")
+            raise ValueError("禁止存储路径穿越")
 
         directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
         file_flags = os.O_RDONLY | os.O_NOFOLLOW

@@ -62,7 +62,7 @@ describe('AuthorListView', () => {
     })
     const wrapper = mountList()
     await flushPromises()
-    expect(wrapper.text()).toContain('No authors found')
+    expect(wrapper.text()).toContain('未找到作者')
     await wrapper.get('[data-test="add-author"]').trigger('click')
     await wrapper.get('[data-test="display-name"]').setValue('New Author')
     await wrapper.get('[data-test="identity-confirm"]').setValue(true)
@@ -159,7 +159,7 @@ describe('AuthorListView', () => {
     await wrapper.get('[data-test="institution-form"]').trigger('submit')
     await flushPromises()
     expect(adapter.mock.calls.some(([config]) => config.method === 'patch')).toBe(false)
-    expect(wrapper.text()).toContain('HTTPS or approved local HTTP')
+    expect(wrapper.text()).toContain('HTTPS，或经允许的本地 HTTP')
   })
 
   it('does not show an empty state when author loading fails', async () => {
@@ -167,7 +167,7 @@ describe('AuthorListView', () => {
     const wrapper = mountList()
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Unable to load authors')
-    expect(wrapper.text()).not.toContain('No authors found')
+    expect(wrapper.text()).toContain('无法加载作者')
+    expect(wrapper.text()).not.toContain('未找到作者')
   })
 })

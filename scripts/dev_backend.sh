@@ -5,7 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PYTHON="$ROOT_DIR/.venv/bin/python"
 
 if [[ ! -x "$PYTHON" ]]; then
-    printf 'Project virtualenv Python is required: %s\n' "$PYTHON" >&2
+    printf '需要项目虚拟环境中的 Python：%s\n' "$PYTHON" >&2
     exit 1
 fi
 

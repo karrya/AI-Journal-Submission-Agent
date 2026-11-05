@@ -96,6 +96,19 @@ async function scanNetwork() {
   return { scanned, nonJson }
 }
 
+async function assertChineseLabels(page, labels, scope) {
+  const text = await page.locator('body').innerText()
+  for (const label of labels) assert(text.includes(label), `Chinese UI label missing in ${scope}: ${label}`)
+}
+
+async function assertChineseAuditTable(page, scope) {
+  await assertChineseLabels(page, ['审计日志', '只读操作历史', '应用筛选', '上一页', '下一页'], scope)
+  const headings = await page.locator('thead').innerText()
+  for (const label of ['创建时间', '操作者', '类别', '操作', '目标', '结果', '请求 ID', '详情']) {
+    assert(headings.includes(label), `Chinese audit table heading missing in ${scope}: ${label}`)
+  }
+}
+
 async function login(context, username, password, actor) {
   const page = await context.newPage()
   capturePage(actor, page)
@@ -104,9 +117,12 @@ async function login(context, username, password, actor) {
   await page.locator('[data-test="password"]').fill(password)
   await Promise.all([
     page.waitForURL('**/dashboard', { timeout: 20000 }),
-    page.getByRole('button', { name: 'Sign in', exact: true }).click(),
+    page.getByRole('button', { name: '登录', exact: true }).click(),
   ])
   await page.locator('h1#dashboard-title').waitFor()
+  const navigationLabels = ['学术投稿助手', '稿件', '作者', '授权', '期刊', '退出登录', '工作台']
+  if (actor === 'admin' || actor === 'auditor') navigationLabels.push('审计日志')
+  await assertChineseLabels(page, navigationLabels, `${actor} main navigation`)
   return page
 }
 
@@ -114,14 +130,14 @@ async function openManuscript(page) {
   await page.goto(`${base}/manuscripts/${fixture.manuscript_id}`)
   await page.locator('h1#manuscript-detail-title').waitFor()
   await page.locator('[data-test="current-files"] table').waitFor()
-  await page.waitForFunction(() => !document.body.innerText.includes('Loading manuscript workspace…'))
+  await page.waitForFunction(() => !document.body.innerText.includes('正在加载稿件工作区…'))
 }
 
 async function uploadResponse(page) {
   const responsePromise = page.waitForResponse((response) =>
     response.request().method() === 'POST' && /\/api\/v1\/manuscripts\/[^/]+\/versions\/[^/]+\/files$/.test(publicPath(response.url())),
   )
-  await page.getByRole('button', { name: 'Upload file', exact: true }).click()
+  await page.getByRole('button', { name: '上传文件', exact: true }).click()
   return responsePromise
 }
 
@@ -157,6 +173,7 @@ async function uploadResponse(page) {
       assert(!Object.hasOwn(file, 'stored_filename'))
     })
     const initialText = await operator.locator('body').innerText()
+    await assertChineseLabels(operator, ['工作元数据', '作者名单及顺序', '当前版本文件', '上传文件'], 'manuscript workspace')
     privateValues.forEach((marker) => assert(!initialText.includes(marker), `private marker rendered: ${marker}`))
     assert(!initialText.includes('storage_path'))
     assert(!initialText.includes('stored_filename'))
@@ -170,7 +187,7 @@ async function uploadResponse(page) {
     assert.equal(newFamilyResponse.status(), 201, await newFamilyResponse.text())
     const newFamilyBody = await newFamilyResponse.json()
     assert.equal(newFamilyBody.file_version, 1)
-    await operator.getByRole('status').filter({ hasText: 'as file version 1' }).waitFor()
+    await operator.getByRole('status').filter({ hasText: '文件版本为 1' }).waitFor()
     await operator.waitForFunction(() => document.querySelector('[data-test="current-files"]').innerText.includes('Browser second family'))
     result.new_family_upload = { status: 201, file_version: 1 }
 
@@ -182,7 +199,7 @@ async function uploadResponse(page) {
     const existingBody = await existingResponse.json()
     assert.equal(existingBody.file_family_id, fixture.file_family_id)
     assert.equal(existingBody.file_version, 2)
-    await operator.getByRole('status').filter({ hasText: 'as file version 2' }).waitFor()
+    await operator.getByRole('status').filter({ hasText: '文件版本为 2' }).waitFor()
     await operator.locator(`[data-test="download-${existingBody.id}"]`).waitFor()
     result.existing_family_upload = { status: 201, file_version: 2, file_family_matches: true }
 
@@ -207,10 +224,10 @@ async function uploadResponse(page) {
     const versionCreateResponse = operator.waitForResponse((response) =>
       response.request().method() === 'POST' && publicPath(response.url()) === `/api/v1/manuscripts/${fixture.manuscript_id}/versions`,
     )
-    await operator.getByRole('button', { name: 'Create new version', exact: true }).click()
+    await operator.getByRole('button', { name: '创建新稿件版本', exact: true }).click()
     const competingVersion = await versionCreateResponse
     assert.equal(competingVersion.status(), 201)
-    await operator.waitForFunction(() => document.body.innerText.includes('Current version: 3'))
+    await operator.waitForFunction(() => document.body.innerText.includes('当前版本：3'))
     staleMark('competing_version_3_created', { status: competingVersion.status() })
 
     await stale.locator('[data-test="display-name"]').fill('Stale upload must not commit')
@@ -220,8 +237,8 @@ async function uploadResponse(page) {
     assert.equal(conflictResponse.status(), 409)
     const conflictBody = await conflictResponse.json()
     assert.equal(conflictBody.code, 'INVALID_MANUSCRIPT_STATE')
-    await stale.getByRole('alert').filter({ hasText: 'The upload was not retried.' }).waitFor()
-    await stale.getByRole('button', { name: 'Refresh manuscript and current version', exact: true }).waitFor()
+    await stale.getByRole('alert').filter({ hasText: '本次上传未自动重试。' }).waitFor()
+    await stale.getByRole('button', { name: '刷新稿件及当前版本', exact: true }).waitFor()
     staleMark('non_retry_warning_and_refresh_visible')
     await stale.waitForTimeout(1000)
     const stalePosts = events.filter((entry) => entry.event === 'request' && entry.actor === 'stale' && entry.method === 'POST' && /\/api\/v1\/manuscripts\/[^/]+\/versions\/[^/]+\/files$/.test(entry.path)).length
@@ -238,6 +255,7 @@ async function uploadResponse(page) {
     await operator.locator('h1#dashboard-title').waitFor()
     await operator.locator('[data-test="author-count"]').waitFor()
     assert.equal(await operator.locator('[data-test="author-count"]').innerText(), '1')
+    await assertChineseLabels(operator, ['已授权作者', '当前版本文件', '即将到期的授权', '您的近期操作', '进入稿件工作区'], 'operator dashboard')
     const operatorAuditRequests = events.filter((entry) => entry.event === 'request' && entry.actor === 'operator' && entry.path.startsWith('/api/v1/audit-logs'))
     assert.equal(operatorAuditRequests.length, 0)
     await operator.screenshot({ path: path.join(evidence, 'browser-dashboard-operator.png'), fullPage: true })
@@ -257,6 +275,7 @@ async function uploadResponse(page) {
     assert.equal((await adminAuditResponse).status(), 200)
     await admin.locator('h1#audit-list-title').waitFor()
     await admin.locator('tbody tr').first().waitFor()
+    await assertChineseAuditTable(admin, 'admin audit')
     await admin.screenshot({ path: path.join(evidence, 'browser-audit-admin.png'), fullPage: true })
     result.admin_audit = { status: 200, rows_visible: true }
     await adminContext.close()
@@ -266,15 +285,18 @@ async function uploadResponse(page) {
     const deniedDashboard = auditor.waitForResponse((response) => publicPath(response.url()) === '/api/v1/dashboard/summary')
     await auditor.goto(`${base}/dashboard`)
     assert.equal((await deniedDashboard).status(), 403)
-    await auditor.getByText('Unable to load the dashboard.', { exact: false }).waitFor()
+    await auditor.getByText('无法加载工作台。', { exact: false }).waitFor()
     const auditorAuditResponse = auditor.waitForResponse((response) => publicPath(response.url()) === '/api/v1/audit-logs')
     await auditor.goto(`${base}/audit`)
     assert.equal((await auditorAuditResponse).status(), 200)
     await auditor.locator('tbody tr').first().waitFor()
+    await assertChineseAuditTable(auditor, 'auditor audit')
     await auditor.screenshot({ path: path.join(evidence, 'browser-audit-auditor.png'), fullPage: true })
     result.auditor_roles = { dashboard_status: 403, audit_status: 200, rows_visible: true }
     await auditorContext.close()
 
+    result.chinese_ui = true
+    result.chinese_ui_scopes = ['main_navigation', 'manuscript_workspace', 'operator_dashboard', 'admin_audit_table', 'auditor_audit_table']
     result.browser = `Google Chrome ${browser.version()} via temporary playwright-core`
     result.headless = true
     result.status = 'passed'

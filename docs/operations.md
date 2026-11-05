@@ -1,15 +1,15 @@
-# Operations runbook
+# 运维手册
 
-All commands below start at the actual project root unless a different directory is shown. Replace only explicitly marked placeholder values; never paste real passwords, session tokens, database URLs, age private keys, or personal file paths into documentation, tickets, shell history, or Git.
+除非另有目录说明，以下命令均从实际项目根目录开始执行。仅替换明确标记的占位值；切勿将真实密码、会话令牌、数据库 URL、age 私钥或个人文件路径粘贴到文档、问题单、Shell 历史或 Git 中。
 
 ```bash
 export PROJECT_ROOT="/Users/didi/PycharmProjects/AI Journal Submission Agent"
 cd "$PROJECT_ROOT"
 ```
 
-## 1. Homebrew dependencies and isolated runtime
+## 1. Homebrew 依赖与隔离运行环境
 
-V0.1 uses Homebrew MySQL 8.0. Docker is optional and is not the tested runtime.
+V0.1 使用 Homebrew MySQL 8.0。Docker 为可选项，不是经过测试的运行时。
 
 ```bash
 brew install python@3.13 node mysql@8.0 age libmagic
@@ -22,9 +22,9 @@ node --version
 npm --version
 ```
 
-Keep the MySQL package and its Homebrew dependencies ABI-compatible. If a restart reports a missing versioned `dylib`, stop application writers and run `HOMEBREW_NO_AUTO_UPDATE=1 brew upgrade mysql@8.0`, then `brew services start mysql@8.0`; do not delete or reinitialize `/opt/homebrew/var/mysql`. Verify both development and test connectivity after the package repair. The acceptance log records one such repair from 8.0.42 to 8.0.46 before the successful restart gate.
+确保 MySQL 软件包及其 Homebrew 依赖的 ABI（应用二进制接口）兼容。如果重启时报告缺少带版本号的 `dylib`，停止所有应用写入方并运行 `HOMEBREW_NO_AUTO_UPDATE=1 brew upgrade mysql@8.0`，然后运行 `brew services start mysql@8.0`；不要删除或重新初始化 `/opt/homebrew/var/mysql`。修复软件包后，验证开发库和测试库的连通性。验收日志记录了一次在成功重启检查前从 8.0.42 到 8.0.46 的此类修复。
 
-Install the pinned backend and frontend dependencies. The backend commands in this runbook always use the project virtualenv, not a system Python.
+安装锁定版本的后端和前端依赖。本手册中的后端命令始终使用项目 virtualenv，而非系统 Python。
 
 ```bash
 cd "$PROJECT_ROOT"
@@ -34,11 +34,11 @@ python3.13 -m venv .venv
 npm --prefix frontend ci
 ```
 
-`backend/requirements-dev.txt` includes the runtime requirements plus pytest, coverage, Ruff, mypy, HTTPX, and OpenAPI validation. `npm ci` installs the exact lockfile, including Newman, Vitest, Vite, TypeScript, and production dependencies.
+`backend/requirements-dev.txt` 包含运行时依赖以及 pytest、coverage、Ruff、mypy、HTTPX 和 OpenAPI 校验。`npm ci` 按锁文件安装精确版本，包括 Newman、Vitest、Vite、TypeScript 和生产依赖。
 
-## 2. Configuration and one-time MySQL bootstrap
+## 2. 配置与一次性 MySQL 初始化
 
-Review the non-secret template, then protect the local configuration:
+检查不含密钥的模板，然后保护本地配置：
 
 ```bash
 cd "$PROJECT_ROOT"
@@ -46,39 +46,39 @@ cp -n .env.example .env
 chmod 600 .env
 ```
 
-Run bootstrap only for initial provisioning or deliberate credential rotation:
+仅在首次预置或有意轮换凭据时运行初始化：
 
 ```bash
 cd "$PROJECT_ROOT"
 .venv/bin/python scripts/bootstrap_mysql.py
 ```
 
-The script prompts for the MySQL administrative password with hidden input. `MYSQL_ADMIN_USER`, `MYSQL_ADMIN_HOST`, and `MYSQL_ADMIN_PORT` optionally select the administrative endpoint; their defaults are `root`, `localhost`, and `3306`. It creates:
+脚本通过隐藏输入提示输入 MySQL 管理密码。`MYSQL_ADMIN_USER`、`MYSQL_ADMIN_HOST` 和 `MYSQL_ADMIN_PORT` 可选择管理端点，默认值分别为 `root`、`localhost` 和 `3306`。脚本会创建：
 
-- `academic_submission_agent` for development;
-- `academic_submission_agent_test` for destructive automated tests;
-- `asa_app@127.0.0.1` with CRUD privileges only on development;
-- `asa_migrate@127.0.0.1` with migration privileges only on development;
-- `asa_test@127.0.0.1` with privileges only on the fixed test database.
+- 用于开发的 `academic_submission_agent`；
+- 用于破坏性自动化测试的 `academic_submission_agent_test`；
+- 仅拥有开发库 CRUD（增删改查）权限的 `asa_app@127.0.0.1`；
+- 仅拥有开发库迁移权限的 `asa_migrate@127.0.0.1`；
+- 仅拥有固定测试库权限的 `asa_test@127.0.0.1`。
 
-It generates new account passwords and a CSRF secret and writes `.env` atomically with mode `0600` only after the MySQL steps succeed. Complete the other local settings afterward, especially `STORAGE_ROOT`, `ALLOWED_ORIGINS`, and the age/restore settings needed for backup. Do not commit `.env`.
+脚本生成新的账号密码和 CSRF（跨站请求伪造）密钥，并且仅在 MySQL 步骤成功后，才以 `0600` 权限原子写入 `.env`。随后完成其他本地配置，尤其是 `STORAGE_ROOT`、`ALLOWED_ORIGINS`，以及备份所需的 age/恢复配置。不要提交 `.env`。
 
-**Bootstrap is not idempotent credential preservation.** Every successful run rotates all three MySQL account passwords and rewrites `.env`; do not run it during ordinary startup or tests.
+**初始化不会幂等保留凭据。** 每次成功运行都会轮换全部三个 MySQL 账号密码并重写 `.env`；不要在日常启动或测试期间运行。
 
-### Bootstrap password-rotation desynchronization recovery
+### 初始化密码轮换失步恢复
 
-MySQL user changes cannot participate in the later filesystem rename. If the run rotates one or more MySQL passwords but fails before `.env` is replaced, the old `.env` and new MySQL credentials are desynchronized. Recover as follows:
+MySQL 用户变更无法参与随后的文件系统重命名。如果运行过程已轮换一个或多个 MySQL 密码，却在替换 `.env` 之前失败，旧 `.env` 与新 MySQL 凭据就会失步。按以下步骤恢复：
 
-1. Stop the backend and all other application writers. Do not keep retrying logins or overwrite either database.
-2. Check the administrative connection and fix the reason the environment write failed (for example, directory permissions or exhausted disk space). Do not copy credentials into a world-readable temporary file.
-3. Run `.venv/bin/python scripts/bootstrap_mysql.py` again interactively after the write problem is fixed. This generates another complete credential set and finishes only after both MySQL and the atomic `.env` replacement succeed. A failed attempt's generated passwords are not recoverable and are never logged.
-4. Restore any local non-secret settings that the rewritten `.env` needs, then run migrations/readiness and administrator login checks. Rotate the administrator's password through the application only if there is separate evidence it was exposed; bootstrap does not change application user passwords.
+1. 停止后端及所有其他应用写入方。不要持续重试登录，也不要覆盖任一数据库。
+2. 检查管理连接，并修复环境写入失败的原因（例如目录权限或磁盘空间耗尽）。不要将凭据复制到所有用户可读的临时文件。
+3. 修复写入问题后，以交互方式再次运行 `.venv/bin/python scripts/bootstrap_mysql.py`。这会生成另一套完整凭据，并且仅在 MySQL 操作和 `.env` 原子替换均成功后完成。失败尝试所生成的密码无法恢复，也绝不会记录到日志。
+4. 恢复重写后的 `.env` 所需的本地非密钥配置，然后运行迁移/就绪检查及管理员登录检查。只有另有证据表明管理员密码已暴露时，才通过应用轮换该密码；初始化不会更改应用用户密码。
 
-If the administrative connection failed before any `ALTER USER`, the existing `.env` remains authoritative. If a later bootstrap also fails, leave services stopped and repeat the repair rather than guessing passwords.
+如果管理连接在任何 `ALTER USER` 之前失败，现有 `.env` 仍为有效依据。如果后续初始化也失败，保持服务停止并重复修复，不要猜测密码。
 
-## 3. Migrations and schema verification
+## 3. 迁移与模式验证
 
-Run the migration command twice. The first reaches head; the second must perform no duplicate data or schema changes. `alembic check` verifies the models match the migrated head.
+连续运行两次迁移命令。第一次到达 head；第二次不得产生重复数据或模式变更。`alembic check` 验证模型与已迁移的 head 一致。
 
 ```bash
 cd "$PROJECT_ROOT/backend"
@@ -101,24 +101,24 @@ finally:
 PY
 ```
 
-The schema has 18 application tables; `alembic_version` is migration bookkeeping, so a completely migrated MySQL schema contains 19 tables.
+模式包含 18 张应用表；`alembic_version` 用于迁移簿记，因此完全迁移的 MySQL 模式共含 19 张表。
 
-## 4. Hidden administrator creation and first login
+## 4. 隐藏输入创建管理员与首次登录
 
-After migrations, and only while no application user exists, run:
+迁移完成后，且仅在不存在任何应用用户时运行：
 
 ```bash
 cd "$PROJECT_ROOT"
 .venv/bin/python scripts/create_admin.py
 ```
 
-Enter a unique administrator username and a 12–128 character initial password at the hidden prompts. There is no default password. The command creates the fixed role catalog and one `system_admin`, sets `must_change_password=true`, and refuses initialization if any user already exists.
+在隐藏提示中输入唯一的管理员用户名和 12–128 字符的初始密码。系统没有默认密码。该命令创建固定角色目录和一个 `system_admin`，设置 `must_change_password=true`，并在任何用户已存在时拒绝初始化。
 
-Start the application, sign in at the frontend, and complete the mandatory password-change form. Changing the password revokes existing sessions; sign in again with the new password. Until this is complete, business APIs return `403 PASSWORD_CHANGE_REQUIRED`; only the session identity, CSRF, logout, and change-password routes remain available.
+启动应用，在前端登录并完成强制修改密码表单。修改密码会撤销现有会话；使用新密码重新登录。在完成此步骤前，业务 API 返回 `403 PASSWORD_CHANGE_REQUIRED`；仅会话身份、CSRF、退出登录和修改密码路由保持可用。
 
-## 5. Backend and frontend startup
+## 5. 后端与前端启动
 
-Use two terminals so both complete argument lists come from the checked-in scripts:
+使用两个终端，使完整参数列表均来自已纳入版本控制的脚本：
 
 ```bash
 cd "$PROJECT_ROOT"
@@ -132,29 +132,29 @@ bash scripts/dev_frontend.sh
 # npm --prefix frontend run dev -- --host 127.0.0.1 --port 5173
 ```
 
-Verify:
+验证：
 
 ```bash
 curl --fail --silent http://127.0.0.1:8000/api/v1/health
 curl --fail --silent http://127.0.0.1:5173/ >/dev/null
 ```
 
-Open `http://127.0.0.1:5173`. Do not expose either development listener on a non-loopback interface. For planned persistence maintenance, stop writes, run the authorized `brew services restart mysql@8.0`, restart both scripts, then verify database records and stored-file SHA-256 values before resuming work.
+打开 `http://127.0.0.1:5173`。不要将任一开发监听器暴露到非回环接口。计划内持久化维护时，停止写入，运行经授权的 `brew services restart mysql@8.0`，重启两个脚本，然后在恢复工作前验证数据库记录及存储文件的 SHA-256（安全哈希算法 256 位）值。
 
-## 6. Tests, coverage, OpenAPI, and Postman/Newman
+## 6. 测试、覆盖率、OpenAPI 与 Postman/Newman
 
-The complete release gate is:
+完整发布检查为：
 
 ```bash
 cd "$PROJECT_ROOT"
 bash scripts/verify.sh
 ```
 
-It runs Ruff, mypy, the full MySQL-backed pytest suite, backend total and per-layer coverage floors, deterministic OpenAPI generation and validation, the isolated Newman collection, frontend unit tests and coverage, and the frontend production build. It stops on the first failure and prints the failed command.
+该命令运行 Ruff、mypy、完整 MySQL 后端 pytest 套件、后端总体及分层覆盖率下限、确定性 OpenAPI 生成与校验、隔离的 Newman 集合、前端单元测试与覆盖率，以及前端生产构建。它在首次失败时停止，并输出失败命令。
 
-Tests require `ENVIRONMENT=test` and a loopback `TEST_DATABASE_URL` whose database is exactly `academic_submission_agent_test`. Pytest creates isolated temporary storage. `scripts/test_api.sh` also creates temporary storage, uses backend port `8001`, generates disposable credentials, and terminates its backend with a trap. Test guards require explicit environment and database-host arguments and reject live/nested-live storage. **These commands delete and recreate test data; never redirect them to development.**
+测试要求 `ENVIRONMENT=test`，且回环地址 `TEST_DATABASE_URL` 中的数据库必须恰好为 `academic_submission_agent_test`。Pytest 创建隔离的临时存储。`scripts/test_api.sh` 同样创建临时存储，使用后端端口 `8001`，生成一次性凭据，并通过 trap 终止其后端。测试防护要求显式环境和数据库主机参数，并拒绝正式存储或嵌套在正式存储内的路径。**这些命令会删除并重建测试数据；切勿将其重定向到开发环境。**
 
-Useful focused commands are:
+常用专项命令为：
 
 ```bash
 cd "$PROJECT_ROOT/backend"
@@ -168,7 +168,7 @@ npm --prefix frontend run test:coverage
 npm --prefix frontend run build
 ```
 
-Generate and validate the committed OpenAPI contract independently:
+独立生成并校验已提交的 OpenAPI 契约：
 
 ```bash
 cd "$PROJECT_ROOT"
@@ -179,39 +179,39 @@ PYTHONPATH=backend .venv/bin/python scripts/export_openapi.py
 git diff --exit-code -- docs/api/v0.1-openapi.json
 ```
 
-Run the real Postman collection through Newman against its isolated backend:
+通过 Newman 对隔离后端运行真实 Postman 集合：
 
 ```bash
 cd "$PROJECT_ROOT"
 bash scripts/test_api.sh
 ```
 
-Inputs are `backend/tests/postman/v0.1.postman_collection.json` and `backend/tests/postman/local.postman_environment.json`. Runtime passwords and cookies are generated in memory, not written to the collection or reports.
+输入为 `backend/tests/postman/v0.1.postman_collection.json` 和 `backend/tests/postman/local.postman_environment.json`。运行时密码和 Cookie 在内存中生成，不写入集合或报告。
 
-## 7. Storage reconciliation and unknown file-commit recovery
+## 7. 存储核对与未知文件提交恢复
 
-With the backend configured for the intended development database/storage, run:
+将后端配置为预期的开发数据库/存储后，运行：
 
 ```bash
 cd "$PROJECT_ROOT"
 PYTHONPATH=backend .venv/bin/python scripts/reconcile_files.py
 ```
 
-The JSON report contains missing file IDs, hash-mismatch IDs, an orphan count (not server paths), and the number of reconciliation manifest entries resolved by matching file ID, relative path, and SHA-256. Active database files that are absent or corrupt are marked with their integrity state and cannot be downloaded until repaired. Reconciliation does not automatically delete uncertain files.
+JSON 报告包含缺失文件 ID、哈希不匹配 ID、孤立文件数量（不含服务器路径），以及通过文件 ID、相对路径和 SHA-256 匹配解决的核对清单条目数。数据库中处于活动状态但缺失或损坏的文件会标记其完整性状态，修复前无法下载。核对不会自动删除状态不确定的文件。
 
-An exception after the formal file move but with an uncertain database commit outcome deliberately preserves the formal file and appends an `unknown_commit` entry to `reconciliation.jsonl`. Recover conservatively:
+正式文件移动后发生异常且数据库提交结果不确定时，系统会有意保留正式文件，并向 `reconciliation.jsonl` 追加 `unknown_commit` 条目。按以下保守步骤恢复：
 
-1. **Do not repeat the upload blindly and do not delete the formal file.** A repeated upload can create a second family version; deletion can destroy the only committed copy.
-2. Restore database connectivity and run the reconciliation command. Match the manifest's file ID and SHA-256 with protected database records and the actual file digest; do not expose storage paths in logs.
-3. If the database row exists and the digest matches, the commit succeeded. The resolved manifest count increases and normal authorized download can resume.
-4. If no row exists after the database is stable, the file is reported as an orphan. Preserve it while investigating the audit trail and manifest. Move it to operator-controlled quarantine only after establishing that it is uncommitted; never treat automatic deletion as recovery.
-5. If the row exists but the file is missing or its hash differs, keep the download blocked, quarantine damaged evidence, and restore the verified object from an encrypted backup before rerunning reconciliation.
+1. **不要盲目重复上传，也不要删除正式文件。** 重复上传可能创建第二个文件族版本；删除可能销毁唯一已提交副本。
+2. 恢复数据库连接并运行核对命令。将清单中的文件 ID 和 SHA-256 与受保护数据库记录及实际文件摘要比对；不要在日志中暴露存储路径。
+3. 如果数据库行存在且摘要匹配，则提交成功。已解决清单计数增加，可恢复正常的授权下载。
+4. 如果数据库稳定后仍不存在该行，文件会报告为孤立文件。调查审计轨迹和清单期间保留该文件。仅在确认其未提交后，才移至操作员控制的隔离区；绝不能将自动删除视为恢复。
+5. 如果该行存在但文件缺失或哈希不同，保持下载阻断，隔离受损证据，从加密备份恢复已验证对象，然后重新运行核对。
 
-Certain rollbacks follow a separate compensation path; only unknown outcomes require this non-destructive manifest workflow.
+确定的回滚走独立补偿路径；只有结果未知时才需要这种非破坏性清单流程。
 
-## 8. Age keys, encrypted backup, and isolated restore
+## 8. age 密钥、加密备份与隔离恢复
 
-Keep the dedicated age private key outside the project and Git. The standard paths are:
+将专用 age 私钥保存在项目和 Git 之外。标准路径为：
 
 ```bash
 install -d -m 700 "$HOME/.config/academic-submission-agent/age"
@@ -223,7 +223,7 @@ chmod 600 "$HOME/.config/academic-submission-agent/age/backup-key.txt" \
   "$HOME/.config/academic-submission-agent/age/recipient.txt"
 ```
 
-`age-keygen -o` refuses to overwrite an existing key. Never rotate or replace a key merely to run a routine backup; losing the only private key makes existing backups unrecoverable. For each maintenance shell:
+`age-keygen -o` 拒绝覆盖现有密钥。切勿仅为执行日常备份而轮换或替换密钥；丢失唯一私钥会使现有备份无法恢复。每个维护 Shell 均需执行：
 
 ```bash
 read -r AGE_RECIPIENT < "$HOME/.config/academic-submission-agent/age/recipient.txt"
@@ -231,18 +231,18 @@ export AGE_RECIPIENT
 export AGE_SECRET_KEY_FILE="$HOME/.config/academic-submission-agent/age/backup-key.txt"
 ```
 
-The recipient is public, but neither it nor the private-key path needs to be committed. The private key file must not be a symlink, must be outside the project, and must deny group/other access.
+接收方标识是公开的，但它和私钥路径均无需提交。私钥文件不得为符号链接，必须位于项目之外，并禁止用户组和其他用户访问。
 
-Stop the backend, frontend, workers, and every other application writer before backup and keep them stopped through restore verification. Then run:
+备份前停止后端、前端、工作进程及所有其他应用写入方，并在恢复验证完成前保持停止。然后运行：
 
 ```bash
 cd "$PROJECT_ROOT"
 .venv/bin/python scripts/backup.py --confirm-writes-stopped
 ```
 
-The default destination is the Git-ignored `backups/` directory. The archive contains a single-transaction MySQL dump, storage files, `.env.example`, and per-member SHA-256/size metadata. It excludes `.env`, plaintext passwords, reusable cookies, and `auth_sessions`. Tar bytes stream directly to age; only a completed `.tar.age` is atomically published. A failure removes temporary plaintext and `.partial` output.
+默认目标是由 Git 忽略的 `backups/` 目录。归档包含单事务 MySQL 转储、存储文件、`.env.example`，以及逐成员的 SHA-256/大小元数据；排除 `.env`、明文密码、可复用 Cookie 和 `auth_sessions`。Tar 字节直接流式传入 age；只有完整的 `.tar.age` 才会原子发布。失败会删除临时明文和 `.partial` 输出。
 
-For restore, provision an **empty** `academic_submission_agent_restore_test` schema and an account authorized only for that isolated target. The example below creates `asa_restore@127.0.0.1` with no global, development, test, or grant-option privileges. `ALL PRIVILEGES` is scoped to the restore schema because import and Alembic need DDL, row writes, and `LOCK TABLES`; it does not grant access to any other schema. The generated password stays in shell variables and is written only to protected `.env`, not command arguments or output:
+恢复时，预置一个**空**的 `academic_submission_agent_restore_test` 模式，以及仅获授权访问该隔离目标的账号。下例创建 `asa_restore@127.0.0.1`，不授予全局、开发、测试或授权选项权限。`ALL PRIVILEGES` 仅限恢复模式，因为导入和 Alembic 需要 DDL（数据定义语言）、行写入和 `LOCK TABLES`；它不会授予任何其他模式的访问权限。生成的密码仅保留在 Shell 变量中，并且只写入受保护的 `.env`，不进入命令参数或输出：
 
 ```bash
 cd "$PROJECT_ROOT"
@@ -276,7 +276,7 @@ PY
 unset RESTORE_PASSWORD RESTORE_DATABASE_URL
 ```
 
-This deliberately rotates the dedicated restore password if rerun; do not use it as a routine startup step. Ensure the protected `RESTORE_DATABASE_URL` matches `--database`. The target directory must be new or empty and outside the configured live storage tree.
+重复运行会有意轮换专用恢复密码；不要将其作为日常启动步骤。确保受保护的 `RESTORE_DATABASE_URL` 与 `--database` 匹配。目标目录必须新建或为空，且位于配置的正式存储树之外。
 
 ```bash
 cd "$PROJECT_ROOT"
@@ -287,14 +287,14 @@ cd "$PROJECT_ROOT"
   --confirm RESTORE
 ```
 
-Restore rejects development/non-`_test` targets, nonempty targets, live storage, unsafe archive members, unexpected SQL, schema-qualified SQL references, and every hash mismatch. It verifies the dump, imports only into the validated target, recreates excluded sessions empty, runs `alembic upgrade head` and `alembic check`, and compares row counts, restored files, and hashes. Standalone restore checks source table names and row counts for stability; it does not by itself prove source content or schema immutability.
+恢复会拒绝开发目标/非 `_test` 目标、非空目标、正式存储、不安全的归档成员、非预期 SQL、限定模式的 SQL 引用及任何哈希不匹配。它验证转储，仅向经过校验的目标导入，将被排除的会话重建为空表，运行 `alembic upgrade head` 和 `alembic check`，并比较行数、恢复文件和哈希。独立恢复检查源表名和行数是否稳定；它本身不能证明源内容或模式不可变。
 
-The stronger real BACKUP-01 proof also compares development table checksums, schema DDL hashes, and storage hashes before/after, verifies age framing and no plaintext/partial artifacts, and removes decrypted restore data. It supports two mutually exclusive target paths:
+更强的真实 BACKUP-01 验证还会比较开发库操作前后的表校验和、模式 DDL 哈希和存储哈希，验证 age 封装且不存在明文/不完整产物，并删除解密后的恢复数据。它支持两条互斥的目标路径：
 
-1. Set `RESTORE_DATABASE_URL` to the dedicated `asa_restore` account above, with the schema already empty. `RESTORE_ADMIN_URL` is then unnecessary and is not used.
-2. Leave `RESTORE_DATABASE_URL` unset or empty and set protected `RESTORE_ADMIN_URL` to a schema-scoped provisioning account. The proof uses `TEST_DATABASE_URL` for the import identity, creates the fixed restore schema if absent, rejects it if nonempty, and grants that test identity `ALL PRIVILEGES` on the restore schema only. The import URL never receives development privileges.
+1. 将 `RESTORE_DATABASE_URL` 设置为上述专用 `asa_restore` 账号，且模式已为空。此时不需要也不会使用 `RESTORE_ADMIN_URL`。
+2. 不设置 `RESTORE_DATABASE_URL` 或将其留空，并将受保护的 `RESTORE_ADMIN_URL` 设置为模式范围预置账号。验证使用 `TEST_DATABASE_URL` 作为导入身份，在固定恢复模式不存在时创建它、非空时拒绝，并仅向该测试身份授予恢复模式的 `ALL PRIVILEGES`。导入 URL 绝不会获得开发权限。
 
-Provision the second path with a separate `asa_restore_admin@127.0.0.1` account. Its grant option and every other privilege are confined to the fixed restore schema:
+使用独立的 `asa_restore_admin@127.0.0.1` 账号预置第二条路径。其授权选项及其他所有权限均仅限固定恢复模式：
 
 ```bash
 cd "$PROJECT_ROOT"
@@ -326,11 +326,11 @@ PY
 unset RESTORE_ADMIN_PASSWORD RESTORE_ADMIN_URL
 ```
 
-The generated URL is written only to protected `.env`; no URL or password is printed. Keep `RESTORE_DATABASE_URL` unset or empty when using this path. Run the proof only with application writers stopped:
+生成的 URL 仅写入受保护的 `.env`；不会输出 URL 或密码。使用此路径时，保持 `RESTORE_DATABASE_URL` 未设置或为空。仅在应用写入方停止时运行验证：
 
 ```bash
 cd "$PROJECT_ROOT"
 .venv/bin/python scripts/test_backup_restore.py
 ```
 
-If development storage is empty, the proof creates and then deletes one uniquely named proof file; it refuses to touch nonempty development storage. The encrypted archive remains in Git-ignored `backups/`. See `backups/README.md` for format details and limitations.
+如果开发存储为空，验证会创建随后删除的一个唯一命名验证文件；对于非空开发存储则拒绝操作。加密归档保留在由 Git 忽略的 `backups/` 中。格式详情和限制见 `backups/README.md`。

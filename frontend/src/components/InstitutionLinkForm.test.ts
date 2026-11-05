@@ -40,6 +40,6 @@ describe('InstitutionLinkForm', () => {
     await wrapper.get('form').trigger('submit')
 
     expect(wrapper.emitted('submit')).toBeUndefined()
-    expect(wrapper.text()).toContain('End date must not be earlier than start date')
+    expect(wrapper.text()).toContain('结束日期不得早于开始日期')
   })
 })

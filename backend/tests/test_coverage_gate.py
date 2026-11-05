@@ -79,5 +79,5 @@ def test_coverage_gate_rejects_low_overall_and_empty_layers():
         gate.evaluate_report(report)
     report = passing_report()
     del report["files"]["app/services/permissions.py"]
-    with pytest.raises(ValueError, match="permissions has no statements"):
+    with pytest.raises(ValueError, match="permissions 没有可统计语句"):
         gate.evaluate_report(report)

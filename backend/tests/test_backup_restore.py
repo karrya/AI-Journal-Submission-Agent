@@ -217,7 +217,7 @@ def test_restore_binds_guard_to_relocated_live_storage(
     archive, key_file = make_sql_archive(tmp_path, age_identity, b"")
     target = live / "child" if child_path else live
 
-    with pytest.raises(ValueError, match="outside live storage"):
+    with pytest.raises(ValueError, match="正式存储目录之外"):
         restore_backup(
             archive,
             "mysql+pymysql://asa_app:unit-only-password@127.0.0.1/academic_submission_agent",
@@ -513,7 +513,7 @@ def test_exact_parser_differential_is_rejected_at_set_statement(tmp_path, age_id
     )
     archive, key_file = make_sql_archive(tmp_path, age_identity, statement.encode())
 
-    with pytest.raises(RestoreFailed, match="unsupported mysqldump SET statement"):
+    with pytest.raises(RestoreFailed, match="不支持的 mysqldump SET 语句"):
         extract_verified_backup(archive, key_file, tmp_path / "verified")
     assert not (tmp_path / "verified").exists()
 
@@ -579,7 +579,7 @@ def test_restore_rejects_nonempty_database_before_reading_backup(tmp_path):
         target.name: FakeEngine(target),
     }
 
-    with pytest.raises(RestoreFailed, match="must be empty"):
+    with pytest.raises(RestoreFailed, match="必须为空"):
         restore_backup(
             tmp_path / "missing.tar.age",
             "mysql+pymysql://asa_app:unit-only-password@127.0.0.1/academic_submission_agent",
@@ -668,7 +668,7 @@ def test_temporary_proof_file_is_exclusive_and_fully_cleaned(tmp_path):
     storage = tmp_path / "storage"
     with _temporary_proof_file(storage) as proof:
         assert proof.name.startswith(".backup-01-temporary-proof-")
-        assert "BACKUP-01 temporary proof" in proof.read_text(encoding="utf-8")
+        assert "BACKUP-01 临时验证文件" in proof.read_text(encoding="utf-8")
         assert storage.is_dir()
     assert not storage.exists()
 
@@ -679,7 +679,7 @@ def test_temporary_proof_file_preserves_existing_storage_content(tmp_path):
     existing = storage / "existing.pdf"
     existing.write_bytes(b"pre-existing content")
 
-    with pytest.raises(RuntimeError, match="not empty"):
+    with pytest.raises(RuntimeError, match="非空"):
         with _temporary_proof_file(storage):
             pass
 
@@ -696,7 +696,7 @@ def test_restore_directory_cleanup_failure_blocks_success(tmp_path, monkeypatch)
         "scripts.test_backup_restore.shutil.rmtree", lambda *args, **kwargs: None
     )
 
-    with pytest.raises(RuntimeError, match="cleanup failed"):
+    with pytest.raises(RuntimeError, match="清理失败"):
         _remove_restore_directory(restored)
     assert remnant.exists()
 

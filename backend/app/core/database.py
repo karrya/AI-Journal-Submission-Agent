@@ -9,7 +9,7 @@ from app.core.config import get_settings
 
 def create_mysql_engine(database_url: str) -> Engine:
     if not make_url(database_url).drivername.startswith("mysql+"):
-        raise ValueError("a MySQL database URL is required")
+        raise ValueError("必须提供 MySQL 数据库 URL")
     return create_engine(
         database_url,
         pool_pre_ping=True,

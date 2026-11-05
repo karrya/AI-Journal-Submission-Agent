@@ -3,6 +3,13 @@ import { onMounted, reactive, ref } from 'vue'
 import { getAuditLog, listAuditLogs, type AuditCategory, type AuditListQuery, type AuditLog } from '../../api/audit'
 import { getSafeRequestId } from '../../api/client'
 import type { SortOrder } from '../../api/authors'
+import {
+  AUDIT_ACTOR_LABELS,
+  AUDIT_CATEGORY_LABELS,
+  AUDIT_RESULT_LABELS,
+  AUDIT_TARGET_LABELS,
+  displayText,
+} from '../../utils/display'
 
 const logs = ref<AuditLog[]>([])
 const total = ref(0)
@@ -32,7 +39,7 @@ function isoDateTime(value: string): string | undefined {
 
 function safeError(error: unknown, fallback: string): string {
   const requestId = getSafeRequestId(error)
-  return requestId ? `${fallback} Request ID: ${requestId}` : fallback
+  return requestId ? `${fallback} 请求 ID：${requestId}` : fallback
 }
 
 async function load(): Promise<void> {
@@ -66,7 +73,7 @@ async function load(): Promise<void> {
     if (sequence !== loadSequence) return
     logs.value = []
     total.value = 0
-    errorMessage.value = safeError(error, 'Unable to load audit logs.')
+    errorMessage.value = safeError(error, '无法加载审计日志。')
   } finally {
     if (sequence === loadSequence) loading.value = false
   }
@@ -93,7 +100,7 @@ async function showDetail(logId: string): Promise<void> {
     if (sequence === loadSequence) detail.value = result
   } catch (error) {
     if (sequence === loadSequence) {
-      errorMessage.value = safeError(error, 'Unable to load the audit log detail.')
+      errorMessage.value = safeError(error, '无法加载审计日志详情。')
     }
   } finally {
     if (sequence === loadSequence) detailLoading.value = false
@@ -109,72 +116,72 @@ onMounted(() => void load())
 
 <template>
   <section class="management-page" aria-labelledby="audit-list-title">
-    <h1 id="audit-list-title">Audit logs</h1>
-    <p>Read-only operation history. Audit records cannot be edited or deleted.</p>
+    <h1 id="audit-list-title">审计日志</h1>
+    <p>只读操作历史，审计记录不可编辑或删除。</p>
 
-    <form class="stacked-form" aria-label="Audit filters" @submit.prevent="applyFilters">
+    <form class="stacked-form" aria-label="审计筛选条件" @submit.prevent="applyFilters">
       <div class="form-grid">
-        <label>Actor user ID<input v-model="filters.actor_user_id" data-test="audit-actor"></label>
-        <label>Author ID<input v-model="filters.author_id"></label>
-        <label>Category
+        <label>操作用户 ID<input v-model="filters.actor_user_id" data-test="audit-actor"></label>
+        <label>作者 ID<input v-model="filters.author_id"></label>
+        <label>类别
           <select v-model="filters.category" data-test="audit-category">
-            <option value="">All categories</option>
-            <option value="authentication">Authentication</option>
-            <option value="authorization">Authorization</option>
-            <option value="business">Business</option>
-            <option value="sensitive_access">Sensitive access</option>
+            <option value="">全部类别</option>
+            <option value="authentication">身份认证</option>
+            <option value="authorization">授权</option>
+            <option value="business">业务操作</option>
+            <option value="sensitive_access">敏感访问</option>
           </select>
         </label>
-        <label>Action<input v-model="filters.action" data-test="audit-action"></label>
-        <label>Target type<input v-model="filters.target_type"></label>
-        <label>Target ID<input v-model="filters.target_id"></label>
-        <label>Result
+        <label>操作<input v-model="filters.action" data-test="audit-action"></label>
+        <label>目标类型<input v-model="filters.target_type"></label>
+        <label>目标 ID<input v-model="filters.target_id"></label>
+        <label>结果
           <select v-model="filters.result" data-test="audit-result">
-            <option value="">All results</option><option value="success">Success</option><option value="failure">Failure</option>
+            <option value="">全部结果</option><option value="success">成功</option><option value="failure">失败</option>
           </select>
         </label>
-        <label>Request ID<input v-model="filters.request_id"></label>
-        <label>Created from<input v-model="filters.created_from" data-test="audit-created-from" type="datetime-local"></label>
-        <label>Created to<input v-model="filters.created_to" type="datetime-local"></label>
-        <label>Order
-          <select v-model="filters.order"><option value="desc">Newest first</option><option value="asc">Oldest first</option></select>
+        <label>请求 ID<input v-model="filters.request_id"></label>
+        <label>创建时间从<input v-model="filters.created_from" data-test="audit-created-from" type="datetime-local"></label>
+        <label>创建时间至<input v-model="filters.created_to" type="datetime-local"></label>
+        <label>排序
+          <select v-model="filters.order"><option value="desc">最新优先</option><option value="asc">最早优先</option></select>
         </label>
       </div>
-      <button type="button" data-test="apply-audit-filters" @click="applyFilters">Apply filters</button>
+      <button type="button" data-test="apply-audit-filters" @click="applyFilters">应用筛选</button>
     </form>
 
     <p v-if="errorMessage" class="form-error" role="alert">{{ errorMessage }}</p>
-    <p v-if="loading">Loading audit logs…</p>
-    <p v-else-if="!errorMessage && logs.length === 0">No audit logs found.</p>
+    <p v-if="loading">正在加载审计日志…</p>
+    <p v-else-if="!errorMessage && logs.length === 0">未找到审计日志。</p>
     <table v-else>
-      <thead><tr><th>Created at</th><th>Actor</th><th>Category</th><th>Action</th><th>Target</th><th>Result</th><th>Request ID</th><th>Detail</th></tr></thead>
+      <thead><tr><th>创建时间</th><th>操作者</th><th>类别</th><th>操作</th><th>目标</th><th>结果</th><th>请求 ID</th><th>详情</th></tr></thead>
       <tbody><tr v-for="log in logs" :key="log.id">
         <td><time :datetime="log.created_at">{{ log.created_at }}</time></td>
-        <td>{{ log.actor_user_id ?? log.actor_type }}</td><td>{{ log.category }}</td><td>{{ log.action }}</td>
-        <td>{{ log.target_type ?? '—' }}<br>{{ log.target_id ?? '—' }}</td><td>{{ log.result }}</td><td>{{ log.request_id }}</td>
-        <td><button type="button" :data-test="`view-audit-${log.id}`" :disabled="detailLoading" @click="showDetail(log.id)">View detail</button></td>
+        <td>{{ log.actor_user_id ?? displayText(AUDIT_ACTOR_LABELS, log.actor_type) }}</td><td>{{ displayText(AUDIT_CATEGORY_LABELS, log.category) }}</td><td>{{ log.action }}</td>
+        <td>{{ log.target_type ? displayText(AUDIT_TARGET_LABELS, log.target_type) : '—' }}<br>{{ log.target_id ?? '—' }}</td><td>{{ displayText(AUDIT_RESULT_LABELS, log.result) }}</td><td>{{ log.request_id }}</td>
+        <td><button type="button" :data-test="`view-audit-${log.id}`" :disabled="detailLoading" @click="showDetail(log.id)">查看详情</button></td>
       </tr></tbody>
     </table>
 
     <section v-if="detail" data-test="audit-detail" aria-labelledby="audit-detail-title">
-      <h2 id="audit-detail-title">Audit detail</h2>
+      <h2 id="audit-detail-title">审计详情</h2>
       <dl class="detail-grid">
-        <div><dt>Log ID</dt><dd>{{ detail.id }}</dd></div>
-        <div><dt>Actor user ID</dt><dd>{{ detail.actor_user_id ?? '—' }}</dd></div>
-        <div><dt>Author ID</dt><dd>{{ detail.author_id ?? '—' }}</dd></div>
-        <div><dt>Action</dt><dd>{{ detail.action }}</dd></div>
-        <div><dt>Result</dt><dd>{{ detail.result }}</dd></div>
-        <div><dt>Error code</dt><dd>{{ detail.error_code ?? '—' }}</dd></div>
-        <div><dt>Error message</dt><dd>{{ detail.error_message ?? '—' }}</dd></div>
+        <div><dt>日志 ID</dt><dd>{{ detail.id }}</dd></div>
+        <div><dt>操作用户 ID</dt><dd>{{ detail.actor_user_id ?? '—' }}</dd></div>
+        <div><dt>作者 ID</dt><dd>{{ detail.author_id ?? '—' }}</dd></div>
+        <div><dt>操作</dt><dd>{{ detail.action }}</dd></div>
+        <div><dt>结果</dt><dd>{{ displayText(AUDIT_RESULT_LABELS, detail.result) }}</dd></div>
+        <div><dt>错误代码</dt><dd>{{ detail.error_code ?? '—' }}</dd></div>
+        <div><dt>错误信息</dt><dd>{{ detail.error_message ?? '—' }}</dd></div>
       </dl>
-      <h3>Before summary</h3><pre>{{ formatSummary(detail.before_summary) }}</pre>
-      <h3>After summary</h3><pre>{{ formatSummary(detail.after_summary) }}</pre>
+      <h3>变更前摘要</h3><pre>{{ formatSummary(detail.before_summary) }}</pre>
+      <h3>变更后摘要</h3><pre>{{ formatSummary(detail.after_summary) }}</pre>
     </section>
 
-    <nav class="pagination" aria-label="Audit pages">
-      <button type="button" :disabled="filters.page === 1 || loading" @click="changePage(filters.page - 1)">Previous</button>
-      <span>Page {{ filters.page }} · {{ total }} total</span>
-      <button type="button" data-test="next-audit" :disabled="filters.page * filters.page_size >= total || loading" @click="changePage(filters.page + 1)">Next</button>
+    <nav class="pagination" aria-label="审计日志分页">
+      <button type="button" :disabled="filters.page === 1 || loading" @click="changePage(filters.page - 1)">上一页</button>
+      <span>第 {{ filters.page }} 页 · 共 {{ total }} 条</span>
+      <button type="button" data-test="next-audit" :disabled="filters.page * filters.page_size >= total || loading" @click="changePage(filters.page + 1)">下一页</button>
     </nav>
   </section>
 </template>

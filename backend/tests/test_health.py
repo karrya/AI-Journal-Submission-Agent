@@ -6,7 +6,7 @@ import pytest
 from fastapi import Request
 from fastapi.testclient import TestClient
 
-from app.main import app
+from app.main import _validation_message, app
 from app.core.errors import AppError
 
 
@@ -109,7 +109,8 @@ def test_app_error_uses_the_flat_envelope():
 
 def test_method_not_allowed_uses_the_flat_envelope():
     response = TestClient(app).post("/api/v1/health")
-    assert_error_envelope(response, 405, "METHOD_NOT_ALLOWED")
+    body = assert_error_envelope(response, 405, "METHOD_NOT_ALLOWED")
+    assert body["message"] == "请求方法不受支持"
 
 
 def test_validation_error_contains_only_safe_location_and_message():
@@ -120,8 +121,59 @@ def test_validation_error_contains_only_safe_location_and_message():
     body = assert_error_envelope(response, 422, "VALIDATION_ERROR")
     assert body["details"]
     assert all(set(item) == {"loc", "message"} for item in body["details"])
+    assert all(
+        any("一" <= character <= "鿿" for character in item["message"])
+        for item in body["details"]
+    )
     assert "do-not-return-this" not in response.text
     assert "not-an-integer" not in response.text
+
+
+@pytest.mark.parametrize(
+    ("error", "expected"),
+    [
+        (
+            {"type": "string_too_short", "ctx": {"min_length": 12}},
+            "字符串长度至少为 12 个字符",
+        ),
+        (
+            {"type": "string_too_long", "ctx": {"max_length": 255}},
+            "字符串长度不能超过 255 个字符",
+        ),
+        (
+            {"type": "too_short", "ctx": {"min_length": 1}},
+            "列表至少包含 1 项",
+        ),
+        (
+            {"type": "too_long", "ctx": {"max_length": 200}},
+            "列表最多包含 200 项",
+        ),
+        ({"type": "greater_than", "ctx": {"gt": 0}}, "数值必须大于 0"),
+        (
+            {"type": "greater_than_equal", "ctx": {"ge": 1}},
+            "数值必须大于或等于 1",
+        ),
+        ({"type": "less_than", "ctx": {"lt": 10}}, "数值必须小于 10"),
+        (
+            {"type": "less_than_equal", "ctx": {"le": 100}},
+            "数值必须小于或等于 100",
+        ),
+        (
+            {"type": "multiple_of", "ctx": {"multiple_of": 5}},
+            "数值必须是 5 的倍数",
+        ),
+        (
+            {"type": "literal_error", "ctx": {"expected": "'research' or 'review'"}},
+            "取值必须是以下允许值之一：'research' or 'review'",
+        ),
+        (
+            {"type": "enum", "ctx": {"expected": "'active' or 'inactive'"}},
+            "取值必须是以下允许值之一：'active' or 'inactive'",
+        ),
+    ],
+)
+def test_validation_messages_preserve_constraint_context(error, expected):
+    assert _validation_message(error) == expected
 
 
 def test_unhandled_exception_is_logged_without_exposing_a_stack(caplog):
@@ -133,5 +185,5 @@ def test_unhandled_exception_is_logged_without_exposing_a_stack(caplog):
     assert body["details"] is None
     assert "Traceback" not in response.text
     assert "sensitive stack detail" not in response.text
-    assert "Unhandled request exception" in caplog.text
+    assert "未处理的请求异常" in caplog.text
     assert "sensitive stack detail" in caplog.text

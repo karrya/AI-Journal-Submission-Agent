@@ -40,7 +40,7 @@ def test_migration_and_test_accounts_are_scoped_to_their_own_databases():
         ("asa_test", "academic_submission_agent"),
         ("unknown", "academic_submission_agent"),
     ):
-        with pytest.raises(ValueError, match="unsupported database identity"):
+        with pytest.raises(ValueError, match="不支持的数据库标识"):
             build_grants(user, database)
 
 
@@ -83,7 +83,7 @@ def test_test_fixtures_reject_non_test_databases_and_live_storage(tmp_path: Path
 
     temporary_storage = tmp_path / "isolated-test-storage"
     assert validate_test_storage_root(temporary_storage) == temporary_storage
-    with pytest.raises(RuntimeError, match="live storage"):
+    with pytest.raises(RuntimeError, match="正式存储目录"):
         validate_test_storage_root(PROJECT_ROOT / "storage")
 
 

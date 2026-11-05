@@ -38,7 +38,7 @@ describe('AuthorshipEditor', () => {
     await wrapper.get('form').trigger('submit')
 
     expect(wrapper.emitted('submit')).toBeUndefined()
-    expect(wrapper.text()).toContain('Confirm the ordered authorship change')
+    expect(wrapper.text()).toContain('保存前请确认作者名单及顺序变更')
   })
 
   it('adds an authorized coauthor, orders entries, and selects corresponding authors', async () => {
@@ -65,7 +65,7 @@ describe('AuthorshipEditor', () => {
     await wrapper.get('form').trigger('submit')
 
     expect(wrapper.emitted('submit')).toBeUndefined()
-    expect(wrapper.text()).toContain('Select at least one corresponding author')
+    expect(wrapper.text()).toContain('请至少选择一位通讯作者')
   })
 
   it('resets confirmation when the parent supplies a new authorship state', async () => {
@@ -80,6 +80,6 @@ describe('AuthorshipEditor', () => {
     await wrapper.get('form').trigger('submit')
 
     expect(wrapper.emitted('submit')).toBeUndefined()
-    expect(wrapper.text()).toContain('Confirm the ordered authorship change')
+    expect(wrapper.text()).toContain('保存前请确认作者名单及顺序变更')
   })
 })

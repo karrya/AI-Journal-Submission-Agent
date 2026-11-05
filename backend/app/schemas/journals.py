@@ -17,12 +17,12 @@ from app.schemas.common import (
 def normalize_issn(value: str) -> str:
     compact = value.replace("-", "").upper()
     if re.fullmatch(r"\d{7}[\dX]", compact) is None:
-        raise ValueError("Invalid ISSN format")
+        raise ValueError("ISSN（国际标准连续出版物号）格式无效")
     weighted_sum = sum(int(digit) * weight for digit, weight in zip(compact[:7], range(8, 1, -1)))
     check_value = (11 - weighted_sum % 11) % 11
     check_character = "X" if check_value == 10 else str(check_value)
     if compact[-1] != check_character:
-        raise ValueError("Invalid ISSN checksum")
+        raise ValueError("ISSN（国际标准连续出版物号）校验位无效")
     return compact
 
 
@@ -101,14 +101,14 @@ class JournalRequirement(InputModel):
     @classmethod
     def normalize_verified_at(cls, value: datetime) -> datetime:
         if value.tzinfo is None or value.utcoffset() is None:
-            raise ValueError("Requirement verified_at must be timezone-aware")
+            raise ValueError("投稿要求的 verified_at 必须包含时区信息")
         return value.astimezone(UTC)
 
     @field_validator("value")
     @classmethod
     def require_nonempty_string(cls, value):
         if isinstance(value, str) and not value:
-            raise ValueError("Requirement value must not be empty")
+            raise ValueError("投稿要求的值不能为空")
         return value
 
 

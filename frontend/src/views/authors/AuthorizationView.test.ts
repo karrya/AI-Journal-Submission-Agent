@@ -80,12 +80,12 @@ describe('AuthorizationView', () => {
     await wrapper.get('[data-test="valid-to"]').setValue('2099-11-02T00:00')
     await wrapper.get('[data-test="authorization-form"]').trigger('submit')
     expect(adapter.mock.calls.some(([config]) => config.method === 'patch')).toBe(false)
-    expect(wrapper.text()).toContain('End time must be later than start time')
+    expect(wrapper.text()).toContain('结束时间必须晚于开始时间')
 
     await wrapper.get('[data-test="valid-to"]').setValue('')
     await wrapper.get('[data-test="authorization-form"]').trigger('submit')
     expect(adapter.mock.calls.some(([config]) => config.method === 'patch')).toBe(false)
-    expect(wrapper.text()).toContain('Start and end times are required')
+    expect(wrapper.text()).toContain('请填写开始时间和结束时间')
 
     await wrapper.get('[data-test="valid-from"]').setValue('2099-11-01T00:00')
     await wrapper.get('[data-test="valid-to"]').setValue('2099-11-04T00:00')
@@ -125,7 +125,7 @@ describe('AuthorizationView', () => {
     }))
     const wrapper = mountView()
     await flushPromises()
-    expect(wrapper.text()).toContain('No authorizations found')
+    expect(wrapper.text()).toContain('未找到授权')
     expect(adapter.mock.calls[0][0].params).toMatchObject({
       author_id: 'a1', page: 1, page_size: 20, sort: 'created_at', order: 'desc',
     })
@@ -139,7 +139,7 @@ describe('AuthorizationView', () => {
     const wrapper = mountView()
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Unable to load authorizations')
-    expect(wrapper.text()).not.toContain('No authorizations found')
+    expect(wrapper.text()).toContain('无法加载授权')
+    expect(wrapper.text()).not.toContain('未找到授权')
   })
 })

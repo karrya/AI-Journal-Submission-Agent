@@ -85,11 +85,11 @@ function submit(): void {
   errorMessage.value = ''
   const displayName = form.display_name.trim()
   if (!displayName) {
-    errorMessage.value = 'Display name is required.'
+    errorMessage.value = '请填写显示姓名。'
     return
   }
   if (!form.confirm_identity_change) {
-    errorMessage.value = 'Confirm the author identity before saving.'
+    errorMessage.value = '保存前请确认作者身份。'
     return
   }
   const optionalValues: Record<OptionalAuthorField, string | null> = {
@@ -127,23 +127,23 @@ function submit(): void {
   <form class="stacked-form" novalidate @submit.prevent="submit">
     <p v-if="errorMessage" class="form-error" role="alert">{{ errorMessage }}</p>
     <div class="form-grid">
-      <label v-if="canEditField('given_name')">Given name<input v-model="form.given_name" data-test="given-name" maxlength="128"></label>
-      <label v-if="canEditField('middle_name')">Middle name<input v-model="form.middle_name" maxlength="128"></label>
-      <label v-if="canEditField('family_name')">Family name<input v-model="form.family_name" maxlength="128"></label>
-      <label>Display name<input v-model="form.display_name" data-test="display-name" required maxlength="255"></label>
+      <label v-if="canEditField('given_name')">名<input v-model="form.given_name" data-test="given-name" maxlength="128"></label>
+      <label v-if="canEditField('middle_name')">中间名<input v-model="form.middle_name" maxlength="128"></label>
+      <label v-if="canEditField('family_name')">姓<input v-model="form.family_name" maxlength="128"></label>
+      <label>显示姓名<input v-model="form.display_name" data-test="display-name" required maxlength="255"></label>
       <label v-if="canEditField('orcid')">ORCID<input v-model="form.orcid" placeholder="0000-0002-1825-0097"></label>
-      <label>Status<select v-model="form.status"><option value="active">Active</option><option value="inactive">Inactive</option></select></label>
-      <label v-if="canEditField('phone_country_code')">Phone country code<input v-model="form.phone_country_code" maxlength="16"></label>
-      <label v-if="canEditField('phone_number')">Phone number<input v-model="form.phone_number" maxlength="32"></label>
+      <label>状态<select v-model="form.status"><option value="active">启用</option><option value="inactive">停用</option></select></label>
+      <label v-if="canEditField('phone_country_code')">电话国家代码<input v-model="form.phone_country_code" maxlength="16"></label>
+      <label v-if="canEditField('phone_number')">电话号码<input v-model="form.phone_number" maxlength="32"></label>
     </div>
-    <label v-if="canEditField('notes')">Notes<textarea v-model="form.notes" rows="3"></textarea></label>
+    <label v-if="canEditField('notes')">备注<textarea v-model="form.notes" rows="3"></textarea></label>
     <label class="confirmation-control">
       <input v-model="form.confirm_identity_change" data-test="identity-confirm" type="checkbox">
-      I confirm that this author identity and these changes are correct.
+      我确认该作者身份及以上变更准确无误。
     </label>
     <div class="form-actions">
-      <button type="submit" :disabled="submitting">{{ submitting ? 'Saving…' : 'Save author' }}</button>
-      <button type="button" :disabled="submitting" @click="emit('cancel')">Cancel</button>
+      <button type="submit" :disabled="submitting">{{ submitting ? '保存中…' : '保存作者' }}</button>
+      <button type="button" :disabled="submitting" @click="emit('cancel')">取消</button>
     </div>
   </form>
 </template>

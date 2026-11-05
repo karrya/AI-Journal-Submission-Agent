@@ -1,4 +1,4 @@
-"""Transactional manuscript, ordered-authorship, and immutable-version services."""
+"""提供稿件事务管理、作者顺序维护和不可变版本服务。"""
 
 from datetime import UTC, datetime
 from typing import Any
@@ -266,18 +266,18 @@ class ManuscriptService(DomainService):
                 )
             ]
         if not entries or len(entries) > 200:
-            raise _validation("Authorship must contain between 1 and 200 authors")
+            raise _validation("署名作者人数必须为 1 至 200 人")
         ordered = sorted(entries, key=lambda entry: entry.position)
         author_ids = [str(entry.author_id) for entry in ordered]
         positions = [entry.position for entry in ordered]
         if len(set(author_ids)) != len(author_ids):
-            raise _validation("Authorship authors must be unique")
+            raise _validation("署名作者不得重复")
         if positions != list(range(1, len(ordered) + 1)):
-            raise _validation("Authorship positions must be contiguous from 1")
+            raise _validation("署名作者顺序必须从 1 开始连续编号")
         if owner_author_id not in author_ids:
-            raise _validation("The manuscript owner must remain in authorship")
+            raise _validation("稿件所有者必须保留在署名作者中")
         if not any(entry.is_corresponding for entry in ordered):
-            raise _validation("At least one corresponding author is required")
+            raise _validation("至少需要一名通讯作者")
         return ordered
 
     def _require_new_coauthors(
@@ -433,7 +433,7 @@ class ManuscriptService(DomainService):
         order: str,
     ) -> ManuscriptPage:
         if sort not in self.repository.SORT_FIELDS:
-            raise _validation("Unsupported sort field")
+            raise _validation("不支持的排序字段")
         roles = self._roles()
         is_admin = self._is_admin()
         if not is_admin and roles.isdisjoint(
@@ -478,7 +478,7 @@ class ManuscriptService(DomainService):
                 field in values and values[field] is None
                 for field in _NON_NULLABLE_UPDATE_FIELDS
             ):
-                raise _validation("A required manuscript field cannot be null")
+                raise _validation("稿件必填字段不能为空")
             before = {
                 field: getattr(manuscript, field)
                 for field in values

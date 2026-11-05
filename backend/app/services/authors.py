@@ -1,4 +1,4 @@
-"""Transactional, authorization-aware author domain services."""
+"""提供具备事务和授权校验的作者领域服务。"""
 
 import re
 import unicodedata
@@ -213,7 +213,7 @@ class DomainService:
     @staticmethod
     def _validate_sort(repository, sort: str) -> None:
         if sort not in repository.SORT_FIELDS:
-            raise _validation("Unsupported sort field")
+            raise _validation("不支持的排序字段")
 
 
 class AuthorService(DomainService):
@@ -243,9 +243,9 @@ class AuthorService(DomainService):
             if isinstance(normalized.get(field), str):
                 normalized[field] = normalize_display_name(normalized[field])
         if normalized.get("display_name") is None and "display_name" in normalized:
-            raise _validation("display_name cannot be null")
+            raise _validation("display_name 不能为空")
         if normalized.get("status") is None and "status" in normalized:
-            raise _validation("status cannot be null")
+            raise _validation("status 不能为空")
         if (
             "alternate_names" in normalized
             and normalized["alternate_names"] is not None
@@ -294,7 +294,7 @@ class AuthorService(DomainService):
     def create(self, payload: AuthorCreate) -> AuthorResponse:
         self._require_admin()
         if payload.confirm_identity_change is not True:
-            raise _validation("Identity confirmation is required")
+            raise _validation("必须明确确认作者身份信息")
         values = self._normalized_values(
             payload.model_dump(exclude={"confirm_identity_change"})
         )
@@ -335,7 +335,7 @@ class AuthorService(DomainService):
             try:
                 normalized_orcid = normalize_orcid(orcid)
             except ValueError:
-                raise _validation("Invalid ORCID filter") from None
+                raise _validation("ORCID（开放研究者与贡献者标识）筛选条件无效") from None
         is_admin = self._is_admin()
         role_can_read = not self._roles().isdisjoint(
             {"system_admin", "submission_operator", "reviewer", "author"}
@@ -366,7 +366,7 @@ class AuthorService(DomainService):
             Permission.AUTHOR_PROFILE_READ,
         )
         if payload.confirm_identity_change is not True:
-            raise _validation("Identity confirmation is required")
+            raise _validation("必须明确确认作者身份信息")
         values = self._normalized_values(
             payload.model_dump(exclude_unset=True, exclude={"confirm_identity_change"})
         )
@@ -462,7 +462,7 @@ class EmailService(DomainService):
     def create(self, author_id: str, payload: EmailCreate) -> EmailResponse:
         self._require_email_author(author_id)
         if payload.confirm_email_binding is not True:
-            raise _validation("Email binding confirmation is required")
+            raise _validation("必须明确确认邮箱绑定关系")
         original = str(payload.email).strip()
         email = self.repository.add(
             AuthorEmail(
@@ -504,15 +504,15 @@ class EmailService(DomainService):
         )
         if "email" in values:
             if payload.confirm_email_binding is not True:
-                raise _validation("Email binding confirmation is required")
+                raise _validation("必须明确确认邮箱绑定关系")
             if values["email"] is None:
-                raise _validation("email cannot be null")
+                raise _validation("email 不能为空")
             original = str(values["email"]).strip()
             values["email"] = original
             values["normalized_email"] = normalize_comparison(original)
         for field in ("purpose", "is_primary", *status_fields):
             if field in values and values[field] is None:
-                raise _validation(f"{field} cannot be null")
+                raise _validation(f"{field} 不能为空")
         before = {key: getattr(email, key) for key in values if key in self.SAFE_FIELDS}
         for key, value in values.items():
             setattr(email, key, value)
@@ -535,7 +535,7 @@ class EmailService(DomainService):
         self._require_email_author(author_id)
         email = self._get(author_id, email_id)
         if confirm_email_binding is not True:
-            raise _validation("Email binding confirmation is required")
+            raise _validation("必须明确确认邮箱绑定关系")
         email.deleted_at = utc_now()
         self._business_audit(
             action="author.email.delete",
@@ -633,7 +633,7 @@ class InstitutionService(DomainService):
         values = payload.model_dump(exclude_unset=True)
         if "name" in values:
             if values["name"] is None:
-                raise _validation("name cannot be null")
+                raise _validation("name 不能为空")
             values["name"] = normalize_display_name(values["name"])
             values["normalized_name"] = normalize_comparison(values["name"])
         before = {
@@ -816,16 +816,16 @@ class AuthorInstitutionService(DomainService):
         values = payload.model_dump(exclude_unset=True)
         if "institution_id" in values:
             if values["institution_id"] is None:
-                raise _validation("institution_id cannot be null")
+                raise _validation("institution_id 不能为空")
             institution = self._active_institution(str(values["institution_id"]))
             values["institution_id"] = str(values["institution_id"])
         for field in ("is_current", "display_order"):
             if field in values and values[field] is None:
-                raise _validation(f"{field} cannot be null")
+                raise _validation(f"{field} 不能为空")
         valid_from = values.get("valid_from", link.valid_from)
         valid_to = values.get("valid_to", link.valid_to)
         if valid_from is not None and valid_to is not None and valid_to < valid_from:
-            raise _validation("valid_to must not be earlier than valid_from")
+            raise _validation("valid_to 不得早于 valid_from")
         before = {
             key: getattr(link, key)
             for key in ("institution_id", "department", "is_current", "display_order")

@@ -1,4 +1,4 @@
-"""Administrator-only finite author authorization management."""
+"""提供仅管理员可用的有限期作者授权管理。"""
 
 from collections.abc import Sequence
 from datetime import UTC, datetime
@@ -39,10 +39,10 @@ class AuthorizationService(DomainService):
     @staticmethod
     def _validate_interval(*, valid_from: datetime, valid_to: datetime, now: datetime):
         if valid_to <= now:
-            raise AppError(422, "VALIDATION_ERROR", "valid_to must be in the future")
+            raise AppError(422, "VALIDATION_ERROR", "valid_to 必须晚于当前时间")
         if valid_to <= valid_from:
             raise AppError(
-                422, "VALIDATION_ERROR", "valid_to must be later than valid_from"
+                422, "VALIDATION_ERROR", "valid_to 必须晚于 valid_from"
             )
 
     def _active_subject(self, author_id: str, user_id: str) -> None:
@@ -57,7 +57,7 @@ class AuthorizationService(DomainService):
             or user.status != "active"
         ):
             raise AppError(
-                422, "VALIDATION_ERROR", "Authorization subjects must be active"
+                422, "VALIDATION_ERROR", "授权关联的作者和用户必须处于有效状态"
             )
 
     def _get(self, authorization_id: str) -> AuthorAuthorization:
@@ -187,7 +187,7 @@ class AuthorizationService(DomainService):
             validity_status is not None
             and validity_status not in self.VALIDITY_STATUSES
         ):
-            raise AppError(422, "VALIDATION_ERROR", "Unsupported validity status")
+            raise AppError(422, "VALIDATION_ERROR", "不支持的授权有效状态")
         records, total = self.repository.list_page(
             page=page,
             page_size=page_size,

@@ -1,4 +1,4 @@
-"""Permission-filtered dashboard aggregates and current-user operation summaries."""
+"""提供按权限过滤的仪表盘聚合数据和当前用户操作摘要。"""
 
 from datetime import UTC, timedelta
 

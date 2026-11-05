@@ -1,4 +1,4 @@
-"""Persistence queries for layered author authorization."""
+"""提供分层作者授权的持久化查询。"""
 
 import json
 from datetime import datetime

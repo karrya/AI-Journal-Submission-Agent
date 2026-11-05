@@ -33,10 +33,10 @@ describe('AuthorForm', () => {
       status: 'inactive',
       confirm_identity_change: true,
     })
-    expect(wrapper.text()).not.toContain('Given name')
+    expect(wrapper.findAll('label').map((label) => label.text())).not.toContain('名')
     expect(wrapper.text()).not.toContain('ORCID')
-    expect(wrapper.text()).not.toContain('Notes')
-    expect(wrapper.text()).not.toContain('Phone number')
+    expect(wrapper.text()).not.toContain('备注')
+    expect(wrapper.text()).not.toContain('电话号码')
   })
 
   it('requires a nonblank display name even when confirmed', async () => {
@@ -46,6 +46,6 @@ describe('AuthorForm', () => {
     await wrapper.get('form').trigger('submit')
 
     expect(wrapper.emitted('submit')).toBeUndefined()
-    expect(wrapper.text()).toContain('Display name is required')
+    expect(wrapper.text()).toContain('请填写显示姓名')
   })
 })

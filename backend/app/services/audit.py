@@ -1,4 +1,4 @@
-"""Sanitized, transaction-sharing audit records."""
+"""提供经过脱敏且共享事务的审计记录。"""
 
 from collections.abc import Collection, Mapping
 from copy import deepcopy
@@ -39,12 +39,12 @@ def _sanitize_summary(
         sanitized = {}
         for key, item in value.items():
             if not isinstance(key, str):
-                raise ValueError("Audit summary keys must be strings")
+                raise ValueError("审计摘要的键必须是字符串")
             normalized = _normalized_key(key)
             if any(fragment in normalized for fragment in _SENSITIVE_KEY_FRAGMENTS):
-                raise ValueError("Audit summary contains a sensitive key")
+                raise ValueError("审计摘要包含敏感字段键")
             if key not in allowed_fields:
-                raise ValueError("Audit summary field is outside the explicit allowlist")
+                raise ValueError("审计摘要字段不在显式允许列表中")
             sanitized[key] = _sanitize_summary(
                 item, allowed_fields=allowed_fields, path=f"{path}.{key}"
             )
@@ -109,7 +109,7 @@ class AuditService:
 
 
 class AuditQueryService:
-    """Read-only audit queries; authorization is enforced at the API boundary."""
+    """只读审计查询；授权校验在 API 边界执行。"""
 
     def __init__(self, db: Session):
         self.repository = AuditRepository(db)
@@ -128,7 +128,7 @@ class AuditQueryService:
             return None
         if value.tzinfo is None or value.utcoffset() is None:
             raise AppError(
-                422, "VALIDATION_ERROR", "Audit time filters must be timezone-aware"
+                422, "VALIDATION_ERROR", "审计时间筛选条件必须包含时区信息"
             )
         return value.astimezone(UTC).replace(tzinfo=None)
 
@@ -151,12 +151,12 @@ class AuditQueryService:
         order: str,
     ) -> AuditLogPage:
         if sort not in self.repository.SORT_FIELDS:
-            raise AppError(422, "VALIDATION_ERROR", "Unsupported sort field")
+            raise AppError(422, "VALIDATION_ERROR", "不支持的排序字段")
         start = self._utc_filter(created_from)
         end = self._utc_filter(created_to)
         if start is not None and end is not None and end < start:
             raise AppError(
-                422, "VALIDATION_ERROR", "created_to must not precede created_from"
+                422, "VALIDATION_ERROR", "created_to 不得早于 created_from"
             )
         records, total = self.repository.list_page(
             page=page,

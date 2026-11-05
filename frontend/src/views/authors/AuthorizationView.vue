@@ -13,6 +13,11 @@ import {
 } from '../../api/authors'
 import { getSafeRequestId } from '../../api/client'
 import { useAuthStore } from '../../stores/auth'
+import {
+  AUTHORIZATION_STATUS_LABELS,
+  displayText,
+  PERMISSION_LABELS,
+} from '../../utils/display'
 
 const props = withDefaults(defineProps<{ authorId?: string }>(), { authorId: '' })
 const auth = useAuthStore()
@@ -47,7 +52,7 @@ let loadSequence = 0
 
 function safeError(error: unknown, fallback: string): string {
   const requestId = getSafeRequestId(error)
-  return requestId ? `${fallback} Request ID: ${requestId}` : fallback
+  return requestId ? `${fallback} 请求 ID：${requestId}` : fallback
 }
 
 async function load(): Promise<void> {
@@ -67,7 +72,7 @@ async function load(): Promise<void> {
     if (sequence !== loadSequence) return
     items.value = []
     total.value = 0
-    errorMessage.value = safeError(error, 'Unable to load authorizations.')
+    errorMessage.value = safeError(error, '无法加载授权。')
   } finally {
     if (sequence === loadSequence) loading.value = false
   }
@@ -121,31 +126,31 @@ async function save(): Promise<void> {
   if (saving.value) return
   errorMessage.value = ''
   if (!form.author_id.trim() || !form.user_id.trim()) {
-    errorMessage.value = 'Author ID and user ID are required.'
+    errorMessage.value = '请填写作者 ID 和用户 ID。'
     return
   }
   if (form.permissions.length === 0) {
-    errorMessage.value = 'Select at least one permission.'
+    errorMessage.value = '请至少选择一项权限。'
     return
   }
   if (!form.valid_from || !form.valid_to) {
-    errorMessage.value = 'Start and end times are required.'
+    errorMessage.value = '请填写开始时间和结束时间。'
     return
   }
   const validFrom = isoDate(form.valid_from)
   const validTo = isoDate(form.valid_to)
   if (!validFrom || !validTo) {
-    errorMessage.value = 'Start and end times must be finite dates.'
+    errorMessage.value = '开始时间和结束时间必须是有效日期。'
     return
   }
   const startMs = new Date(validFrom).getTime()
   const endMs = new Date(validTo).getTime()
   if (endMs <= startMs) {
-    errorMessage.value = 'End time must be later than start time.'
+    errorMessage.value = '结束时间必须晚于开始时间。'
     return
   }
   if (endMs <= Date.now()) {
-    errorMessage.value = 'End time must be in the future.'
+    errorMessage.value = '结束时间必须晚于当前时间。'
     return
   }
   const common = {
@@ -170,7 +175,7 @@ async function save(): Promise<void> {
     editingId.value = null
     await load()
   } catch (error) {
-    errorMessage.value = safeError(error, 'Unable to save the authorization.')
+    errorMessage.value = safeError(error, '无法保存授权。')
   } finally {
     saving.value = false
   }
@@ -187,7 +192,7 @@ function startRevoke(authorizationId: string): void {
 async function confirmRevoke(): Promise<void> {
   if (!revokingId.value || saving.value) return
   if (!revokeConfirmed.value) {
-    errorMessage.value = 'Confirm authorization revocation separately before continuing.'
+    errorMessage.value = '继续前请单独确认撤销授权。'
     return
   }
   saving.value = true
@@ -197,7 +202,7 @@ async function confirmRevoke(): Promise<void> {
     revokingId.value = null
     await load()
   } catch (error) {
-    errorMessage.value = safeError(error, 'Unable to revoke the authorization.')
+    errorMessage.value = safeError(error, '无法撤销授权。')
   } finally {
     saving.value = false
   }
@@ -213,57 +218,57 @@ watch(() => props.authorId, () => {
 
 <template>
   <section class="management-page" aria-labelledby="authorization-title">
-    <h1 id="authorization-title">Author authorizations</h1>
-    <p>Grants are limited to the nine defined permissions and always have finite start and end times.</p>
+    <h1 id="authorization-title">作者授权</h1>
+    <p>授权仅限九项既定权限，且必须设置明确的开始和结束时间。</p>
     <div class="toolbar">
-      <label>User ID<input v-model="query.user_id" @change="query.page = 1; load()"></label>
-      <label>Sort<select v-model="query.sort" @change="sortChanged"><option value="created_at">Created at</option><option value="updated_at">Updated at</option><option value="valid_from">Valid from</option><option value="valid_to">Valid to</option></select></label>
-      <label>Order<select v-model="query.order" @change="sortChanged"><option value="desc">Descending</option><option value="asc">Ascending</option></select></label>
-      <button v-if="isAdmin" type="button" data-test="add-authorization" @click="openForm()">Add authorization</button>
+      <label>用户 ID<input v-model="query.user_id" @change="query.page = 1; load()"></label>
+      <label>排序<select v-model="query.sort" @change="sortChanged"><option value="created_at">创建时间</option><option value="updated_at">更新时间</option><option value="valid_from">开始时间</option><option value="valid_to">结束时间</option></select></label>
+      <label>顺序<select v-model="query.order" @change="sortChanged"><option value="desc">降序</option><option value="asc">升序</option></select></label>
+      <button v-if="isAdmin" type="button" data-test="add-authorization" @click="openForm()">添加授权</button>
     </div>
     <p v-if="errorMessage" class="form-error" role="alert">{{ errorMessage }}</p>
 
     <form v-if="showForm" data-test="authorization-form" class="stacked-form" novalidate @submit.prevent="save">
-      <h2>{{ editingId ? 'Edit authorization' : 'Add authorization' }}</h2>
+      <h2>{{ editingId ? '编辑授权' : '添加授权' }}</h2>
       <div class="form-grid">
-        <label>Author ID<input v-model="form.author_id" :disabled="Boolean(editingId)" required></label>
-        <label>User ID<input v-model="form.user_id" data-test="authorization-user-id" :disabled="Boolean(editingId)" required></label>
-        <label>Valid from<input v-model="form.valid_from" data-test="valid-from" type="datetime-local" required></label>
-        <label>Valid to<input v-model="form.valid_to" data-test="valid-to" type="datetime-local" required></label>
+        <label>作者 ID<input v-model="form.author_id" :disabled="Boolean(editingId)" required></label>
+        <label>用户 ID<input v-model="form.user_id" data-test="authorization-user-id" :disabled="Boolean(editingId)" required></label>
+        <label>开始时间<input v-model="form.valid_from" data-test="valid-from" type="datetime-local" required></label>
+        <label>结束时间<input v-model="form.valid_to" data-test="valid-to" type="datetime-local" required></label>
       </div>
       <fieldset>
-        <legend>Permissions</legend>
-        <label v-for="code in PERMISSION_CODES" :key="code" class="permission-option"><input v-model="form.permissions" data-test="permission-option" type="checkbox" :value="code"> {{ code }}</label>
+        <legend>权限</legend>
+        <label v-for="code in PERMISSION_CODES" :key="code" class="permission-option"><input v-model="form.permissions" data-test="permission-option" type="checkbox" :value="code"> {{ displayText(PERMISSION_LABELS, code) }}</label>
       </fieldset>
-      <label>Evidence reference<input v-model="form.evidence_ref" maxlength="1024"></label>
-      <label>Notes<textarea v-model="form.notes" rows="3"></textarea></label>
-      <button type="submit" :disabled="saving">Save authorization</button>
-      <button type="button" @click="showForm = false">Cancel</button>
+      <label>授权依据<input v-model="form.evidence_ref" maxlength="1024"></label>
+      <label>备注<textarea v-model="form.notes" rows="3"></textarea></label>
+      <button type="submit" :disabled="saving">保存授权</button>
+      <button type="button" @click="showForm = false">取消</button>
     </form>
 
-    <section v-if="revokingId" class="confirmation-panel" aria-label="Confirm authorization revocation">
-      <h2>Revoke authorization</h2>
-      <p>Revocation is separate from editing and takes effect on the subject's next request.</p>
-      <label>Reason<textarea v-model="revokeReason" data-test="revoke-reason" rows="3" maxlength="2000"></textarea></label>
-      <label class="confirmation-control"><input v-model="revokeConfirmed" data-test="revoke-confirm" type="checkbox"> I confirm revocation of this authorization.</label>
-      <button type="button" :data-test="`confirm-revoke-${revokingId}`" :disabled="saving" @click="confirmRevoke">Confirm revocation</button>
-      <button type="button" @click="revokingId = null">Cancel</button>
+    <section v-if="revokingId" class="confirmation-panel" aria-label="确认撤销授权">
+      <h2>撤销授权</h2>
+      <p>撤销与编辑相互独立，并将在授权对象的下次请求时生效。</p>
+      <label>原因<textarea v-model="revokeReason" data-test="revoke-reason" rows="3" maxlength="2000"></textarea></label>
+      <label class="confirmation-control"><input v-model="revokeConfirmed" data-test="revoke-confirm" type="checkbox"> 我确认撤销此授权。</label>
+      <button type="button" :data-test="`confirm-revoke-${revokingId}`" :disabled="saving" @click="confirmRevoke">确认撤销</button>
+      <button type="button" @click="revokingId = null">取消</button>
     </section>
 
-    <p v-if="loading">Loading authorizations…</p>
-    <p v-else-if="!errorMessage && items.length === 0">No authorizations found.</p>
+    <p v-if="loading">正在加载授权…</p>
+    <p v-else-if="!errorMessage && items.length === 0">未找到授权。</p>
     <table v-else>
-      <thead><tr><th>Author ID</th><th>User ID</th><th>Permissions</th><th>Valid from</th><th>Valid to</th><th>Status</th><th v-if="isAdmin">Actions</th></tr></thead>
+      <thead><tr><th>作者 ID</th><th>用户 ID</th><th>权限</th><th>开始时间</th><th>结束时间</th><th>状态</th><th v-if="isAdmin">操作</th></tr></thead>
       <tbody><tr v-for="authorization in items" :key="authorization.id">
-        <td>{{ authorization.author_id }}</td><td>{{ authorization.user_id }}</td><td>{{ authorization.permissions.join(', ') }}</td>
-        <td>{{ authorization.valid_from }}</td><td>{{ authorization.valid_to }}</td><td>{{ authorization.validity_status }}</td>
-        <td v-if="isAdmin"><button type="button" :data-test="`edit-authorization-${authorization.id}`" @click="openForm(authorization)">Edit</button><button v-if="!authorization.revoked_at" type="button" :data-test="`revoke-authorization-${authorization.id}`" @click="startRevoke(authorization.id)">Revoke</button></td>
+        <td>{{ authorization.author_id }}</td><td>{{ authorization.user_id }}</td><td>{{ authorization.permissions.map((code) => displayText(PERMISSION_LABELS, code)).join('、') }}</td>
+        <td>{{ authorization.valid_from }}</td><td>{{ authorization.valid_to }}</td><td>{{ displayText(AUTHORIZATION_STATUS_LABELS, authorization.validity_status) }}</td>
+        <td v-if="isAdmin"><button type="button" :data-test="`edit-authorization-${authorization.id}`" @click="openForm(authorization)">编辑</button><button v-if="!authorization.revoked_at" type="button" :data-test="`revoke-authorization-${authorization.id}`" @click="startRevoke(authorization.id)">撤销</button></td>
       </tr></tbody>
     </table>
-    <nav class="pagination" aria-label="Authorization pages">
-      <button type="button" :disabled="query.page === 1 || loading" @click="changePage(query.page - 1)">Previous</button>
-      <span>Page {{ query.page }} · {{ total }} total</span>
-      <button type="button" data-test="next-authorizations" :disabled="query.page * query.page_size >= total || loading" @click="changePage(query.page + 1)">Next</button>
+    <nav class="pagination" aria-label="授权分页">
+      <button type="button" :disabled="query.page === 1 || loading" @click="changePage(query.page - 1)">上一页</button>
+      <span>第 {{ query.page }} 页 · 共 {{ total }} 条</span>
+      <button type="button" data-test="next-authorizations" :disabled="query.page * query.page_size >= total || loading" @click="changePage(query.page + 1)">下一页</button>
     </nav>
   </section>
 </template>

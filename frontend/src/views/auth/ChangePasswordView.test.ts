@@ -103,8 +103,8 @@ describe('ChangePasswordView', () => {
     await wrapper.get('form').trigger('submit')
     await flushPromises()
 
-    expect(wrapper.text()).toContain(`Request ID: ${requestId}`)
-    expect(wrapper.text()).toContain('Unable to change password')
+    expect(wrapper.text()).toContain(`请求 ID：${requestId}`)
+    expect(wrapper.text()).toContain('无法修改密码')
     expect(wrapper.text()).not.toContain('password_hash')
     expect(wrapper.text()).not.toContain('Traceback')
     expect(wrapper.text()).not.toContain('raw stack')
@@ -118,6 +118,6 @@ describe('ChangePasswordView', () => {
     await flushPromises()
 
     expect(adapter).not.toHaveBeenCalled()
-    expect(wrapper.text()).toContain('Passwords do not match')
+    expect(wrapper.text()).toContain('两次输入的密码不一致')
   })
 })

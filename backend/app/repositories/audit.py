@@ -1,4 +1,4 @@
-"""Append-only operation log persistence and read-only query filters."""
+"""提供仅追加的操作日志持久化和只读查询过滤。"""
 
 from datetime import datetime
 

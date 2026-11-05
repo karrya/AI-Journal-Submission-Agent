@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Enforce backend-wide and layer-specific statement coverage floors."""
+"""强制执行后端整体及各分层的语句覆盖率下限。"""
 
 from __future__ import annotations
 
@@ -24,14 +24,14 @@ def _percentage(files: list[dict[str, Any]], label: str) -> float:
     covered = sum(item["summary"]["covered_lines"] for item in files)
     statements = sum(item["summary"]["num_statements"] for item in files)
     if statements == 0:
-        raise ValueError(f"{label} has no statements in the coverage report")
+        raise ValueError(f"覆盖率报告中 {label} 没有可统计语句")
     return covered * 100.0 / statements
 
 
 def evaluate_report(report: dict[str, Any]) -> dict[str, float]:
     percentages = {"backend": float(report["totals"]["percent_covered"])}
     if percentages["backend"] < 80.0:
-        raise ValueError(f"backend coverage {percentages['backend']:.2f}% < 80.00%")
+        raise ValueError(f"backend 整体覆盖率 {percentages['backend']:.2f}% < 80.00%")
 
     for label, prefixes, floor in LAYER_FLOORS:
         files = [
@@ -42,7 +42,7 @@ def evaluate_report(report: dict[str, Any]) -> dict[str, float]:
         percentage = _percentage(files, label)
         percentages[label] = percentage
         if percentage < floor:
-            raise ValueError(f"{label} coverage {percentage:.2f}% < {floor:.2f}%")
+            raise ValueError(f"{label} 覆盖率 {percentage:.2f}% < {floor:.2f}%")
     return percentages
 
 
@@ -55,7 +55,7 @@ def main() -> None:
     percentages = evaluate_report(report)
     floors = {"backend": 80.0, **{label: floor for label, _, floor in LAYER_FLOORS}}
     for label, percentage in percentages.items():
-        print(f"{label}: {percentage:.2f}% (floor {floors[label]:.2f}%)")
+        print(f"{label}：{percentage:.2f}%（下限 {floors[label]:.2f}%）")
 
 
 if __name__ == "__main__":

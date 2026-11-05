@@ -1,16 +1,16 @@
-# This is a sample Python script.
+# 这是一个 Python 示例脚本。
 
-# Press ⌃R to execute it or replace it with your code.
-# Press Double ⇧ to search everywhere for classes, files, tool windows, actions, and settings.
+# 按 ⌃R 运行脚本，或将此处替换为你的代码。
+# 双击 ⇧ 可以全局搜索类、文件、工具窗口、操作和设置。
 
 
 def print_hi(name):
-    # Use a breakpoint in the code line below to debug your script.
-    print(f'Hi, {name}')  # Press ⌘F8 to toggle the breakpoint.
+    # 在下一行代码中设置断点，可以调试脚本。
+    print(f'你好，{name}')  # 按 ⌘F8 切换断点。
 
 
-# Press the green button in the gutter to run the script.
+# 点击编辑器行号旁的绿色按钮运行脚本。
 if __name__ == '__main__':
     print_hi('PyCharm')
 
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
+# 查看 PyCharm 帮助：https://www.jetbrains.com/help/pycharm/

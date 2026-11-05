@@ -95,7 +95,7 @@ describe('ManuscriptListView', () => {
     const wrapper = mount(ManuscriptListView, { global: { stubs } })
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Unable to load manuscripts')
-    expect(wrapper.text()).not.toContain('No manuscripts found')
+    expect(wrapper.text()).toContain('无法加载稿件')
+    expect(wrapper.text()).not.toContain('未找到稿件')
   })
 })

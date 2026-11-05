@@ -25,7 +25,7 @@ def new_uuid() -> str:
 
 
 def utc_now() -> datetime:
-    """Return naive UTC for MySQL DATETIME, whose values have no timezone offset."""
+    """返回不带时区信息的 UTC 时间；MySQL DATETIME 值不包含时区偏移。"""
     return datetime.now(UTC).replace(tzinfo=None)
 
 

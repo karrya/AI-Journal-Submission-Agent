@@ -39,7 +39,7 @@ function publicPath(url) {
     await page.locator('[data-test="password"]').fill(process.env.OPERATOR_PASSWORD)
     await Promise.all([
       page.waitForURL('**/dashboard', { timeout: 20000 }),
-      page.getByRole('button', { name: 'Sign in', exact: true }).click(),
+      page.getByRole('button', { name: '登录', exact: true }).click(),
     ])
 
     await page.goto(`${base}/manuscripts/${fixture.first_manuscript_id}`)
@@ -65,7 +65,7 @@ function publicPath(url) {
       window.dispatchEvent(new PopStateEvent('popstate'))
     }, fixture.second_manuscript_id)
     await secondRequested
-    await page.getByText('Loading manuscript workspace…', { exact: true }).waitFor()
+    await page.getByText('正在加载稿件工作区…', { exact: true }).waitFor()
 
     const pendingText = await page.locator('body').innerText()
     for (const oldValue of [fixture.first_title, fixture.first_snapshot_title, fixture.first_filename]) {
@@ -81,7 +81,7 @@ function publicPath(url) {
     releaseSecond()
     await page.locator('h1#manuscript-detail-title').waitFor()
     await page.locator('[data-test="current-files"] table').waitFor()
-    await page.waitForFunction(() => !document.body.innerText.includes('Loading manuscript workspace…'))
+    await page.waitForFunction(() => !document.body.innerText.includes('正在加载稿件工作区…'))
 
     const finalText = await page.locator('body').innerText()
     assert(finalText.includes(fixture.second_title))

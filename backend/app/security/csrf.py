@@ -18,4 +18,4 @@ def csrf_token(session_token_hash: str, secret: str) -> str:
 
 def validate_csrf_secret(secret: str) -> None:
     if not secret or len(secret.encode()) < 32:
-        raise ValueError("CSRF_SECRET_KEY must contain at least 32 bytes")
+        raise ValueError("CSRF_SECRET_KEY（跨站请求伪造防护密钥）必须至少包含 32 字节")

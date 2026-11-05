@@ -216,7 +216,7 @@ def test_authorization_requires_a_finite_validity_period():
 
 
 def test_authorization_create_rejects_mixed_timezone_awareness():
-    with pytest.raises(ValidationError, match="timezone-aware"):
+    with pytest.raises(ValidationError, match="时区信息"):
         AuthorizationCreate(
             **valid_authorization(
                 valid_from="2026-11-04T00:00:00",
@@ -226,7 +226,7 @@ def test_authorization_create_rejects_mixed_timezone_awareness():
 
 
 def test_authorization_update_rejects_mixed_timezone_awareness():
-    with pytest.raises(ValidationError, match="timezone-aware"):
+    with pytest.raises(ValidationError, match="时区信息"):
         AuthorizationUpdate(
             valid_from="2026-11-04T00:00:00Z",
             valid_to="2027-11-04T00:00:00",

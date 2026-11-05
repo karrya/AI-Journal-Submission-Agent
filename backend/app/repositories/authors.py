@@ -1,4 +1,4 @@
-"""Persistence queries for authors and their related resources."""
+"""提供作者及其关联资源的持久化查询。"""
 
 import json
 from datetime import datetime

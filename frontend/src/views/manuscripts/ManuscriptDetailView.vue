@@ -19,6 +19,13 @@ import { fetchAllPages } from '../../api/pagination'
 import AuthorshipEditor from '../../components/AuthorshipEditor.vue'
 import FileFamilyUpload from '../../components/FileFamilyUpload.vue'
 import { useAuthStore } from '../../stores/auth'
+import {
+  displayText,
+  FILE_INTEGRITY_LABELS,
+  FILE_SCAN_LABELS,
+  FILE_TYPE_LABELS,
+  MANUSCRIPT_STATUS_LABELS,
+} from '../../utils/display'
 
 const props = defineProps<{ manuscriptId: string }>()
 const auth = useAuthStore()
@@ -54,7 +61,7 @@ const metadata = reactive({
 
 function safeError(error: unknown, fallback: string): string {
   const requestId = getSafeRequestId(error)
-  return requestId ? `${fallback} Request ID: ${requestId}` : fallback
+  return requestId ? `${fallback} 请求 ID：${requestId}` : fallback
 }
 
 function isCurrent(sequence: number): boolean {
@@ -134,7 +141,7 @@ async function loadWorkspace(): Promise<void> {
     await loadCurrentVersion(sequence, manuscriptId, result.current_version_id)
   } catch (error) {
     if (!isCurrent(sequence)) return
-    errorMessage.value = safeError(error, 'Unable to load the manuscript workspace.')
+    errorMessage.value = safeError(error, '无法加载稿件工作区。')
     currentVersion.value = null
     currentFiles.value = []
   } finally {
@@ -159,7 +166,7 @@ async function refreshCurrentWorkspace(): Promise<void> {
     if (!isCurrent(sequence)) return
     currentVersion.value = null
     currentFiles.value = []
-    fileError.value = safeError(error, 'Unable to refresh the current version and files.')
+    fileError.value = safeError(error, '无法刷新当前版本和文件。')
   } finally {
     if (isCurrent(sequence)) loading.value = false
   }
@@ -175,7 +182,7 @@ async function saveMetadata(): Promise<void> {
   const manuscriptId = current.id
   metadataError.value = ''
   if (!metadata.title.trim() || !metadata.abstract.trim() || !metadata.article_type.trim() || !metadata.language.trim()) {
-    metadataError.value = 'Title, abstract, article type, and language are required.'
+    metadataError.value = '请填写标题、摘要、文章类型和语言。'
     return
   }
   const sequence = loadSequence
@@ -212,7 +219,7 @@ async function saveMetadata(): Promise<void> {
     }
     syncMetadata(result)
   } catch (error) {
-    if (isCurrent(sequence)) metadataError.value = safeError(error, 'Unable to update manuscript metadata.')
+    if (isCurrent(sequence)) metadataError.value = safeError(error, '无法更新稿件元数据。')
   } finally {
     if (isCurrent(sequence)) metadataBusy.value = false
   }
@@ -231,7 +238,7 @@ async function saveAuthorship(payload: ManuscriptAuthorsUpdate): Promise<void> {
     manuscript.value = { ...manuscript.value, authors }
     authorshipFormKey.value += 1
   } catch (error) {
-    if (isCurrent(sequence)) authorshipError.value = safeError(error, 'Unable to update authorship.')
+    if (isCurrent(sequence)) authorshipError.value = safeError(error, '无法更新作者名单。')
   } finally {
     if (isCurrent(sequence)) authorshipBusy.value = false
   }
@@ -250,14 +257,14 @@ async function saveVersion(): Promise<void> {
       change_note: nullable(versionNote.value),
     })
     if (!isCurrent(sequence)) {
-      versionError.value = 'The version was created. Refresh the workspace before creating another version.'
+      versionError.value = '稿件版本已创建，请刷新工作区后再创建其他版本。'
       return
     }
     versionLabel.value = ''
     versionNote.value = ''
     await loadWorkspace()
   } catch (error) {
-    versionError.value = safeError(error, 'The version may have been created; refresh before trying again.')
+    versionError.value = safeError(error, '稿件版本可能已创建，请刷新后重试。')
   } finally {
     versionBusy.value = false
   }
@@ -279,12 +286,12 @@ async function download(file: ManuscriptFile): Promise<void> {
     document.body.appendChild(anchor)
     anchor.click()
   } catch (error) {
-    fileError.value = safeError(error, 'Unable to download the file.')
+    fileError.value = safeError(error, '无法下载文件。')
   } finally {
     try {
       anchor?.remove()
     } catch {
-      // Cleanup must still revoke the object URL if DOM removal fails.
+      // 即使 DOM 移除失败，也必须继续释放对象 URL。
     }
     if (objectUrl) {
       const url = objectUrl
@@ -302,49 +309,49 @@ watch(() => props.manuscriptId, () => {
 
 <template>
   <section class="management-page" aria-labelledby="manuscript-detail-title">
-    <RouterLink to="/manuscripts">Back to manuscripts</RouterLink>
-    <p v-if="loading">Loading manuscript workspace…</p>
+    <RouterLink to="/manuscripts">返回稿件列表</RouterLink>
+    <p v-if="loading">正在加载稿件工作区…</p>
     <p v-if="errorMessage" class="form-error" role="alert">{{ errorMessage }}</p>
 
     <template v-if="manuscript">
       <header>
         <h1 id="manuscript-detail-title">{{ manuscript.title }}</h1>
-        <p>{{ manuscript.internal_number }} · {{ manuscript.status }}</p>
-        <p v-if="currentVersion">Current version: {{ currentVersion.version_number }}<span v-if="currentVersion.label"> · {{ currentVersion.label }}</span></p>
-        <p v-else>No current version is available.</p>
+        <p>{{ manuscript.internal_number }} · {{ displayText(MANUSCRIPT_STATUS_LABELS, manuscript.status) }}</p>
+        <p v-if="currentVersion">当前版本：{{ currentVersion.version_number }}<span v-if="currentVersion.label"> · {{ currentVersion.label }}</span></p>
+        <p v-else>暂无当前版本。</p>
       </header>
 
       <section aria-labelledby="working-metadata-title">
-        <h2 id="working-metadata-title">Working metadata</h2>
+        <h2 id="working-metadata-title">工作元数据</h2>
         <form v-if="canManage && manuscript.status !== 'archived'" data-test="metadata-form" class="stacked-form" novalidate @submit.prevent="saveMetadata">
           <div class="form-grid">
-            <label>Title<input v-model="metadata.title" data-test="metadata-title" maxlength="1000" required></label>
-            <label>Article type<input v-model="metadata.article_type" maxlength="100" required></label>
-            <label>Language<input v-model="metadata.language" maxlength="32" required></label>
-            <label>Subject field<input v-model="metadata.subject_field" maxlength="255"></label>
-            <label>Keywords (comma separated)<input v-model="metadata.keywords"></label>
+            <label>标题<input v-model="metadata.title" data-test="metadata-title" maxlength="1000" required></label>
+            <label>文章类型<input v-model="metadata.article_type" maxlength="100" required></label>
+            <label>语言<input v-model="metadata.language" maxlength="32" required></label>
+            <label>学科领域<input v-model="metadata.subject_field" maxlength="255"></label>
+            <label>关键词（以逗号分隔）<input v-model="metadata.keywords"></label>
           </div>
-          <label>Abstract<textarea v-model="metadata.abstract" rows="6" required></textarea></label>
-          <label>Funding statement<textarea v-model="metadata.funding_statement" rows="3"></textarea></label>
-          <label>Conflict of interest statement<textarea v-model="metadata.conflict_of_interest_statement" rows="3"></textarea></label>
-          <label>Ethics statement<textarea v-model="metadata.ethics_statement" rows="3"></textarea></label>
-          <label>Data availability statement<textarea v-model="metadata.data_availability_statement" rows="3"></textarea></label>
-          <label>Notes<textarea v-model="metadata.notes" rows="3"></textarea></label>
+          <label>摘要<textarea v-model="metadata.abstract" rows="6" required></textarea></label>
+          <label>基金声明<textarea v-model="metadata.funding_statement" rows="3"></textarea></label>
+          <label>利益冲突声明<textarea v-model="metadata.conflict_of_interest_statement" rows="3"></textarea></label>
+          <label>伦理声明<textarea v-model="metadata.ethics_statement" rows="3"></textarea></label>
+          <label>数据可用性声明<textarea v-model="metadata.data_availability_statement" rows="3"></textarea></label>
+          <label>备注<textarea v-model="metadata.notes" rows="3"></textarea></label>
           <p v-if="metadataError" class="form-error" role="alert">{{ metadataError }}</p>
-          <button type="submit" :disabled="metadataBusy">Save working metadata</button>
+          <button type="submit" :disabled="metadataBusy">保存工作元数据</button>
         </form>
         <dl v-else class="detail-grid">
-          <div><dt>Title</dt><dd>{{ manuscript.title }}</dd></div>
-          <div><dt>Abstract</dt><dd>{{ manuscript.abstract }}</dd></div>
-          <div><dt>Keywords</dt><dd>{{ manuscript.keywords.join(', ') || '—' }}</dd></div>
-          <div><dt>Article type</dt><dd>{{ manuscript.article_type }}</dd></div>
-          <div><dt>Language</dt><dd>{{ manuscript.language }}</dd></div>
+          <div><dt>标题</dt><dd>{{ manuscript.title }}</dd></div>
+          <div><dt>摘要</dt><dd>{{ manuscript.abstract }}</dd></div>
+          <div><dt>关键词</dt><dd>{{ manuscript.keywords.join(', ') || '—' }}</dd></div>
+          <div><dt>文章类型</dt><dd>{{ manuscript.article_type }}</dd></div>
+          <div><dt>语言</dt><dd>{{ manuscript.language }}</dd></div>
         </dl>
       </section>
 
       <section aria-labelledby="authorship-title">
-        <h2 id="authorship-title">Ordered authorship</h2>
-        <p>Only author IDs, positions, and corresponding-author flags are submitted. Display names are read-only.</p>
+        <h2 id="authorship-title">作者名单及顺序</h2>
+        <p>仅提交作者 ID、位置和通讯作者标记，显示姓名为只读。</p>
         <AuthorshipEditor
           v-if="canManage && manuscript.status !== 'archived'"
           :key="authorshipFormKey"
@@ -357,52 +364,52 @@ watch(() => props.manuscriptId, () => {
         />
         <ol v-else>
           <li v-for="author in manuscript.authors" :key="author.author_id">
-            {{ author.position }}. {{ author.display_name }}<span v-if="author.is_corresponding"> · Corresponding author</span>
+            {{ author.position }}. {{ author.display_name }}<span v-if="author.is_corresponding"> · 通讯作者</span>
           </li>
         </ol>
         <p v-if="authorshipError" class="form-error" role="alert">{{ authorshipError }}</p>
       </section>
 
       <section v-if="canManage && manuscript.status !== 'archived'" aria-labelledby="new-version-title">
-        <h2 id="new-version-title">Create immutable version</h2>
-        <p>Creating a version snapshots the current working metadata and authorship. Existing snapshots never change.</p>
+        <h2 id="new-version-title">创建不可变稿件版本</h2>
+        <p>创建版本会为当前工作元数据和作者名单生成快照，现有快照永不更改。</p>
         <form data-test="version-form" class="stacked-form" @submit.prevent="saveVersion">
-          <label>Version label<input v-model="versionLabel" data-test="version-label" maxlength="100"></label>
-          <label>Change note<textarea v-model="versionNote" rows="3"></textarea></label>
-          <button type="submit" :disabled="versionBusy">Create new version</button>
+          <label>版本标签<input v-model="versionLabel" data-test="version-label" maxlength="100"></label>
+          <label>变更说明<textarea v-model="versionNote" rows="3"></textarea></label>
+          <button type="submit" :disabled="versionBusy">创建新稿件版本</button>
         </form>
         <p v-if="versionError" class="form-error" role="alert">{{ versionError }}</p>
       </section>
 
       <section data-test="snapshot-history" aria-labelledby="snapshot-history-title">
-        <h2 id="snapshot-history-title">Immutable snapshot history</h2>
+        <h2 id="snapshot-history-title">不可变快照历史</h2>
         <details v-for="version in versions" :key="version.id" :open="version.id === manuscript.current_version_id">
-          <summary>Version {{ version.version_number }}<span v-if="version.label"> · {{ version.label }}</span><span v-if="version.id === manuscript.current_version_id"> · Current</span></summary>
+          <summary>版本 {{ version.version_number }}<span v-if="version.label"> · {{ version.label }}</span><span v-if="version.id === manuscript.current_version_id"> · 当前版本</span></summary>
           <p><time :datetime="version.created_at">{{ version.created_at }}</time></p>
           <p v-if="version.change_note">{{ version.change_note }}</p>
           <dl class="detail-grid">
-            <div><dt>Title</dt><dd>{{ version.metadata_snapshot.title }}</dd></div>
-            <div><dt>Abstract</dt><dd>{{ version.metadata_snapshot.abstract }}</dd></div>
-            <div><dt>Keywords</dt><dd>{{ version.metadata_snapshot.keywords.join(', ') || '—' }}</dd></div>
-            <div><dt>Article type</dt><dd>{{ version.metadata_snapshot.article_type }}</dd></div>
-            <div><dt>Subject field</dt><dd>{{ version.metadata_snapshot.subject_field ?? '—' }}</dd></div>
-            <div><dt>Language</dt><dd>{{ version.metadata_snapshot.language }}</dd></div>
-            <div><dt>Funding</dt><dd>{{ version.metadata_snapshot.funding_statement ?? '—' }}</dd></div>
-            <div><dt>Conflict of interest</dt><dd>{{ version.metadata_snapshot.conflict_of_interest_statement ?? '—' }}</dd></div>
-            <div><dt>Ethics</dt><dd>{{ version.metadata_snapshot.ethics_statement ?? '—' }}</dd></div>
-            <div><dt>Data availability</dt><dd>{{ version.metadata_snapshot.data_availability_statement ?? '—' }}</dd></div>
-            <div><dt>Notes</dt><dd>{{ version.metadata_snapshot.notes ?? '—' }}</dd></div>
+            <div><dt>标题</dt><dd>{{ version.metadata_snapshot.title }}</dd></div>
+            <div><dt>摘要</dt><dd>{{ version.metadata_snapshot.abstract }}</dd></div>
+            <div><dt>关键词</dt><dd>{{ version.metadata_snapshot.keywords.join(', ') || '—' }}</dd></div>
+            <div><dt>文章类型</dt><dd>{{ version.metadata_snapshot.article_type }}</dd></div>
+            <div><dt>学科领域</dt><dd>{{ version.metadata_snapshot.subject_field ?? '—' }}</dd></div>
+            <div><dt>语言</dt><dd>{{ version.metadata_snapshot.language }}</dd></div>
+            <div><dt>基金声明</dt><dd>{{ version.metadata_snapshot.funding_statement ?? '—' }}</dd></div>
+            <div><dt>利益冲突</dt><dd>{{ version.metadata_snapshot.conflict_of_interest_statement ?? '—' }}</dd></div>
+            <div><dt>伦理声明</dt><dd>{{ version.metadata_snapshot.ethics_statement ?? '—' }}</dd></div>
+            <div><dt>数据可用性</dt><dd>{{ version.metadata_snapshot.data_availability_statement ?? '—' }}</dd></div>
+            <div><dt>备注</dt><dd>{{ version.metadata_snapshot.notes ?? '—' }}</dd></div>
           </dl>
           <ol class="authorship-position-list" data-test="snapshot-authorship">
             <li v-for="author in version.metadata_snapshot.authors" :key="author.author_id">
-              {{ author.position }}. {{ author.display_name }}<span v-if="author.is_corresponding"> · Corresponding author</span>
+              {{ author.position }}. {{ author.display_name }}<span v-if="author.is_corresponding"> · 通讯作者</span>
             </li>
           </ol>
         </details>
       </section>
 
       <section data-test="current-files" aria-labelledby="current-files-title">
-        <h2 id="current-files-title">Current-version files</h2>
+        <h2 id="current-files-title">当前版本文件</h2>
         <p v-if="fileError" class="form-error" role="alert">{{ fileError }}</p>
         <FileFamilyUpload
           v-if="currentVersion && currentVersion.id === manuscript.current_version_id && canManage && manuscript.status !== 'archived'"
@@ -412,15 +419,15 @@ watch(() => props.manuscriptId, () => {
           @uploaded="refreshCurrentWorkspace"
           @refresh="refreshCurrentWorkspace"
         />
-        <p v-if="!currentVersion">Refresh the manuscript before managing files.</p>
-        <p v-else-if="currentFiles.length === 0">No files in the current version.</p>
+        <p v-if="!currentVersion">请先刷新稿件，再管理文件。</p>
+        <p v-else-if="currentFiles.length === 0">当前版本暂无文件。</p>
         <table v-else>
-          <thead><tr><th>Family</th><th>Type</th><th>File version</th><th>Original filename</th><th>Size</th><th>Integrity</th><th>Scan</th><th>Actions</th></tr></thead>
+          <thead><tr><th>文件族</th><th>类型</th><th>文件版本</th><th>原始文件名</th><th>大小</th><th>完整性</th><th>扫描状态</th><th>操作</th></tr></thead>
           <tbody><tr v-for="file in currentFiles" :key="file.id">
-            <td>{{ file.display_name }}</td><td>{{ file.file_type }}</td><td>{{ file.file_version }}</td>
-            <td>{{ file.original_filename }}</td><td>{{ file.size_bytes }} bytes</td>
-            <td>{{ file.integrity_status }}</td><td>{{ file.scan_status }}</td>
-            <td><button type="button" :data-test="`download-${file.id}`" :disabled="downloadingId !== null" @click="download(file)">Download</button></td>
+            <td>{{ file.display_name }}</td><td>{{ displayText(FILE_TYPE_LABELS, file.file_type) }}</td><td>{{ file.file_version }}</td>
+            <td>{{ file.original_filename }}</td><td>{{ file.size_bytes }} 字节</td>
+            <td>{{ displayText(FILE_INTEGRITY_LABELS, file.integrity_status) }}</td><td>{{ displayText(FILE_SCAN_LABELS, file.scan_status) }}</td>
+            <td><button type="button" :data-test="`download-${file.id}`" :disabled="downloadingId !== null" @click="download(file)">下载</button></td>
           </tr></tbody>
         </table>
       </section>

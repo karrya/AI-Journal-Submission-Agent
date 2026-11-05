@@ -182,7 +182,7 @@ def test_ooxml_rejects_more_than_2000_entries(tmp_path):
     with zipfile.ZipFile(payload, "a") as archive:
         for index in range(2000):
             archive.writestr(f"entry-{index}", "")
-    with pytest.raises(UnsupportedFileType, match="entries"):
+    with pytest.raises(UnsupportedFileType, match="条目超过"):
         FileValidator().inspect(payload, "entries.docx", DOCX_MIME)
 
 
@@ -193,7 +193,7 @@ def test_ooxml_rejects_expanded_size_over_500_mib(tmp_path, monkeypatch):
     oversized.file_size = 500 * 1024 * 1024 + 1
     oversized.compress_size = oversized.file_size
     monkeypatch.setattr(zipfile.ZipFile, "infolist", lambda self: [oversized])
-    with pytest.raises(UnsupportedFileType, match="expanded"):
+    with pytest.raises(UnsupportedFileType, match="解压后大小"):
         FileValidator().inspect(payload, "expanded.docx", DOCX_MIME)
 
 
@@ -202,7 +202,7 @@ def test_ooxml_rejects_per_entry_ratio_over_100_to_1(tmp_path):
     make_ooxml(payload)
     with zipfile.ZipFile(payload, "a", compression=zipfile.ZIP_DEFLATED) as archive:
         archive.writestr("large.bin", b"0" * (1024 * 1024))
-    with pytest.raises(UnsupportedFileType, match="ratio"):
+    with pytest.raises(UnsupportedFileType, match="压缩比"):
         FileValidator().inspect(payload, "ratio.docx", DOCX_MIME)
 
 
@@ -215,7 +215,7 @@ def test_ooxml_rejects_nested_zip_by_extension_or_magic(tmp_path, nested_name):
         archive.writestr("payload", "bad")
     with zipfile.ZipFile(payload, "a") as archive:
         archive.writestr(nested_name, nested.getvalue())
-    with pytest.raises(UnsupportedFileType, match="nested"):
+    with pytest.raises(UnsupportedFileType, match="嵌套 ZIP"):
         FileValidator().inspect(payload, "nested.docx", DOCX_MIME)
 
 
@@ -227,7 +227,7 @@ def test_ooxml_rejects_empty_nested_zip_disguised_by_extension(tmp_path):
         pass
     with zipfile.ZipFile(payload, "a") as archive:
         archive.writestr("nested.bin", nested.getvalue())
-    with pytest.raises(UnsupportedFileType, match="nested"):
+    with pytest.raises(UnsupportedFileType, match="嵌套 ZIP"):
         FileValidator().inspect(payload, "empty-nested.docx", DOCX_MIME)
 
 
@@ -333,7 +333,7 @@ def test_ooxml_prefixed_nested_zip_is_rejected(tmp_path):
         archive.writestr("payload", "bad")
     with zipfile.ZipFile(payload, "a") as archive:
         archive.writestr("nested.bin", b"MZ" + b"\x00" * 30 + nested.getvalue())
-    with pytest.raises(UnsupportedFileType, match="nested"):
+    with pytest.raises(UnsupportedFileType, match="嵌套 ZIP"):
         FileValidator().inspect(payload, "prefixed-nested.docx", DOCX_MIME)
 
 

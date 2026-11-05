@@ -1,4 +1,4 @@
-"""Transactional file-family uploads, authorized downloads, and compensation."""
+"""提供文件族事务上传、授权下载和失败补偿。"""
 
 from __future__ import annotations
 
@@ -93,7 +93,7 @@ class FileService(DomainService):
     def _original_filename(filename: str) -> str:
         normalized = unicodedata.normalize("NFC", filename)
         if not normalized or len(normalized) > 255:
-            raise _validation("Original filename must contain 1 to 255 characters")
+            raise _validation("原始文件名必须包含 1 至 255 个字符")
         return normalized
 
     @staticmethod
@@ -102,7 +102,7 @@ class FileService(DomainService):
             return None
         normalized = unicodedata.normalize("NFC", value.strip())
         if not normalized or len(normalized) > 255:
-            raise _validation("Display name must contain 1 to 255 characters")
+            raise _validation("显示名称必须包含 1 至 255 个字符")
         return normalized
 
     def _response(self, record: ManuscriptFile, family: FileFamily) -> FileResponse:
@@ -165,10 +165,10 @@ class FileService(DomainService):
     ) -> FileFamily:
         normalized_display = self._display_name(display_name)
         if file_type is not None and file_type not in _FILE_TYPES:
-            raise _validation("Unsupported file type")
+            raise _validation("不支持的文件类型")
         if family_id is None:
             if file_type is None or normalized_display is None:
-                raise _validation("New file families require file_type and display_name")
+                raise _validation("新文件族必须提供 file_type 和 display_name")
             new_family = self.repository.add_family(
                 FileFamily(
                     author_id=author_id,
@@ -184,9 +184,9 @@ class FileService(DomainService):
         if family is None:
             raise _not_found()
         if file_type is not None and file_type != family.file_type:
-            raise _validation("file_type must match the existing file family")
+            raise _validation("file_type 必须与现有文件族一致")
         if normalized_display is not None and normalized_display != family.display_name:
-            raise _validation("display_name must match the existing file family")
+            raise _validation("display_name 必须与现有文件族一致")
         return family
 
     def _record_unknown(self, *, file_id: str, relative: Path, sha256: str, event: str) -> None:
@@ -196,7 +196,7 @@ class FileService(DomainService):
             )
         except Exception as exc:
             logger.error(
-                "Reconciliation manifest append failed; formal file retained; "
+                "追加核对清单失败，已保留正式文件；"
                 "file_id=%s; event=%s; error_type=%s",
                 file_id,
                 event,
@@ -355,7 +355,7 @@ class FileService(DomainService):
                     temporary.unlink(missing_ok=True)
                 except OSError as cleanup_error:
                     logger.warning(
-                        "Temporary upload cleanup failed; file_id=%s; error_type=%s",
+                        "临时上传文件清理失败；file_id=%s；error_type=%s",
                         file_id,
                         type(cleanup_error).__name__,
                     )

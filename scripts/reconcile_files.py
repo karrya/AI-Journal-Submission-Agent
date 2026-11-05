@@ -1,4 +1,4 @@
-"""Report file/database divergence without deleting uncertain formal files."""
+"""报告文件与数据库的不一致，不删除状态不确定的正式文件。"""
 
 from __future__ import annotations
 
@@ -76,7 +76,7 @@ def main() -> None:
             storage=StorageService(Path(settings.storage_root)),
             session_factory=sessionmaker(bind=engine, expire_on_commit=False),
         )
-        # IDs and counts are safe for logs; server-side storage paths are not printed.
+        # ID 和数量可安全写入日志；不打印服务端存储路径。
         print(
             json.dumps(
                 {

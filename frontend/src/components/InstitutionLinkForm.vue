@@ -55,19 +55,19 @@ function nullable(value: string): string | null {
 function submit(): void {
   errorMessage.value = ''
   if (!form.institution_id) {
-    errorMessage.value = 'Select an institution.'
+    errorMessage.value = '请选择单位。'
     return
   }
   if (form.valid_from && form.valid_to && form.valid_to < form.valid_from) {
-    errorMessage.value = 'End date must not be earlier than start date.'
+    errorMessage.value = '结束日期不得早于开始日期。'
     return
   }
   if (!Number.isInteger(form.display_order) || form.display_order < 0) {
-    errorMessage.value = 'Display order must be a nonnegative integer.'
+    errorMessage.value = '显示顺序必须是非负整数。'
     return
   }
   if (!form.confirm) {
-    errorMessage.value = 'Confirm this affiliation change before saving.'
+    errorMessage.value = '保存前请确认本次单位关联变更。'
     return
   }
   emit('submit', {
@@ -85,23 +85,23 @@ function submit(): void {
 <template>
   <form class="stacked-form" novalidate @submit.prevent="submit">
     <p v-if="errorMessage" class="form-error" role="alert">{{ errorMessage }}</p>
-    <label>Institution
+    <label>单位
       <select v-model="form.institution_id" data-test="institution-select" required>
-        <option value="" disabled>Select an institution</option>
+        <option value="" disabled>请选择单位</option>
         <option v-for="institution in institutions" :key="institution.id" :value="institution.id">
           {{ institution.name }}<template v-if="institution.city"> — {{ institution.city }}</template><template v-if="institution.country_code"> ({{ institution.country_code }})</template>
         </option>
       </select>
     </label>
-    <label>Department<input v-model="form.department" data-test="department" maxlength="255"></label>
-    <label>Position title<input v-model="form.position_title" maxlength="255"></label>
+    <label>院系<input v-model="form.department" data-test="department" maxlength="255"></label>
+    <label>职务<input v-model="form.position_title" maxlength="255"></label>
     <div class="form-grid">
-      <label>Valid from<input v-model="form.valid_from" data-test="valid-from" type="date"></label>
-      <label>Valid to<input v-model="form.valid_to" data-test="valid-to" type="date"></label>
-      <label>Display order<input v-model.number="form.display_order" type="number" min="0" step="1"></label>
-      <label><input v-model="form.is_current" type="checkbox"> Current affiliation</label>
+      <label>开始日期<input v-model="form.valid_from" data-test="valid-from" type="date"></label>
+      <label>结束日期<input v-model="form.valid_to" data-test="valid-to" type="date"></label>
+      <label>显示顺序<input v-model.number="form.display_order" type="number" min="0" step="1"></label>
+      <label><input v-model="form.is_current" type="checkbox"> 当前单位</label>
     </div>
-    <label class="confirmation-control"><input v-model="form.confirm" data-test="affiliation-confirm" type="checkbox"> I confirm this author affiliation change.</label>
-    <div class="form-actions"><button type="submit" :disabled="submitting">Save affiliation</button><button type="button" @click="emit('cancel')">Cancel</button></div>
+    <label class="confirmation-control"><input v-model="form.confirm" data-test="affiliation-confirm" type="checkbox"> 我确认本次作者单位关联变更。</label>
+    <div class="form-actions"><button type="submit" :disabled="submitting">保存单位关联</button><button type="button" @click="emit('cancel')">取消</button></div>
   </form>
 </template>

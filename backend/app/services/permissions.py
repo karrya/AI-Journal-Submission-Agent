@@ -1,4 +1,4 @@
-"""Role capability checks and database-backed author grants."""
+"""提供角色能力校验和数据库支持的作者授权。"""
 
 from datetime import UTC, datetime
 from enum import Enum
@@ -104,7 +104,7 @@ def _deny_author_permission(
     error_code: str,
     established_author_relationship: bool,
 ) -> NoReturn:
-    """Persist a sanitized denial without revealing author existence."""
+    """持久化脱敏的拒绝记录，同时不泄露作者是否存在。"""
     message = (
         "作者授权未生效、已过期或已撤销"
         if error_code == "AUTHORIZATION_EXPIRED"

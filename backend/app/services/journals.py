@@ -1,4 +1,4 @@
-"""Transactional journal-resource services with role checks and audit records."""
+"""提供期刊资源事务服务、角色校验和审计记录。"""
 
 from datetime import UTC, datetime
 from typing import Any
@@ -140,7 +140,7 @@ class PublisherService(JournalResourceService):
         values = payload.model_dump(exclude_unset=True)
         if "name" in values:
             if values["name"] is None:
-                raise _validation("name cannot be null")
+                raise _validation("name 不能为空")
             values["name"] = normalize_display_name(values["name"])
             values["normalized_name"] = normalize_comparison(values["name"])
         before = {
@@ -256,7 +256,7 @@ class JournalPlatformService(JournalResourceService):
         values = payload.model_dump(exclude_unset=True)
         for field in ("code", "name", "description", "status"):
             if field in values and values[field] is None:
-                raise _validation(f"{field} cannot be null")
+                raise _validation(f"{field} 不能为空")
         if "name" in values:
             values["name"] = normalize_display_name(values["name"])
         before = {
@@ -322,7 +322,7 @@ class JournalService(JournalResourceService):
                 item = dict(requirement)
                 verified_at = item["verified_at"]
                 if verified_at.tzinfo is None or verified_at.utcoffset() is None:
-                    raise _validation("Requirement verified_at must be timezone-aware")
+                    raise _validation("投稿要求的 verified_at 必须包含时区信息")
                 item["verified_at"] = verified_at.astimezone(UTC).isoformat()
                 requirements.append(item)
             normalized["requirements"] = requirements
@@ -335,7 +335,7 @@ class JournalService(JournalResourceService):
     def _require_related(self, values: dict[str, Any]) -> None:
         if "publisher_id" in values:
             if values["publisher_id"] is None:
-                raise _validation("publisher_id cannot be null")
+                raise _validation("publisher_id 不能为空")
             publisher_id = str(values["publisher_id"])
             if self.publishers.get(publisher_id) is None:
                 raise _not_found()
@@ -366,7 +366,7 @@ class JournalService(JournalResourceService):
             try:
                 normalized_issn = normalize_issn(issn)
             except ValueError:
-                raise _validation("Invalid ISSN filter") from None
+                raise _validation("ISSN（国际标准连续出版物号）筛选条件无效") from None
         records, total = self.repository.list_page(
             page=page,
             page_size=page_size,
@@ -431,7 +431,7 @@ class JournalService(JournalResourceService):
             "status",
         ):
             if field in values and values[field] is None:
-                raise _validation(f"{field} cannot be null")
+                raise _validation(f"{field} 不能为空")
         if "name" in values:
             values["name"] = normalize_display_name(values["name"])
         self._require_related(values)

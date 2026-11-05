@@ -30,14 +30,14 @@ describe('App navigation', () => {
     useAuthStore().setSession(user, 'csrf')
     const wrapper = mount(App, { global })
 
-    expect(wrapper.text()).toContain('Manuscripts')
-    expect(wrapper.text()).not.toContain('Audit logs')
+    expect(wrapper.text()).toContain('稿件')
+    expect(wrapper.text()).not.toContain('审计日志')
   })
 
   it('links auditors to the read-only audit workflow', () => {
     useAuthStore().setSession({ ...user, roles: ['auditor'] }, 'csrf')
     const wrapper = mount(App, { global })
 
-    expect(wrapper.text()).toContain('Audit logs')
+    expect(wrapper.text()).toContain('审计日志')
   })
 })

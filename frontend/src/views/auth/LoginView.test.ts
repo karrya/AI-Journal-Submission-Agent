@@ -111,8 +111,8 @@ describe('LoginView', () => {
     await wrapper.get('form').trigger('submit')
     await flushPromises()
 
-    expect(wrapper.text()).toContain(`Request ID: ${requestId}`)
-    expect(wrapper.text()).toContain('Unable to sign in')
+    expect(wrapper.text()).toContain(`请求 ID：${requestId}`)
+    expect(wrapper.text()).toContain('无法登录')
     expect(wrapper.text()).not.toContain('password_hash')
     expect(wrapper.text()).not.toContain('Traceback')
     expect(wrapper.text()).not.toContain('raw stack')

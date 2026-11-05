@@ -1,4 +1,4 @@
-"""Persistence and row-locking queries for file families and immutable file versions."""
+"""提供文件族和不可变文件版本的持久化及行锁查询。"""
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session

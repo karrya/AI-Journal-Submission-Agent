@@ -9,7 +9,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=PROJECT_ROOT / ".env", extra="ignore")
-    app_name: str = "Academic Submission Agent"
+    app_name: str = "学术论文投稿代理"
     environment: str = "development"
     database_url: str = "mysql+pymysql://unset:unset@127.0.0.1/unset"
     alembic_database_url: str | None = None

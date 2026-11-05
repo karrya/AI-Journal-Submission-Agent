@@ -45,7 +45,7 @@ describe('DashboardView', () => {
     const wrapper = mount(DashboardView, { global: { stubs } })
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Unable to load the dashboard')
+    expect(wrapper.text()).toContain('无法加载工作台')
     expect(wrapper.find('[data-test="author-count"]').exists()).toBe(false)
   })
 })

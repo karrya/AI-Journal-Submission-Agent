@@ -12,8 +12,8 @@ const form = reactive({ current_password: '', new_password: '', confirm_password
 
 function changePasswordError(error: unknown): string {
   const requestId = getSafeRequestId(error)
-  const message = 'Unable to change password. Check your entries and try again.'
-  return requestId ? `${message} Request ID: ${requestId}` : message
+  const message = '无法修改密码，请检查输入后重试。'
+  return requestId ? `${message} 请求 ID：${requestId}` : message
 }
 
 async function submit(): Promise<void> {
@@ -22,15 +22,15 @@ async function submit(): Promise<void> {
   errorMessage.value = ''
   try {
     if (!form.current_password || !form.new_password || !form.confirm_password) {
-      errorMessage.value = 'Complete all password fields.'
+      errorMessage.value = '请填写所有密码字段。'
       return
     }
     if (form.new_password.length < 12 || form.new_password.length > 128) {
-      errorMessage.value = 'New password must contain 12 to 128 characters.'
+      errorMessage.value = '新密码长度须为 12 至 128 个字符。'
       return
     }
     if (form.new_password !== form.confirm_password) {
-      errorMessage.value = 'Passwords do not match.'
+      errorMessage.value = '两次输入的密码不一致。'
       return
     }
     await auth.changePassword(form.current_password, form.new_password)
@@ -45,9 +45,9 @@ async function submit(): Promise<void> {
 
 <template>
   <section class="auth-card" aria-labelledby="change-password-title">
-    <p class="auth-eyebrow">First-password setup</p>
-    <h1 id="change-password-title">Change password</h1>
-    <p class="auth-intro">Choose a new password before using the application.</p>
+    <p class="auth-eyebrow">首次密码设置</p>
+    <h1 id="change-password-title">修改密码</h1>
+    <p class="auth-intro">请先设置新密码，再使用本系统。</p>
     <el-alert
       v-if="errorMessage"
       class="auth-alert"
@@ -61,7 +61,7 @@ async function submit(): Promise<void> {
       label-position="top"
       @submit.prevent="submit"
     >
-      <el-form-item label="Current password" prop="current_password">
+      <el-form-item label="当前密码" prop="current_password">
         <el-input
           v-model="form.current_password"
           data-test="current-password"
@@ -71,7 +71,7 @@ async function submit(): Promise<void> {
           :disabled="submitting"
         />
       </el-form-item>
-      <el-form-item label="New password" prop="new_password">
+      <el-form-item label="新密码" prop="new_password">
         <el-input
           v-model="form.new_password"
           data-test="new-password"
@@ -81,7 +81,7 @@ async function submit(): Promise<void> {
           :disabled="submitting"
         />
       </el-form-item>
-      <el-form-item label="Confirm new password" prop="confirm_password">
+      <el-form-item label="确认新密码" prop="confirm_password">
         <el-input
           v-model="form.confirm_password"
           data-test="confirm-password"
@@ -98,7 +98,7 @@ async function submit(): Promise<void> {
         :loading="submitting"
         :disabled="submitting"
       >
-        Change password
+        修改密码
       </el-button>
     </el-form>
   </section>

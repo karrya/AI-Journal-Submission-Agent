@@ -153,7 +153,7 @@ class AuthService:
                 result="failure",
                 request_id=request_id,
                 error_code="TOO_MANY_ATTEMPTS",
-                error_message="Login rate limit exceeded",
+                error_message="超过登录频率限制",
             )
             self.db.commit()
             raise AppError(429, "TOO_MANY_ATTEMPTS", "登录尝试过多，请稍后重试")
@@ -229,7 +229,7 @@ class AuthService:
                 request_id=request_id,
                 user_id=user.id,
                 error_code="UNAUTHORIZED",
-                error_message="Current password verification failed",
+                error_message="当前密码校验失败",
             )
             self.db.commit()
             raise AppError(401, "UNAUTHORIZED", "当前密码错误")
@@ -242,7 +242,7 @@ class AuthService:
                 request_id=request_id,
                 user_id=user.id,
                 error_code="VALIDATION_ERROR",
-                error_message="New password failed strength validation",
+                error_message="新密码未通过强度校验",
             )
             self.db.commit()
             raise AppError(422, "VALIDATION_ERROR", str(exc)) from None

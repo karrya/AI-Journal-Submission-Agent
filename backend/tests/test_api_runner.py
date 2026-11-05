@@ -23,6 +23,6 @@ def test_api_runner_rejects_remote_database_before_migration_or_newman():
     output = result.stdout + result.stderr
 
     assert result.returncode != 0
-    assert "explicit loopback" in output
+    assert "回环地址" in output
     assert "alembic.runtime.migration" not in output
     assert "newman" not in output.lower()

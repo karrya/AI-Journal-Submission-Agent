@@ -1,4 +1,4 @@
-"""Create encrypted, write-quiesced database and storage backups."""
+"""在停止应用写入后创建加密的数据库和存储备份。"""
 
 from __future__ import annotations
 
@@ -24,21 +24,21 @@ DATABASE_NAME = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")
 
 
 class BackupFailed(RuntimeError):
-    """A backup failed without producing a final artifact."""
+    """备份失败，未生成最终备份文件。"""
 
 
 def _database_settings(database_url: str) -> tuple[URL, dict[str, str]]:
     try:
         url = make_url(database_url)
     except Exception as exc:
-        raise BackupFailed("invalid database configuration") from exc
+        raise BackupFailed("数据库配置无效") from exc
     if (
         not url.drivername.startswith("mysql+")
         or not url.database
         or not DATABASE_NAME.fullmatch(url.database)
         or not url.username
     ):
-        raise BackupFailed("a valid MySQL database URL is required")
+        raise BackupFailed("必须提供有效的 MySQL 数据库 URL")
     environment = os.environ.copy()
     environment["MYSQL_PWD"] = url.password or ""
     return url, environment
@@ -95,21 +95,21 @@ def create_backup(
     mysqldump_binary: str = "mysqldump",
     age_binary: str = "age",
 ) -> Path:
-    """Stream a tar archive directly to age and atomically publish it."""
+    """将 tar 归档流式传给 age 加密，并以原子方式发布。"""
     if not writes_stopped:
-        raise BackupFailed("application writes must be stopped before backup")
+        raise BackupFailed("备份前必须停止应用写入")
     if not recipient:
-        raise BackupFailed("AGE_RECIPIENT is required")
+        raise BackupFailed("必须设置 AGE_RECIPIENT")
     if not database_url:
-        raise BackupFailed("DATABASE_URL is required")
+        raise BackupFailed("必须设置 DATABASE_URL")
 
     url, environment = _database_settings(database_url)
     storage = Path(storage_root or PROJECT_ROOT / "storage").resolve()
     example = Path(config_example or PROJECT_ROOT / ".env.example").resolve()
     if not example.is_file():
-        raise BackupFailed("the configuration example is missing")
+        raise BackupFailed("缺少配置示例文件")
     if storage.exists() and not storage.is_dir():
-        raise BackupFailed("STORAGE_ROOT must be a directory")
+        raise BackupFailed("STORAGE_ROOT 必须是目录")
 
     destination = Path(output_dir).resolve()
     if (
@@ -117,10 +117,10 @@ def create_backup(
         or destination in storage.parents
         or storage in destination.parents
     ):
-        raise BackupFailed("backup output must be outside live storage")
+        raise BackupFailed("备份输出目录必须位于正式存储目录之外")
     destination.mkdir(parents=True, exist_ok=True)
     if not destination.is_dir():
-        raise BackupFailed("backup output must be a directory")
+        raise BackupFailed("备份输出路径必须是目录")
 
     timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     final_path = destination / (
@@ -143,7 +143,7 @@ def create_backup(
                     check=False,
                 )
             if dump_result.returncode != 0:
-                raise BackupFailed("database dump failed; temporary data removed")
+                raise BackupFailed("数据库导出失败，临时数据已删除")
 
             archived_files: list[tuple[Path, str]] = [
                 (dump_path, "database.sql"),
@@ -152,13 +152,13 @@ def create_backup(
             if storage.exists():
                 for path in sorted(storage.rglob("*")):
                     if path.is_symlink():
-                        raise BackupFailed("live storage must not contain symlinks")
+                        raise BackupFailed("正式存储目录不得包含符号链接")
                     if path.is_file():
                         archived_files.append(
                             (path, f"storage/{path.relative_to(storage).as_posix()}")
                         )
                     elif not path.is_dir():
-                        raise BackupFailed("live storage contains an unsupported file")
+                        raise BackupFailed("正式存储目录包含不支持的文件")
 
             manifest_files = []
             for path, archive_name in archived_files:
@@ -206,7 +206,7 @@ def create_backup(
                     age_process.wait()
                     raise
                 if age_process.wait() != 0:
-                    raise BackupFailed("age encryption failed; temporary data removed")
+                    raise BackupFailed("age 加密失败，临时数据已删除")
             age_process = None
 
         os.replace(partial_path, final_path)
@@ -214,7 +214,7 @@ def create_backup(
     except BackupFailed:
         raise
     except Exception as exc:
-        raise BackupFailed("backup failed; temporary data removed") from exc
+        raise BackupFailed("备份失败，临时数据已删除") from exc
     finally:
         if age_process is not None and age_process.poll() is None:
             age_process.kill()
@@ -233,7 +233,7 @@ def main() -> None:
     args = _parse_args()
     load_dotenv(PROJECT_ROOT / ".env", override=False)
     if not args.confirm_writes_stopped:
-        raise SystemExit("stop application writes and pass --confirm-writes-stopped")
+        raise SystemExit("请停止应用写入，并传入 --confirm-writes-stopped")
     try:
         archive = create_backup(
             args.output_dir,
@@ -245,7 +245,7 @@ def main() -> None:
         )
     except BackupFailed as exc:
         raise SystemExit(str(exc)) from None
-    print(f"Encrypted backup created: {archive}")
+    print(f"加密备份已创建：{archive}")
 
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-"""Provision the fixed local MySQL databases and least-privilege accounts."""
+"""配置固定的本地 MySQL 数据库和最小权限账户。"""
 
 import getpass
 import os
@@ -30,7 +30,7 @@ def build_grants(user: str, database: str) -> str:
         "asa_test": TEST_DATABASE,
     }.get(user)
     if not validate_database_name(database) or database != expected_database:
-        raise ValueError("unsupported database identity")
+        raise ValueError("不支持的数据库标识")
 
     privileges = {
         "asa_app": "SELECT, INSERT, UPDATE, DELETE",
@@ -44,7 +44,7 @@ def build_grants(user: str, database: str) -> str:
 
 def database_url(user: str, password: str, database: str) -> str:
     if user not in ACCOUNTS or not validate_database_name(database):
-        raise ValueError("unsupported database identity")
+        raise ValueError("不支持的数据库标识")
     return (
         f"mysql+pymysql://{user}:{quote(password, safe='')}@"
         f"{DATABASE_HOST}:{DATABASE_PORT}/{database}"
@@ -53,7 +53,7 @@ def database_url(user: str, password: str, database: str) -> str:
 
 def write_env_file(env_path: Path, passwords: dict[str, str], csrf_secret: str) -> None:
     if set(passwords) != set(ACCOUNTS):
-        raise ValueError("exactly three generated account passwords are required")
+        raise ValueError("必须提供恰好三个已生成的账户密码")
 
     values = {
         "DATABASE_URL": database_url(
@@ -110,7 +110,7 @@ def bootstrap_mysql(
         with connection.cursor() as cursor:
             for database in (DEVELOPMENT_DATABASE, TEST_DATABASE):
                 if not validate_database_name(database):
-                    raise ValueError("unsupported database identity")
+                    raise ValueError("不支持的数据库标识")
                 cursor.execute(
                     f"CREATE DATABASE IF NOT EXISTS `{database}` "
                     "CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci"
@@ -143,7 +143,7 @@ def bootstrap_mysql(
 
 
 def main() -> None:
-    administrative_password = getpass.getpass("MySQL administrative password: ")
+    administrative_password = getpass.getpass("MySQL 管理员密码：")
     administrative_user = os.environ.get("MYSQL_ADMIN_USER", "root")
     administrative_host = os.environ.get("MYSQL_ADMIN_HOST", "localhost")
     administrative_port = int(os.environ.get("MYSQL_ADMIN_PORT", DATABASE_PORT))
@@ -156,10 +156,10 @@ def main() -> None:
         )
     except Exception as exc:
         raise SystemExit(
-            "MySQL bootstrap failed without writing credentials; "
-            "verify the local administrative connection and retry."
+            "MySQL 初始化失败，未写入凭据；"
+            "请检查本地管理员连接后重试。"
         ) from exc
-    print("MySQL bootstrap complete; .env written with mode 0600.")
+    print("MySQL 初始化完成，.env 已写入并设置为 0600 权限。")
 
 
 if __name__ == "__main__":

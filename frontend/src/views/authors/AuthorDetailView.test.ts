@@ -94,7 +94,7 @@ describe('AuthorDetailView', () => {
       '/authors/a1',
       '/authors/a1/institutions',
     ])
-    expect(wrapper.text()).toContain('Email permission is not available')
+    expect(wrapper.text()).toContain('当前没有查看邮箱的权限')
   })
 
   it('clears stale emails when a later author email request is forbidden', async () => {
@@ -125,8 +125,8 @@ describe('AuthorDetailView', () => {
 
     expect(wrapper.text()).toContain('Second Author')
     expect(wrapper.text()).not.toContain('old@example.org')
-    expect(wrapper.text()).toContain('Emails are not available for this author')
-    expect(wrapper.text()).not.toContain('No emails.')
+    expect(wrapper.text()).toContain('无法查看该作者的邮箱')
+    expect(wrapper.text()).not.toContain('暂无邮箱。')
   })
 
   it('does not render phone fields omitted by the API', async () => {
@@ -140,8 +140,8 @@ describe('AuthorDetailView', () => {
     const wrapper = mount(AuthorDetailView, { global: { stubs }, props: { authorId: 'a1' } })
     await flushPromises()
 
-    expect(wrapper.text()).not.toContain('Phone country code')
-    expect(wrapper.text()).not.toContain('Phone number')
+    expect(wrapper.text()).not.toContain('电话国家代码')
+    expect(wrapper.text()).not.toContain('电话号码')
     expect(wrapper.text()).not.toContain('undefined')
     expect(wrapper.text()).not.toContain('null')
   })
@@ -472,7 +472,7 @@ describe('AuthorDetailView', () => {
     await wrapper.get('[data-test="edit-email-form"]').trigger('submit')
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Unable to update the email binding')
+    expect(wrapper.text()).toContain('无法更新邮箱绑定')
     expect(wrapper.text()).toContain(address('author'))
     expect(wrapper.find('[data-test="edit-email-e1"]').exists()).toBe(true)
     expect(wrapper.find('[data-test="edit-email-form"]').exists()).toBe(true)
@@ -501,7 +501,7 @@ describe('AuthorDetailView', () => {
     await flushPromises()
     await wrapper.get('[data-test="edit-affiliation-l1"]').trigger('click')
     await flushPromises()
-    expect(wrapper.text()).toContain('Unable to load institution choices')
+    expect(wrapper.text()).toContain('无法加载单位选项')
     expect((wrapper.get('[data-test="institution-select"]').element as HTMLSelectElement).value).toBe('missing-i')
 
     await wrapper.get('form[data-test="affiliation-form"] button[type="button"]').trigger('click')
@@ -555,7 +555,7 @@ describe('AuthorDetailView', () => {
     await flushPromises()
 
     expect(wrapper.text()).not.toContain(address('author'))
-    expect(wrapper.text()).toContain('Email permission is not available')
+    expect(wrapper.text()).toContain('当前没有查看邮箱的权限')
     expect(adapter.mock.calls.filter(([config]) => config.url === '/authors/a1/emails')).toHaveLength(1)
 
     await wrapper.setProps({ permissions: ['author:profile:read', 'author:email:read'] })

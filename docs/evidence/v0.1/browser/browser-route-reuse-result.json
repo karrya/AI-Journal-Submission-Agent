@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "captured_at": "2026-11-05T16:02:19.951Z",
+  "captured_at": "2026-11-05T21:04:52.211Z",
   "browser": "Google Chrome 156.0.8078.80 via temporary playwright-core",
   "synthetic_data_only": true,
   "route_reuse": "m1 to m2 through Vue Router popstate with delayed m2 GET",
@@ -62,18 +62,18 @@
     {
       "event": "request",
       "method": "GET",
-      "path": "/api/v1/manuscripts/f2170d5c-b1dd-4ab9-80a1-35588b4ae808"
+      "path": "/api/v1/manuscripts/cca24078-6da8-4739-940c-6f377052e082"
     },
     {
       "event": "response",
       "method": "GET",
-      "path": "/api/v1/manuscripts/f2170d5c-b1dd-4ab9-80a1-35588b4ae808",
+      "path": "/api/v1/manuscripts/cca24078-6da8-4739-940c-6f377052e082",
       "status": 200
     },
     {
       "event": "request",
       "method": "GET",
-      "path": "/api/v1/manuscripts/f2170d5c-b1dd-4ab9-80a1-35588b4ae808/versions"
+      "path": "/api/v1/manuscripts/cca24078-6da8-4739-940c-6f377052e082/versions"
     },
     {
       "event": "request",
@@ -83,7 +83,62 @@
     {
       "event": "response",
       "method": "GET",
-      "path": "/api/v1/manuscripts/f2170d5c-b1dd-4ab9-80a1-35588b4ae808/versions",
+      "path": "/api/v1/authors",
+      "status": 200
+    },
+    {
+      "event": "response",
+      "method": "GET",
+      "path": "/api/v1/manuscripts/cca24078-6da8-4739-940c-6f377052e082/versions",
+      "status": 200
+    },
+    {
+      "event": "request",
+      "method": "GET",
+      "path": "/api/v1/manuscripts/cca24078-6da8-4739-940c-6f377052e082/versions/a17754a9-38cf-4781-bbb4-5a023e046372"
+    },
+    {
+      "event": "response",
+      "method": "GET",
+      "path": "/api/v1/manuscripts/cca24078-6da8-4739-940c-6f377052e082/versions/a17754a9-38cf-4781-bbb4-5a023e046372",
+      "status": 200
+    },
+    {
+      "event": "request",
+      "method": "GET",
+      "path": "/api/v1/manuscripts/cca24078-6da8-4739-940c-6f377052e082/versions/a17754a9-38cf-4781-bbb4-5a023e046372/files"
+    },
+    {
+      "event": "response",
+      "method": "GET",
+      "path": "/api/v1/manuscripts/cca24078-6da8-4739-940c-6f377052e082/versions/a17754a9-38cf-4781-bbb4-5a023e046372/files",
+      "status": 200
+    },
+    {
+      "event": "request",
+      "method": "GET",
+      "path": "/api/v1/manuscripts/67d9376b-bcf1-4d6d-ba5d-fc2208d06cc0"
+    },
+    {
+      "event": "response",
+      "method": "GET",
+      "path": "/api/v1/manuscripts/67d9376b-bcf1-4d6d-ba5d-fc2208d06cc0",
+      "status": 200
+    },
+    {
+      "event": "request",
+      "method": "GET",
+      "path": "/api/v1/manuscripts/67d9376b-bcf1-4d6d-ba5d-fc2208d06cc0/versions"
+    },
+    {
+      "event": "request",
+      "method": "GET",
+      "path": "/api/v1/authors"
+    },
+    {
+      "event": "response",
+      "method": "GET",
+      "path": "/api/v1/manuscripts/67d9376b-bcf1-4d6d-ba5d-fc2208d06cc0/versions",
       "status": 200
     },
     {
@@ -95,78 +150,23 @@
     {
       "event": "request",
       "method": "GET",
-      "path": "/api/v1/manuscripts/f2170d5c-b1dd-4ab9-80a1-35588b4ae808/versions/3a07f350-ed12-4ba8-9973-a415f9beb44e"
+      "path": "/api/v1/manuscripts/67d9376b-bcf1-4d6d-ba5d-fc2208d06cc0/versions/ba9dbd86-6d87-45c9-9982-de6f9790bda3"
     },
     {
       "event": "response",
       "method": "GET",
-      "path": "/api/v1/manuscripts/f2170d5c-b1dd-4ab9-80a1-35588b4ae808/versions/3a07f350-ed12-4ba8-9973-a415f9beb44e",
+      "path": "/api/v1/manuscripts/67d9376b-bcf1-4d6d-ba5d-fc2208d06cc0/versions/ba9dbd86-6d87-45c9-9982-de6f9790bda3",
       "status": 200
     },
     {
       "event": "request",
       "method": "GET",
-      "path": "/api/v1/manuscripts/f2170d5c-b1dd-4ab9-80a1-35588b4ae808/versions/3a07f350-ed12-4ba8-9973-a415f9beb44e/files"
+      "path": "/api/v1/manuscripts/67d9376b-bcf1-4d6d-ba5d-fc2208d06cc0/versions/ba9dbd86-6d87-45c9-9982-de6f9790bda3/files"
     },
     {
       "event": "response",
       "method": "GET",
-      "path": "/api/v1/manuscripts/f2170d5c-b1dd-4ab9-80a1-35588b4ae808/versions/3a07f350-ed12-4ba8-9973-a415f9beb44e/files",
-      "status": 200
-    },
-    {
-      "event": "request",
-      "method": "GET",
-      "path": "/api/v1/manuscripts/7bd08505-2d34-4003-a088-42d1ff495f28"
-    },
-    {
-      "event": "response",
-      "method": "GET",
-      "path": "/api/v1/manuscripts/7bd08505-2d34-4003-a088-42d1ff495f28",
-      "status": 200
-    },
-    {
-      "event": "request",
-      "method": "GET",
-      "path": "/api/v1/manuscripts/7bd08505-2d34-4003-a088-42d1ff495f28/versions"
-    },
-    {
-      "event": "request",
-      "method": "GET",
-      "path": "/api/v1/authors"
-    },
-    {
-      "event": "response",
-      "method": "GET",
-      "path": "/api/v1/manuscripts/7bd08505-2d34-4003-a088-42d1ff495f28/versions",
-      "status": 200
-    },
-    {
-      "event": "response",
-      "method": "GET",
-      "path": "/api/v1/authors",
-      "status": 200
-    },
-    {
-      "event": "request",
-      "method": "GET",
-      "path": "/api/v1/manuscripts/7bd08505-2d34-4003-a088-42d1ff495f28/versions/5ae0b061-b986-431c-9b2b-c6d6a219c5c7"
-    },
-    {
-      "event": "response",
-      "method": "GET",
-      "path": "/api/v1/manuscripts/7bd08505-2d34-4003-a088-42d1ff495f28/versions/5ae0b061-b986-431c-9b2b-c6d6a219c5c7",
-      "status": 200
-    },
-    {
-      "event": "request",
-      "method": "GET",
-      "path": "/api/v1/manuscripts/7bd08505-2d34-4003-a088-42d1ff495f28/versions/5ae0b061-b986-431c-9b2b-c6d6a219c5c7/files"
-    },
-    {
-      "event": "response",
-      "method": "GET",
-      "path": "/api/v1/manuscripts/7bd08505-2d34-4003-a088-42d1ff495f28/versions/5ae0b061-b986-431c-9b2b-c6d6a219c5c7/files",
+      "path": "/api/v1/manuscripts/67d9376b-bcf1-4d6d-ba5d-fc2208d06cc0/versions/ba9dbd86-6d87-45c9-9982-de6f9790bda3/files",
       "status": 200
     }
   ],

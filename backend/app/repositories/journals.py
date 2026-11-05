@@ -1,4 +1,4 @@
-"""Persistence queries for publishers, journal platforms, and journals."""
+"""提供出版商、期刊平台和期刊的持久化查询。"""
 
 from sqlalchemy import ColumnElement, func, select
 from sqlalchemy.orm import Session

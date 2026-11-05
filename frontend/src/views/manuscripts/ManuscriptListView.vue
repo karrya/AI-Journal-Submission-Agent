@@ -15,6 +15,7 @@ import {
 import { fetchAllPages } from '../../api/pagination'
 import AuthorshipEditor from '../../components/AuthorshipEditor.vue'
 import { useAuthStore } from '../../stores/auth'
+import { displayText, MANUSCRIPT_STATUS_LABELS } from '../../utils/display'
 
 const auth = useAuthStore()
 const canCreate = computed(() => auth.user?.roles.some(
@@ -49,7 +50,7 @@ const metadata = reactive({
 
 function safeError(error: unknown, fallback: string): string {
   const requestId = getSafeRequestId(error)
-  return requestId ? `${fallback} Request ID: ${requestId}` : fallback
+  return requestId ? `${fallback} 请求 ID：${requestId}` : fallback
 }
 
 async function load(): Promise<void> {
@@ -68,7 +69,7 @@ async function load(): Promise<void> {
     if (sequence !== loadSequence) return
     manuscripts.value = []
     total.value = 0
-    errorMessage.value = safeError(error, 'Unable to load manuscripts.')
+    errorMessage.value = safeError(error, '无法加载稿件。')
   } finally {
     if (sequence === loadSequence) loading.value = false
   }
@@ -97,7 +98,7 @@ async function openCreate(): Promise<void> {
     authorOptions.value = result.items
     authorOptionsLoaded.value = true
   } catch (error) {
-    createError.value = safeError(error, 'Unable to load authorized owner choices.')
+    createError.value = safeError(error, '无法加载已授权的所有者选项。')
   }
 }
 
@@ -120,7 +121,7 @@ async function saveCreate(authorship: ManuscriptAuthorsUpdate): Promise<void> {
   createError.value = ''
   if (!ownerAuthorId.value || !metadata.title.trim() || !metadata.abstract.trim()
     || !metadata.article_type.trim() || !metadata.language.trim()) {
-    createError.value = 'Owner, title, abstract, article type, and language are required.'
+    createError.value = '请选择所有者，并填写标题、摘要、文章类型和语言。'
     return
   }
   creating.value = true
@@ -150,7 +151,7 @@ async function saveCreate(authorship: ManuscriptAuthorsUpdate): Promise<void> {
     })
     await load()
   } catch (error) {
-    createError.value = safeError(error, 'Unable to create the manuscript.')
+    createError.value = safeError(error, '无法创建稿件。')
   } finally {
     creating.value = false
   }
@@ -165,57 +166,57 @@ onMounted(() => void load())
 
 <template>
   <section class="management-page" aria-labelledby="manuscript-list-title">
-    <h1 id="manuscript-list-title">Manuscripts</h1>
+    <h1 id="manuscript-list-title">稿件</h1>
     <div class="toolbar">
-      <label>Status
+      <label>状态
         <select v-model="query.status" data-test="status-filter">
-          <option value="">All statuses</option>
-          <option value="draft">Draft</option>
-          <option value="active">Active</option>
-          <option value="archived">Archived</option>
+          <option value="">全部状态</option>
+          <option value="draft">草稿</option>
+          <option value="active">进行中</option>
+          <option value="archived">已归档</option>
         </select>
       </label>
-      <label>Sort
+      <label>排序
         <select v-model="query.sort" data-test="manuscript-sort" @change="applyFilters">
-          <option value="created_at">Created at</option>
-          <option value="updated_at">Updated at</option>
-          <option value="title">Title</option>
+          <option value="created_at">创建时间</option>
+          <option value="updated_at">更新时间</option>
+          <option value="title">标题</option>
         </select>
       </label>
-      <label>Order
+      <label>顺序
         <select v-model="query.order" @change="applyFilters">
-          <option value="desc">Descending</option>
-          <option value="asc">Ascending</option>
+          <option value="desc">降序</option>
+          <option value="asc">升序</option>
         </select>
       </label>
-      <button type="button" data-test="apply-filters" @click="applyFilters">Apply filters</button>
-      <button v-if="canCreate" type="button" data-test="add-manuscript" @click="openCreate">New manuscript</button>
+      <button type="button" data-test="apply-filters" @click="applyFilters">应用筛选</button>
+      <button v-if="canCreate" type="button" data-test="add-manuscript" @click="openCreate">新建稿件</button>
     </div>
 
     <p v-if="errorMessage" class="form-error" role="alert">{{ errorMessage }}</p>
 
     <section v-if="showCreate" aria-labelledby="create-manuscript-title">
-      <h2 id="create-manuscript-title">Create manuscript</h2>
+      <h2 id="create-manuscript-title">创建稿件</h2>
       <div class="stacked-form">
-        <label>Owner author
+        <label>所有者作者
           <select v-model="ownerAuthorId" data-test="owner-author" required @change="ownerChanged">
-            <option value="">Select an authorized owner</option>
+            <option value="">请选择已授权的所有者</option>
             <option v-for="author in authorOptions" :key="author.id" :value="author.id">{{ author.display_name }}</option>
           </select>
         </label>
         <div class="form-grid">
-          <label>Title<input v-model="metadata.title" data-test="title" maxlength="1000" required></label>
-          <label>Article type<input v-model="metadata.article_type" data-test="article-type" maxlength="100" required></label>
-          <label>Language<input v-model="metadata.language" data-test="language" maxlength="32" required></label>
-          <label>Subject field<input v-model="metadata.subject_field" maxlength="255"></label>
-          <label>Keywords (comma separated)<input v-model="metadata.keywords" data-test="keywords"></label>
+          <label>标题<input v-model="metadata.title" data-test="title" maxlength="1000" required></label>
+          <label>文章类型<input v-model="metadata.article_type" data-test="article-type" maxlength="100" required></label>
+          <label>语言<input v-model="metadata.language" data-test="language" maxlength="32" required></label>
+          <label>学科领域<input v-model="metadata.subject_field" maxlength="255"></label>
+          <label>关键词（以逗号分隔）<input v-model="metadata.keywords" data-test="keywords"></label>
         </div>
-        <label>Abstract<textarea v-model="metadata.abstract" data-test="abstract" rows="6" required></textarea></label>
-        <label>Funding statement<textarea v-model="metadata.funding_statement" rows="3"></textarea></label>
-        <label>Conflict of interest statement<textarea v-model="metadata.conflict_of_interest_statement" rows="3"></textarea></label>
-        <label>Ethics statement<textarea v-model="metadata.ethics_statement" rows="3"></textarea></label>
-        <label>Data availability statement<textarea v-model="metadata.data_availability_statement" rows="3"></textarea></label>
-        <label>Notes<textarea v-model="metadata.notes" rows="3"></textarea></label>
+        <label>摘要<textarea v-model="metadata.abstract" data-test="abstract" rows="6" required></textarea></label>
+        <label>基金声明<textarea v-model="metadata.funding_statement" rows="3"></textarea></label>
+        <label>利益冲突声明<textarea v-model="metadata.conflict_of_interest_statement" rows="3"></textarea></label>
+        <label>伦理声明<textarea v-model="metadata.ethics_statement" rows="3"></textarea></label>
+        <label>数据可用性声明<textarea v-model="metadata.data_availability_statement" rows="3"></textarea></label>
+        <label>备注<textarea v-model="metadata.notes" rows="3"></textarea></label>
       </div>
       <AuthorshipEditor
         v-if="ownerAuthorId"
@@ -227,26 +228,26 @@ onMounted(() => void load())
         @submit="saveCreate"
       />
       <p v-if="createError" class="form-error" role="alert">{{ createError }}</p>
-      <button type="button" :disabled="creating" @click="showCreate = false">Cancel</button>
+      <button type="button" :disabled="creating" @click="showCreate = false">取消</button>
     </section>
 
-    <p v-if="loading">Loading manuscripts…</p>
-    <p v-else-if="!errorMessage && manuscripts.length === 0">No manuscripts found.</p>
+    <p v-if="loading">正在加载稿件…</p>
+    <p v-else-if="!errorMessage && manuscripts.length === 0">未找到稿件。</p>
     <table v-else>
-      <thead><tr><th>Internal number</th><th>Title</th><th>Owner</th><th>Status</th><th>Updated</th><th>Actions</th></tr></thead>
+      <thead><tr><th>内部编号</th><th>标题</th><th>所有者</th><th>状态</th><th>更新时间</th><th>操作</th></tr></thead>
       <tbody><tr v-for="manuscript in manuscripts" :key="manuscript.id">
         <td>{{ manuscript.internal_number }}</td>
         <td>{{ manuscript.title }}</td>
         <td>{{ ownerName(manuscript) }}</td>
-        <td>{{ manuscript.status }}</td>
+        <td>{{ displayText(MANUSCRIPT_STATUS_LABELS, manuscript.status) }}</td>
         <td><time :datetime="manuscript.updated_at">{{ manuscript.updated_at }}</time></td>
-        <td><RouterLink :to="`/manuscripts/${manuscript.id}`">Open workspace</RouterLink></td>
+        <td><RouterLink :to="`/manuscripts/${manuscript.id}`">打开工作区</RouterLink></td>
       </tr></tbody>
     </table>
-    <nav class="pagination" aria-label="Manuscript pages">
-      <button type="button" :disabled="query.page === 1 || loading" @click="changePage(query.page - 1)">Previous</button>
-      <span>Page {{ query.page }} · {{ total }} total</span>
-      <button type="button" data-test="next-manuscripts" :disabled="query.page * query.page_size >= total || loading" @click="changePage(query.page + 1)">Next</button>
+    <nav class="pagination" aria-label="稿件分页">
+      <button type="button" :disabled="query.page === 1 || loading" @click="changePage(query.page - 1)">上一页</button>
+      <span>第 {{ query.page }} 页 · 共 {{ total }} 条</span>
+      <button type="button" data-test="next-manuscripts" :disabled="query.page * query.page_size >= total || loading" @click="changePage(query.page + 1)">下一页</button>
     </nav>
   </section>
 </template>

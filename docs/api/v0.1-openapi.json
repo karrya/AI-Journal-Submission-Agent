@@ -1,7 +1,8 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Academic Submission Agent",
+    "title": "学术论文投稿代理",
+    "description": "用于管理作者、稿件、文件、期刊资料和访问授权的本地学术论文投稿代理 API。",
     "version": "0.1.0"
   },
   "paths": {
@@ -10,11 +11,11 @@
         "tags": [
           "health"
         ],
-        "summary": "Readiness",
+        "summary": "数据库就绪检查",
         "operationId": "readiness_api_v1_health_ready_get",
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "请求成功",
             "content": {
               "application/json": {
                 "schema": {
@@ -31,7 +32,7 @@
         "tags": [
           "authentication"
         ],
-        "summary": "Login",
+        "summary": "用户登录",
         "operationId": "login_api_v1_auth_login_post",
         "parameters": [
           {
@@ -47,7 +48,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Origin"
+              "title": "请求来源"
             }
           }
         ],
@@ -63,7 +64,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "请求成功",
             "content": {
               "application/json": {
                 "schema": {
@@ -73,7 +74,7 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -90,7 +91,7 @@
         "tags": [
           "authentication"
         ],
-        "summary": "Logout",
+        "summary": "用户退出登录",
         "operationId": "logout_api_v1_auth_logout_post",
         "parameters": [
           {
@@ -106,7 +107,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Origin"
+              "title": "请求来源"
             }
           },
           {
@@ -122,16 +123,16 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Csrf-Token"
+              "title": "CSRF 防护令牌"
             }
           }
         ],
         "responses": {
           "204": {
-            "description": "Successful Response"
+            "description": "操作成功，无返回内容"
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -148,11 +149,11 @@
         "tags": [
           "authentication"
         ],
-        "summary": "Me",
+        "summary": "获取当前用户",
         "operationId": "me_api_v1_auth_me_get",
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "请求成功",
             "content": {
               "application/json": {
                 "schema": {
@@ -169,11 +170,11 @@
         "tags": [
           "authentication"
         ],
-        "summary": "Get Csrf",
+        "summary": "获取 CSRF（跨站请求伪造）防护令牌",
         "operationId": "get_csrf_api_v1_auth_csrf_get",
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "请求成功",
             "content": {
               "application/json": {
                 "schema": {
@@ -190,7 +191,7 @@
         "tags": [
           "authentication"
         ],
-        "summary": "Change Password",
+        "summary": "修改密码",
         "operationId": "change_password_api_v1_auth_change_password_post",
         "parameters": [
           {
@@ -206,7 +207,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Origin"
+              "title": "请求来源"
             }
           },
           {
@@ -222,7 +223,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Csrf-Token"
+              "title": "CSRF 防护令牌"
             }
           }
         ],
@@ -238,10 +239,10 @@
         },
         "responses": {
           "204": {
-            "description": "Successful Response"
+            "description": "操作成功，无返回内容"
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -258,7 +259,7 @@
         "tags": [
           "authors"
         ],
-        "summary": "List Authors",
+        "summary": "获取作者列表",
         "operationId": "list_authors_api_v1_authors_get",
         "parameters": [
           {
@@ -269,7 +270,7 @@
               "type": "integer",
               "minimum": 1,
               "default": 1,
-              "title": "Page"
+              "title": "页码"
             }
           },
           {
@@ -281,7 +282,7 @@
               "maximum": 100,
               "minimum": 1,
               "default": 20,
-              "title": "Page Size"
+              "title": "每页数量"
             }
           },
           {
@@ -297,7 +298,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Name"
+              "title": "名称"
             }
           },
           {
@@ -313,7 +314,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Orcid"
+              "title": "ORCID（开放研究者与贡献者标识）"
             }
           },
           {
@@ -333,7 +334,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Status"
+              "title": "状态"
             }
           },
           {
@@ -343,7 +344,7 @@
             "schema": {
               "type": "string",
               "default": "display_name",
-              "title": "Sort"
+              "title": "排序字段"
             }
           },
           {
@@ -357,13 +358,13 @@
               ],
               "type": "string",
               "default": "asc",
-              "title": "Order"
+              "title": "排序方向"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "请求成功",
             "content": {
               "application/json": {
                 "schema": {
@@ -373,7 +374,7 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -388,7 +389,7 @@
         "tags": [
           "authors"
         ],
-        "summary": "Create Author",
+        "summary": "创建作者",
         "operationId": "create_author_api_v1_authors_post",
         "parameters": [
           {
@@ -404,7 +405,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Origin"
+              "title": "请求来源"
             }
           },
           {
@@ -420,7 +421,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Csrf-Token"
+              "title": "CSRF 防护令牌"
             }
           }
         ],
@@ -436,7 +437,7 @@
         },
         "responses": {
           "201": {
-            "description": "Successful Response",
+            "description": "创建成功",
             "content": {
               "application/json": {
                 "schema": {
@@ -446,7 +447,7 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -463,7 +464,7 @@
         "tags": [
           "authors"
         ],
-        "summary": "Get Author",
+        "summary": "获取作者详情",
         "operationId": "get_author_api_v1_authors__author_id__get",
         "parameters": [
           {
@@ -473,13 +474,13 @@
             "schema": {
               "type": "string",
               "format": "uuid",
-              "title": "Author Id"
+              "title": "作者 ID"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "请求成功",
             "content": {
               "application/json": {
                 "schema": {
@@ -489,7 +490,7 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -504,7 +505,7 @@
         "tags": [
           "authors"
         ],
-        "summary": "Update Author",
+        "summary": "更新作者",
         "operationId": "update_author_api_v1_authors__author_id__patch",
         "parameters": [
           {
@@ -514,7 +515,7 @@
             "schema": {
               "type": "string",
               "format": "uuid",
-              "title": "Author Id"
+              "title": "作者 ID"
             }
           },
           {
@@ -530,7 +531,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Origin"
+              "title": "请求来源"
             }
           },
           {
@@ -546,7 +547,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Csrf-Token"
+              "title": "CSRF 防护令牌"
             }
           }
         ],
@@ -562,7 +563,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "请求成功",
             "content": {
               "application/json": {
                 "schema": {
@@ -572,7 +573,7 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -587,7 +588,7 @@
         "tags": [
           "authors"
         ],
-        "summary": "Delete Author",
+        "summary": "删除作者",
         "operationId": "delete_author_api_v1_authors__author_id__delete",
         "parameters": [
           {
@@ -597,7 +598,7 @@
             "schema": {
               "type": "string",
               "format": "uuid",
-              "title": "Author Id"
+              "title": "作者 ID"
             }
           },
           {
@@ -613,7 +614,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Origin"
+              "title": "请求来源"
             }
           },
           {
@@ -629,16 +630,16 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Csrf-Token"
+              "title": "CSRF 防护令牌"
             }
           }
         ],
         "responses": {
           "204": {
-            "description": "Successful Response"
+            "description": "操作成功，无返回内容"
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -655,7 +656,7 @@
         "tags": [
           "authors"
         ],
-        "summary": "List Emails",
+        "summary": "获取作者邮箱列表",
         "operationId": "list_emails_api_v1_authors__author_id__emails_get",
         "parameters": [
           {
@@ -665,7 +666,7 @@
             "schema": {
               "type": "string",
               "format": "uuid",
-              "title": "Author Id"
+              "title": "作者 ID"
             }
           },
           {
@@ -676,7 +677,7 @@
               "type": "integer",
               "minimum": 1,
               "default": 1,
-              "title": "Page"
+              "title": "页码"
             }
           },
           {
@@ -688,7 +689,7 @@
               "maximum": 100,
               "minimum": 1,
               "default": 20,
-              "title": "Page Size"
+              "title": "每页数量"
             }
           },
           {
@@ -698,7 +699,7 @@
             "schema": {
               "type": "string",
               "default": "created_at",
-              "title": "Sort"
+              "title": "排序字段"
             }
           },
           {
@@ -712,13 +713,13 @@
               ],
               "type": "string",
               "default": "asc",
-              "title": "Order"
+              "title": "排序方向"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "请求成功",
             "content": {
               "application/json": {
                 "schema": {
@@ -728,7 +729,7 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -743,7 +744,7 @@
         "tags": [
           "authors"
         ],
-        "summary": "Create Email",
+        "summary": "添加作者邮箱",
         "operationId": "create_email_api_v1_authors__author_id__emails_post",
         "parameters": [
           {
@@ -753,7 +754,7 @@
             "schema": {
               "type": "string",
               "format": "uuid",
-              "title": "Author Id"
+              "title": "作者 ID"
             }
           },
           {
@@ -769,7 +770,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Origin"
+              "title": "请求来源"
             }
           },
           {
@@ -785,7 +786,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Csrf-Token"
+              "title": "CSRF 防护令牌"
             }
           }
         ],
@@ -801,7 +802,7 @@
         },
         "responses": {
           "201": {
-            "description": "Successful Response",
+            "description": "创建成功",
             "content": {
               "application/json": {
                 "schema": {
@@ -811,7 +812,7 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -828,7 +829,7 @@
         "tags": [
           "authors"
         ],
-        "summary": "Update Email",
+        "summary": "更新作者邮箱",
         "operationId": "update_email_api_v1_authors__author_id__emails__email_id__patch",
         "parameters": [
           {
@@ -838,7 +839,7 @@
             "schema": {
               "type": "string",
               "format": "uuid",
-              "title": "Author Id"
+              "title": "作者 ID"
             }
           },
           {
@@ -848,7 +849,7 @@
             "schema": {
               "type": "string",
               "format": "uuid",
-              "title": "Email Id"
+              "title": "邮箱 ID"
             }
           },
           {
@@ -864,7 +865,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Origin"
+              "title": "请求来源"
             }
           },
           {
@@ -880,7 +881,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Csrf-Token"
+              "title": "CSRF 防护令牌"
             }
           }
         ],
@@ -896,7 +897,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "请求成功",
             "content": {
               "application/json": {
                 "schema": {
@@ -906,7 +907,7 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -921,7 +922,7 @@
         "tags": [
           "authors"
         ],
-        "summary": "Delete Email",
+        "summary": "删除作者邮箱",
         "operationId": "delete_email_api_v1_authors__author_id__emails__email_id__delete",
         "parameters": [
           {
@@ -931,7 +932,7 @@
             "schema": {
               "type": "string",
               "format": "uuid",
-              "title": "Author Id"
+              "title": "作者 ID"
             }
           },
           {
@@ -941,7 +942,7 @@
             "schema": {
               "type": "string",
               "format": "uuid",
-              "title": "Email Id"
+              "title": "邮箱 ID"
             }
           },
           {
@@ -957,7 +958,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Origin"
+              "title": "请求来源"
             }
           },
           {
@@ -973,7 +974,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Csrf-Token"
+              "title": "CSRF 防护令牌"
             }
           }
         ],
@@ -989,10 +990,10 @@
         },
         "responses": {
           "204": {
-            "description": "Successful Response"
+            "description": "操作成功，无返回内容"
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -1009,7 +1010,7 @@
         "tags": [
           "authors"
         ],
-        "summary": "List Institutions",
+        "summary": "获取机构列表",
         "operationId": "list_institutions_api_v1_institutions_get",
         "parameters": [
           {
@@ -1020,7 +1021,7 @@
               "type": "integer",
               "minimum": 1,
               "default": 1,
-              "title": "Page"
+              "title": "页码"
             }
           },
           {
@@ -1032,7 +1033,7 @@
               "maximum": 100,
               "minimum": 1,
               "default": 20,
-              "title": "Page Size"
+              "title": "每页数量"
             }
           },
           {
@@ -1048,7 +1049,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Name"
+              "title": "名称"
             }
           },
           {
@@ -1064,7 +1065,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Country Code"
+              "title": "国家或地区代码"
             }
           },
           {
@@ -1080,7 +1081,7 @@
                   "type": "null"
                 }
               ],
-              "title": "City"
+              "title": "城市"
             }
           },
           {
@@ -1090,7 +1091,7 @@
             "schema": {
               "type": "string",
               "default": "name",
-              "title": "Sort"
+              "title": "排序字段"
             }
           },
           {
@@ -1104,13 +1105,13 @@
               ],
               "type": "string",
               "default": "asc",
-              "title": "Order"
+              "title": "排序方向"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "请求成功",
             "content": {
               "application/json": {
                 "schema": {
@@ -1120,7 +1121,7 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -1135,7 +1136,7 @@
         "tags": [
           "authors"
         ],
-        "summary": "Create Institution",
+        "summary": "创建机构",
         "operationId": "create_institution_api_v1_institutions_post",
         "parameters": [
           {
@@ -1151,7 +1152,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Origin"
+              "title": "请求来源"
             }
           },
           {
@@ -1167,7 +1168,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Csrf-Token"
+              "title": "CSRF 防护令牌"
             }
           }
         ],
@@ -1183,7 +1184,7 @@
         },
         "responses": {
           "201": {
-            "description": "Successful Response",
+            "description": "创建成功",
             "content": {
               "application/json": {
                 "schema": {
@@ -1193,7 +1194,7 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -1210,7 +1211,7 @@
         "tags": [
           "authors"
         ],
-        "summary": "Get Institution",
+        "summary": "获取机构详情",
         "operationId": "get_institution_api_v1_institutions__institution_id__get",
         "parameters": [
           {
@@ -1220,13 +1221,13 @@
             "schema": {
               "type": "string",
               "format": "uuid",
-              "title": "Institution Id"
+              "title": "机构 ID"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "请求成功",
             "content": {
               "application/json": {
                 "schema": {
@@ -1236,7 +1237,7 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -1251,7 +1252,7 @@
         "tags": [
           "authors"
         ],
-        "summary": "Update Institution",
+        "summary": "更新机构",
         "operationId": "update_institution_api_v1_institutions__institution_id__patch",
         "parameters": [
           {
@@ -1261,7 +1262,7 @@
             "schema": {
               "type": "string",
               "format": "uuid",
-              "title": "Institution Id"
+              "title": "机构 ID"
             }
           },
           {
@@ -1277,7 +1278,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Origin"
+              "title": "请求来源"
             }
           },
           {
@@ -1293,7 +1294,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Csrf-Token"
+              "title": "CSRF 防护令牌"
             }
           }
         ],
@@ -1309,7 +1310,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "请求成功",
             "content": {
               "application/json": {
                 "schema": {
@@ -1319,7 +1320,7 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -1334,7 +1335,7 @@
         "tags": [
           "authors"
         ],
-        "summary": "Delete Institution",
+        "summary": "删除机构",
         "operationId": "delete_institution_api_v1_institutions__institution_id__delete",
         "parameters": [
           {
@@ -1344,7 +1345,7 @@
             "schema": {
               "type": "string",
               "format": "uuid",
-              "title": "Institution Id"
+              "title": "机构 ID"
             }
           },
           {
@@ -1360,7 +1361,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Origin"
+              "title": "请求来源"
             }
           },
           {
@@ -1376,16 +1377,16 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Csrf-Token"
+              "title": "CSRF 防护令牌"
             }
           }
         ],
         "responses": {
           "204": {
-            "description": "Successful Response"
+            "description": "操作成功，无返回内容"
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -1402,7 +1403,7 @@
         "tags": [
           "authors"
         ],
-        "summary": "List Author Institutions",
+        "summary": "获取作者机构关联列表",
         "operationId": "list_author_institutions_api_v1_authors__author_id__institutions_get",
         "parameters": [
           {
@@ -1412,7 +1413,7 @@
             "schema": {
               "type": "string",
               "format": "uuid",
-              "title": "Author Id"
+              "title": "作者 ID"
             }
           },
           {
@@ -1423,7 +1424,7 @@
               "type": "integer",
               "minimum": 1,
               "default": 1,
-              "title": "Page"
+              "title": "页码"
             }
           },
           {
@@ -1435,7 +1436,7 @@
               "maximum": 100,
               "minimum": 1,
               "default": 20,
-              "title": "Page Size"
+              "title": "每页数量"
             }
           },
           {
@@ -1445,7 +1446,7 @@
             "schema": {
               "type": "string",
               "default": "display_order",
-              "title": "Sort"
+              "title": "排序字段"
             }
           },
           {
@@ -1459,13 +1460,13 @@
               ],
               "type": "string",
               "default": "asc",
-              "title": "Order"
+              "title": "排序方向"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "请求成功",
             "content": {
               "application/json": {
                 "schema": {
@@ -1475,7 +1476,7 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -1490,7 +1491,7 @@
         "tags": [
           "authors"
         ],
-        "summary": "Create Author Institution",
+        "summary": "创建作者机构关联",
         "operationId": "create_author_institution_api_v1_authors__author_id__institutions_post",
         "parameters": [
           {
@@ -1500,7 +1501,7 @@
             "schema": {
               "type": "string",
               "format": "uuid",
-              "title": "Author Id"
+              "title": "作者 ID"
             }
           },
           {
@@ -1516,7 +1517,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Origin"
+              "title": "请求来源"
             }
           },
           {
@@ -1532,7 +1533,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Csrf-Token"
+              "title": "CSRF 防护令牌"
             }
           }
         ],
@@ -1548,7 +1549,7 @@
         },
         "responses": {
           "201": {
-            "description": "Successful Response",
+            "description": "创建成功",
             "content": {
               "application/json": {
                 "schema": {
@@ -1558,7 +1559,7 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -1575,7 +1576,7 @@
         "tags": [
           "authors"
         ],
-        "summary": "Update Author Institution",
+        "summary": "更新作者机构关联",
         "operationId": "update_author_institution_api_v1_authors__author_id__institutions__link_id__patch",
         "parameters": [
           {
@@ -1585,7 +1586,7 @@
             "schema": {
               "type": "string",
               "format": "uuid",
-              "title": "Author Id"
+              "title": "作者 ID"
             }
           },
           {
@@ -1595,7 +1596,7 @@
             "schema": {
               "type": "string",
               "format": "uuid",
-              "title": "Link Id"
+              "title": "关联 ID"
             }
           },
           {
@@ -1611,7 +1612,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Origin"
+              "title": "请求来源"
             }
           },
           {
@@ -1627,7 +1628,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Csrf-Token"
+              "title": "CSRF 防护令牌"
             }
           }
         ],
@@ -1643,7 +1644,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "请求成功",
             "content": {
               "application/json": {
                 "schema": {
@@ -1653,7 +1654,7 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -1668,7 +1669,7 @@
         "tags": [
           "authors"
         ],
-        "summary": "Delete Author Institution",
+        "summary": "删除作者机构关联",
         "operationId": "delete_author_institution_api_v1_authors__author_id__institutions__link_id__delete",
         "parameters": [
           {
@@ -1678,7 +1679,7 @@
             "schema": {
               "type": "string",
               "format": "uuid",
-              "title": "Author Id"
+              "title": "作者 ID"
             }
           },
           {
@@ -1688,7 +1689,7 @@
             "schema": {
               "type": "string",
               "format": "uuid",
-              "title": "Link Id"
+              "title": "关联 ID"
             }
           },
           {
@@ -1704,7 +1705,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Origin"
+              "title": "请求来源"
             }
           },
           {
@@ -1720,16 +1721,16 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Csrf-Token"
+              "title": "CSRF 防护令牌"
             }
           }
         ],
         "responses": {
           "204": {
-            "description": "Successful Response"
+            "description": "操作成功，无返回内容"
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -1746,7 +1747,7 @@
         "tags": [
           "manuscripts"
         ],
-        "summary": "List Manuscripts",
+        "summary": "获取稿件列表",
         "operationId": "list_manuscripts_api_v1_manuscripts_get",
         "parameters": [
           {
@@ -1757,7 +1758,7 @@
               "type": "integer",
               "minimum": 1,
               "default": 1,
-              "title": "Page"
+              "title": "页码"
             }
           },
           {
@@ -1769,7 +1770,7 @@
               "maximum": 100,
               "minimum": 1,
               "default": 20,
-              "title": "Page Size"
+              "title": "每页数量"
             }
           },
           {
@@ -1790,7 +1791,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Status"
+              "title": "状态"
             }
           },
           {
@@ -1800,7 +1801,7 @@
             "schema": {
               "type": "string",
               "default": "created_at",
-              "title": "Sort"
+              "title": "排序字段"
             }
           },
           {
@@ -1814,13 +1815,13 @@
               ],
               "type": "string",
               "default": "desc",
-              "title": "Order"
+              "title": "排序方向"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "请求成功",
             "content": {
               "application/json": {
                 "schema": {
@@ -1830,7 +1831,7 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -1845,7 +1846,7 @@
         "tags": [
           "manuscripts"
         ],
-        "summary": "Create Manuscript",
+        "summary": "创建稿件",
         "operationId": "create_manuscript_api_v1_manuscripts_post",
         "parameters": [
           {
@@ -1861,7 +1862,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Origin"
+              "title": "请求来源"
             }
           },
           {
@@ -1877,7 +1878,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Csrf-Token"
+              "title": "CSRF 防护令牌"
             }
           }
         ],
@@ -1893,7 +1894,7 @@
         },
         "responses": {
           "201": {
-            "description": "Successful Response",
+            "description": "创建成功",
             "content": {
               "application/json": {
                 "schema": {
@@ -1903,7 +1904,7 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -1920,7 +1921,7 @@
         "tags": [
           "manuscripts"
         ],
-        "summary": "Get Manuscript",
+        "summary": "获取稿件详情",
         "operationId": "get_manuscript_api_v1_manuscripts__manuscript_id__get",
         "parameters": [
           {
@@ -1930,13 +1931,13 @@
             "schema": {
               "type": "string",
               "format": "uuid",
-              "title": "Manuscript Id"
+              "title": "稿件 ID"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "请求成功",
             "content": {
               "application/json": {
                 "schema": {
@@ -1946,7 +1947,7 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -1961,7 +1962,7 @@
         "tags": [
           "manuscripts"
         ],
-        "summary": "Update Manuscript",
+        "summary": "更新稿件",
         "operationId": "update_manuscript_api_v1_manuscripts__manuscript_id__patch",
         "parameters": [
           {
@@ -1971,7 +1972,7 @@
             "schema": {
               "type": "string",
               "format": "uuid",
-              "title": "Manuscript Id"
+              "title": "稿件 ID"
             }
           },
           {
@@ -1987,7 +1988,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Origin"
+              "title": "请求来源"
             }
           },
           {
@@ -2003,7 +2004,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Csrf-Token"
+              "title": "CSRF 防护令牌"
             }
           }
         ],
@@ -2019,7 +2020,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "请求成功",
             "content": {
               "application/json": {
                 "schema": {
@@ -2029,7 +2030,7 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -2044,7 +2045,7 @@
         "tags": [
           "manuscripts"
         ],
-        "summary": "Delete Manuscript",
+        "summary": "删除稿件",
         "operationId": "delete_manuscript_api_v1_manuscripts__manuscript_id__delete",
         "parameters": [
           {
@@ -2054,7 +2055,7 @@
             "schema": {
               "type": "string",
               "format": "uuid",
-              "title": "Manuscript Id"
+              "title": "稿件 ID"
             }
           },
           {
@@ -2070,7 +2071,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Origin"
+              "title": "请求来源"
             }
           },
           {
@@ -2086,16 +2087,16 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Csrf-Token"
+              "title": "CSRF 防护令牌"
             }
           }
         ],
         "responses": {
           "204": {
-            "description": "Successful Response"
+            "description": "操作成功，无返回内容"
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -2112,7 +2113,7 @@
         "tags": [
           "manuscripts"
         ],
-        "summary": "List Manuscript Authors",
+        "summary": "获取稿件署名作者",
         "operationId": "list_manuscript_authors_api_v1_manuscripts__manuscript_id__authors_get",
         "parameters": [
           {
@@ -2122,13 +2123,13 @@
             "schema": {
               "type": "string",
               "format": "uuid",
-              "title": "Manuscript Id"
+              "title": "稿件 ID"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "请求成功",
             "content": {
               "application/json": {
                 "schema": {
@@ -2136,13 +2137,13 @@
                   "items": {
                     "$ref": "#/components/schemas/ManuscriptAuthorResponse"
                   },
-                  "title": "Response List Manuscript Authors Api V1 Manuscripts  Manuscript Id  Authors Get"
+                  "title": "响应数据"
                 }
               }
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -2157,7 +2158,7 @@
         "tags": [
           "manuscripts"
         ],
-        "summary": "Replace Manuscript Authors",
+        "summary": "替换稿件署名作者",
         "operationId": "replace_manuscript_authors_api_v1_manuscripts__manuscript_id__authors_put",
         "parameters": [
           {
@@ -2167,7 +2168,7 @@
             "schema": {
               "type": "string",
               "format": "uuid",
-              "title": "Manuscript Id"
+              "title": "稿件 ID"
             }
           },
           {
@@ -2183,7 +2184,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Origin"
+              "title": "请求来源"
             }
           },
           {
@@ -2199,7 +2200,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Csrf-Token"
+              "title": "CSRF 防护令牌"
             }
           }
         ],
@@ -2215,7 +2216,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "请求成功",
             "content": {
               "application/json": {
                 "schema": {
@@ -2223,13 +2224,13 @@
                   "items": {
                     "$ref": "#/components/schemas/ManuscriptAuthorResponse"
                   },
-                  "title": "Response Replace Manuscript Authors Api V1 Manuscripts  Manuscript Id  Authors Put"
+                  "title": "响应数据"
                 }
               }
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -2246,7 +2247,7 @@
         "tags": [
           "manuscripts"
         ],
-        "summary": "List Manuscript Versions",
+        "summary": "获取稿件版本列表",
         "operationId": "list_manuscript_versions_api_v1_manuscripts__manuscript_id__versions_get",
         "parameters": [
           {
@@ -2256,7 +2257,7 @@
             "schema": {
               "type": "string",
               "format": "uuid",
-              "title": "Manuscript Id"
+              "title": "稿件 ID"
             }
           },
           {
@@ -2267,7 +2268,7 @@
               "type": "integer",
               "minimum": 1,
               "default": 1,
-              "title": "Page"
+              "title": "页码"
             }
           },
           {
@@ -2279,13 +2280,13 @@
               "maximum": 100,
               "minimum": 1,
               "default": 20,
-              "title": "Page Size"
+              "title": "每页数量"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "请求成功",
             "content": {
               "application/json": {
                 "schema": {
@@ -2295,7 +2296,7 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -2310,7 +2311,7 @@
         "tags": [
           "manuscripts"
         ],
-        "summary": "Create Manuscript Version",
+        "summary": "创建稿件版本",
         "operationId": "create_manuscript_version_api_v1_manuscripts__manuscript_id__versions_post",
         "parameters": [
           {
@@ -2320,7 +2321,7 @@
             "schema": {
               "type": "string",
               "format": "uuid",
-              "title": "Manuscript Id"
+              "title": "稿件 ID"
             }
           },
           {
@@ -2336,7 +2337,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Origin"
+              "title": "请求来源"
             }
           },
           {
@@ -2352,7 +2353,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Csrf-Token"
+              "title": "CSRF 防护令牌"
             }
           }
         ],
@@ -2368,7 +2369,7 @@
         },
         "responses": {
           "201": {
-            "description": "Successful Response",
+            "description": "创建成功",
             "content": {
               "application/json": {
                 "schema": {
@@ -2378,7 +2379,7 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -2395,7 +2396,7 @@
         "tags": [
           "manuscripts"
         ],
-        "summary": "Get Manuscript Version",
+        "summary": "获取稿件版本详情",
         "operationId": "get_manuscript_version_api_v1_manuscripts__manuscript_id__versions__version_id__get",
         "parameters": [
           {
@@ -2405,7 +2406,7 @@
             "schema": {
               "type": "string",
               "format": "uuid",
-              "title": "Manuscript Id"
+              "title": "稿件 ID"
             }
           },
           {
@@ -2415,13 +2416,13 @@
             "schema": {
               "type": "string",
               "format": "uuid",
-              "title": "Version Id"
+              "title": "版本 ID"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "请求成功",
             "content": {
               "application/json": {
                 "schema": {
@@ -2431,7 +2432,7 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -2448,7 +2449,7 @@
         "tags": [
           "files"
         ],
-        "summary": "List Files",
+        "summary": "获取稿件版本文件列表",
         "operationId": "list_files_api_v1_manuscripts__manuscript_id__versions__version_id__files_get",
         "parameters": [
           {
@@ -2458,7 +2459,7 @@
             "schema": {
               "type": "string",
               "format": "uuid",
-              "title": "Manuscript Id"
+              "title": "稿件 ID"
             }
           },
           {
@@ -2468,7 +2469,7 @@
             "schema": {
               "type": "string",
               "format": "uuid",
-              "title": "Version Id"
+              "title": "版本 ID"
             }
           },
           {
@@ -2479,7 +2480,7 @@
               "type": "integer",
               "minimum": 1,
               "default": 1,
-              "title": "Page"
+              "title": "页码"
             }
           },
           {
@@ -2491,13 +2492,13 @@
               "maximum": 100,
               "minimum": 1,
               "default": 20,
-              "title": "Page Size"
+              "title": "每页数量"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "请求成功",
             "content": {
               "application/json": {
                 "schema": {
@@ -2507,7 +2508,7 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -2522,7 +2523,7 @@
         "tags": [
           "files"
         ],
-        "summary": "Upload File",
+        "summary": "上传稿件文件",
         "operationId": "upload_file_api_v1_manuscripts__manuscript_id__versions__version_id__files_post",
         "parameters": [
           {
@@ -2532,7 +2533,7 @@
             "schema": {
               "type": "string",
               "format": "uuid",
-              "title": "Manuscript Id"
+              "title": "稿件 ID"
             }
           },
           {
@@ -2542,7 +2543,7 @@
             "schema": {
               "type": "string",
               "format": "uuid",
-              "title": "Version Id"
+              "title": "版本 ID"
             }
           },
           {
@@ -2558,7 +2559,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Origin"
+              "title": "请求来源"
             }
           },
           {
@@ -2574,7 +2575,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Csrf-Token"
+              "title": "CSRF 防护令牌"
             }
           }
         ],
@@ -2590,7 +2591,7 @@
         },
         "responses": {
           "201": {
-            "description": "Successful Response",
+            "description": "创建成功",
             "content": {
               "application/json": {
                 "schema": {
@@ -2600,7 +2601,7 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -2617,7 +2618,7 @@
         "tags": [
           "files"
         ],
-        "summary": "Get File",
+        "summary": "获取文件元数据",
         "operationId": "get_file_api_v1_files__file_id__get",
         "parameters": [
           {
@@ -2627,13 +2628,13 @@
             "schema": {
               "type": "string",
               "format": "uuid",
-              "title": "File Id"
+              "title": "文件 ID"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "请求成功",
             "content": {
               "application/json": {
                 "schema": {
@@ -2643,7 +2644,7 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -2658,7 +2659,7 @@
         "tags": [
           "files"
         ],
-        "summary": "Delete File",
+        "summary": "删除文件",
         "operationId": "delete_file_api_v1_files__file_id__delete",
         "parameters": [
           {
@@ -2668,7 +2669,7 @@
             "schema": {
               "type": "string",
               "format": "uuid",
-              "title": "File Id"
+              "title": "文件 ID"
             }
           },
           {
@@ -2684,7 +2685,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Origin"
+              "title": "请求来源"
             }
           },
           {
@@ -2700,16 +2701,16 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Csrf-Token"
+              "title": "CSRF 防护令牌"
             }
           }
         ],
         "responses": {
           "204": {
-            "description": "Successful Response"
+            "description": "操作成功，无返回内容"
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -2726,7 +2727,7 @@
         "tags": [
           "files"
         ],
-        "summary": "Download File",
+        "summary": "下载文件",
         "operationId": "download_file_api_v1_files__file_id__download_get",
         "parameters": [
           {
@@ -2736,16 +2737,16 @@
             "schema": {
               "type": "string",
               "format": "uuid",
-              "title": "File Id"
+              "title": "文件 ID"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "Successful Response"
+            "description": "请求成功"
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -2762,7 +2763,7 @@
         "tags": [
           "authorizations"
         ],
-        "summary": "List Authorizations",
+        "summary": "获取作者授权列表",
         "operationId": "list_authorizations_api_v1_author_authorizations_get",
         "parameters": [
           {
@@ -2773,7 +2774,7 @@
               "type": "integer",
               "minimum": 1,
               "default": 1,
-              "title": "Page"
+              "title": "页码"
             }
           },
           {
@@ -2785,7 +2786,7 @@
               "maximum": 100,
               "minimum": 1,
               "default": 20,
-              "title": "Page Size"
+              "title": "每页数量"
             }
           },
           {
@@ -2802,7 +2803,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Author Id"
+              "title": "作者 ID"
             }
           },
           {
@@ -2819,7 +2820,7 @@
                   "type": "null"
                 }
               ],
-              "title": "User Id"
+              "title": "用户 ID"
             }
           },
           {
@@ -2846,7 +2847,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Permission"
+              "title": "权限"
             }
           },
           {
@@ -2869,7 +2870,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Validity Status"
+              "title": "有效期状态"
             }
           },
           {
@@ -2879,7 +2880,7 @@
             "schema": {
               "type": "string",
               "default": "created_at",
-              "title": "Sort"
+              "title": "排序字段"
             }
           },
           {
@@ -2893,13 +2894,13 @@
               ],
               "type": "string",
               "default": "desc",
-              "title": "Order"
+              "title": "排序方向"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "请求成功",
             "content": {
               "application/json": {
                 "schema": {
@@ -2909,7 +2910,7 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -2924,7 +2925,7 @@
         "tags": [
           "authorizations"
         ],
-        "summary": "Create Authorization",
+        "summary": "创建作者授权",
         "operationId": "create_authorization_api_v1_author_authorizations_post",
         "parameters": [
           {
@@ -2940,7 +2941,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Origin"
+              "title": "请求来源"
             }
           },
           {
@@ -2956,7 +2957,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Csrf-Token"
+              "title": "CSRF 防护令牌"
             }
           }
         ],
@@ -2972,7 +2973,7 @@
         },
         "responses": {
           "201": {
-            "description": "Successful Response",
+            "description": "创建成功",
             "content": {
               "application/json": {
                 "schema": {
@@ -2982,7 +2983,7 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -2999,7 +3000,7 @@
         "tags": [
           "authorizations"
         ],
-        "summary": "Get Authorization",
+        "summary": "获取作者授权详情",
         "operationId": "get_authorization_api_v1_author_authorizations__authorization_id__get",
         "parameters": [
           {
@@ -3009,13 +3010,13 @@
             "schema": {
               "type": "string",
               "format": "uuid",
-              "title": "Authorization Id"
+              "title": "授权 ID"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "请求成功",
             "content": {
               "application/json": {
                 "schema": {
@@ -3025,7 +3026,7 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -3040,7 +3041,7 @@
         "tags": [
           "authorizations"
         ],
-        "summary": "Update Authorization",
+        "summary": "更新作者授权",
         "operationId": "update_authorization_api_v1_author_authorizations__authorization_id__patch",
         "parameters": [
           {
@@ -3050,7 +3051,7 @@
             "schema": {
               "type": "string",
               "format": "uuid",
-              "title": "Authorization Id"
+              "title": "授权 ID"
             }
           },
           {
@@ -3066,7 +3067,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Origin"
+              "title": "请求来源"
             }
           },
           {
@@ -3082,7 +3083,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Csrf-Token"
+              "title": "CSRF 防护令牌"
             }
           }
         ],
@@ -3098,7 +3099,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "请求成功",
             "content": {
               "application/json": {
                 "schema": {
@@ -3108,7 +3109,7 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -3125,7 +3126,7 @@
         "tags": [
           "authorizations"
         ],
-        "summary": "Revoke Authorization",
+        "summary": "撤销作者授权",
         "operationId": "revoke_authorization_api_v1_author_authorizations__authorization_id__revoke_post",
         "parameters": [
           {
@@ -3135,7 +3136,7 @@
             "schema": {
               "type": "string",
               "format": "uuid",
-              "title": "Authorization Id"
+              "title": "授权 ID"
             }
           },
           {
@@ -3151,7 +3152,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Origin"
+              "title": "请求来源"
             }
           },
           {
@@ -3167,7 +3168,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Csrf-Token"
+              "title": "CSRF 防护令牌"
             }
           }
         ],
@@ -3183,7 +3184,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "请求成功",
             "content": {
               "application/json": {
                 "schema": {
@@ -3193,7 +3194,7 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -3210,7 +3211,7 @@
         "tags": [
           "journals"
         ],
-        "summary": "List Publishers",
+        "summary": "获取出版商列表",
         "operationId": "list_publishers_api_v1_publishers_get",
         "parameters": [
           {
@@ -3221,7 +3222,7 @@
               "type": "integer",
               "minimum": 1,
               "default": 1,
-              "title": "Page"
+              "title": "页码"
             }
           },
           {
@@ -3233,7 +3234,7 @@
               "maximum": 100,
               "minimum": 1,
               "default": 20,
-              "title": "Page Size"
+              "title": "每页数量"
             }
           },
           {
@@ -3249,7 +3250,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Name"
+              "title": "名称"
             }
           },
           {
@@ -3259,7 +3260,7 @@
             "schema": {
               "type": "string",
               "default": "name",
-              "title": "Sort"
+              "title": "排序字段"
             }
           },
           {
@@ -3273,13 +3274,13 @@
               ],
               "type": "string",
               "default": "asc",
-              "title": "Order"
+              "title": "排序方向"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "请求成功",
             "content": {
               "application/json": {
                 "schema": {
@@ -3289,7 +3290,7 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -3304,7 +3305,7 @@
         "tags": [
           "journals"
         ],
-        "summary": "Create Publisher",
+        "summary": "创建出版商",
         "operationId": "create_publisher_api_v1_publishers_post",
         "parameters": [
           {
@@ -3320,7 +3321,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Origin"
+              "title": "请求来源"
             }
           },
           {
@@ -3336,7 +3337,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Csrf-Token"
+              "title": "CSRF 防护令牌"
             }
           }
         ],
@@ -3352,7 +3353,7 @@
         },
         "responses": {
           "201": {
-            "description": "Successful Response",
+            "description": "创建成功",
             "content": {
               "application/json": {
                 "schema": {
@@ -3362,7 +3363,7 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -3379,7 +3380,7 @@
         "tags": [
           "journals"
         ],
-        "summary": "Get Publisher",
+        "summary": "获取出版商详情",
         "operationId": "get_publisher_api_v1_publishers__publisher_id__get",
         "parameters": [
           {
@@ -3389,13 +3390,13 @@
             "schema": {
               "type": "string",
               "format": "uuid",
-              "title": "Publisher Id"
+              "title": "出版商 ID"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "请求成功",
             "content": {
               "application/json": {
                 "schema": {
@@ -3405,7 +3406,7 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -3420,7 +3421,7 @@
         "tags": [
           "journals"
         ],
-        "summary": "Update Publisher",
+        "summary": "更新出版商",
         "operationId": "update_publisher_api_v1_publishers__publisher_id__patch",
         "parameters": [
           {
@@ -3430,7 +3431,7 @@
             "schema": {
               "type": "string",
               "format": "uuid",
-              "title": "Publisher Id"
+              "title": "出版商 ID"
             }
           },
           {
@@ -3446,7 +3447,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Origin"
+              "title": "请求来源"
             }
           },
           {
@@ -3462,7 +3463,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Csrf-Token"
+              "title": "CSRF 防护令牌"
             }
           }
         ],
@@ -3478,7 +3479,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "请求成功",
             "content": {
               "application/json": {
                 "schema": {
@@ -3488,7 +3489,7 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -3503,7 +3504,7 @@
         "tags": [
           "journals"
         ],
-        "summary": "Delete Publisher",
+        "summary": "删除出版商",
         "operationId": "delete_publisher_api_v1_publishers__publisher_id__delete",
         "parameters": [
           {
@@ -3513,7 +3514,7 @@
             "schema": {
               "type": "string",
               "format": "uuid",
-              "title": "Publisher Id"
+              "title": "出版商 ID"
             }
           },
           {
@@ -3529,7 +3530,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Origin"
+              "title": "请求来源"
             }
           },
           {
@@ -3545,16 +3546,16 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Csrf-Token"
+              "title": "CSRF 防护令牌"
             }
           }
         ],
         "responses": {
           "204": {
-            "description": "Successful Response"
+            "description": "操作成功，无返回内容"
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -3571,7 +3572,7 @@
         "tags": [
           "journals"
         ],
-        "summary": "List Platforms",
+        "summary": "获取期刊平台列表",
         "operationId": "list_platforms_api_v1_journal_platforms_get",
         "parameters": [
           {
@@ -3582,7 +3583,7 @@
               "type": "integer",
               "minimum": 1,
               "default": 1,
-              "title": "Page"
+              "title": "页码"
             }
           },
           {
@@ -3594,7 +3595,7 @@
               "maximum": 100,
               "minimum": 1,
               "default": 20,
-              "title": "Page Size"
+              "title": "每页数量"
             }
           },
           {
@@ -3610,7 +3611,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Code"
+              "title": "代码"
             }
           },
           {
@@ -3626,7 +3627,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Name"
+              "title": "名称"
             }
           },
           {
@@ -3647,7 +3648,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Status"
+              "title": "状态"
             }
           },
           {
@@ -3657,7 +3658,7 @@
             "schema": {
               "type": "string",
               "default": "code",
-              "title": "Sort"
+              "title": "排序字段"
             }
           },
           {
@@ -3671,13 +3672,13 @@
               ],
               "type": "string",
               "default": "asc",
-              "title": "Order"
+              "title": "排序方向"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "请求成功",
             "content": {
               "application/json": {
                 "schema": {
@@ -3687,7 +3688,7 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -3702,7 +3703,7 @@
         "tags": [
           "journals"
         ],
-        "summary": "Create Platform",
+        "summary": "创建期刊平台",
         "operationId": "create_platform_api_v1_journal_platforms_post",
         "parameters": [
           {
@@ -3718,7 +3719,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Origin"
+              "title": "请求来源"
             }
           },
           {
@@ -3734,7 +3735,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Csrf-Token"
+              "title": "CSRF 防护令牌"
             }
           }
         ],
@@ -3750,7 +3751,7 @@
         },
         "responses": {
           "201": {
-            "description": "Successful Response",
+            "description": "创建成功",
             "content": {
               "application/json": {
                 "schema": {
@@ -3760,7 +3761,7 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -3777,7 +3778,7 @@
         "tags": [
           "journals"
         ],
-        "summary": "Get Platform",
+        "summary": "获取期刊平台详情",
         "operationId": "get_platform_api_v1_journal_platforms__platform_id__get",
         "parameters": [
           {
@@ -3787,13 +3788,13 @@
             "schema": {
               "type": "string",
               "format": "uuid",
-              "title": "Platform Id"
+              "title": "平台 ID"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "请求成功",
             "content": {
               "application/json": {
                 "schema": {
@@ -3803,7 +3804,7 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -3818,7 +3819,7 @@
         "tags": [
           "journals"
         ],
-        "summary": "Update Platform",
+        "summary": "更新期刊平台",
         "operationId": "update_platform_api_v1_journal_platforms__platform_id__patch",
         "parameters": [
           {
@@ -3828,7 +3829,7 @@
             "schema": {
               "type": "string",
               "format": "uuid",
-              "title": "Platform Id"
+              "title": "平台 ID"
             }
           },
           {
@@ -3844,7 +3845,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Origin"
+              "title": "请求来源"
             }
           },
           {
@@ -3860,7 +3861,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Csrf-Token"
+              "title": "CSRF 防护令牌"
             }
           }
         ],
@@ -3876,7 +3877,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "请求成功",
             "content": {
               "application/json": {
                 "schema": {
@@ -3886,7 +3887,7 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -3901,7 +3902,7 @@
         "tags": [
           "journals"
         ],
-        "summary": "Delete Platform",
+        "summary": "删除期刊平台",
         "operationId": "delete_platform_api_v1_journal_platforms__platform_id__delete",
         "parameters": [
           {
@@ -3911,7 +3912,7 @@
             "schema": {
               "type": "string",
               "format": "uuid",
-              "title": "Platform Id"
+              "title": "平台 ID"
             }
           },
           {
@@ -3927,7 +3928,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Origin"
+              "title": "请求来源"
             }
           },
           {
@@ -3943,16 +3944,16 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Csrf-Token"
+              "title": "CSRF 防护令牌"
             }
           }
         ],
         "responses": {
           "204": {
-            "description": "Successful Response"
+            "description": "操作成功，无返回内容"
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -3969,7 +3970,7 @@
         "tags": [
           "journals"
         ],
-        "summary": "List Journals",
+        "summary": "获取期刊列表",
         "operationId": "list_journals_api_v1_journals_get",
         "parameters": [
           {
@@ -3980,7 +3981,7 @@
               "type": "integer",
               "minimum": 1,
               "default": 1,
-              "title": "Page"
+              "title": "页码"
             }
           },
           {
@@ -3992,7 +3993,7 @@
               "maximum": 100,
               "minimum": 1,
               "default": 20,
-              "title": "Page Size"
+              "title": "每页数量"
             }
           },
           {
@@ -4008,7 +4009,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Name"
+              "title": "名称"
             }
           },
           {
@@ -4025,7 +4026,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Publisher Id"
+              "title": "出版商 ID"
             }
           },
           {
@@ -4042,7 +4043,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Platform Id"
+              "title": "平台 ID"
             }
           },
           {
@@ -4058,7 +4059,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Issn"
+              "title": "ISSN（国际标准连续出版物号）"
             }
           },
           {
@@ -4074,7 +4075,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Status"
+              "title": "状态"
             }
           },
           {
@@ -4084,7 +4085,7 @@
             "schema": {
               "type": "string",
               "default": "name",
-              "title": "Sort"
+              "title": "排序字段"
             }
           },
           {
@@ -4098,13 +4099,13 @@
               ],
               "type": "string",
               "default": "asc",
-              "title": "Order"
+              "title": "排序方向"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "请求成功",
             "content": {
               "application/json": {
                 "schema": {
@@ -4114,7 +4115,7 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -4129,7 +4130,7 @@
         "tags": [
           "journals"
         ],
-        "summary": "Create Journal",
+        "summary": "创建期刊",
         "operationId": "create_journal_api_v1_journals_post",
         "parameters": [
           {
@@ -4145,7 +4146,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Origin"
+              "title": "请求来源"
             }
           },
           {
@@ -4161,7 +4162,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Csrf-Token"
+              "title": "CSRF 防护令牌"
             }
           }
         ],
@@ -4177,7 +4178,7 @@
         },
         "responses": {
           "201": {
-            "description": "Successful Response",
+            "description": "创建成功",
             "content": {
               "application/json": {
                 "schema": {
@@ -4187,7 +4188,7 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -4204,7 +4205,7 @@
         "tags": [
           "journals"
         ],
-        "summary": "Get Journal",
+        "summary": "获取期刊详情",
         "operationId": "get_journal_api_v1_journals__journal_id__get",
         "parameters": [
           {
@@ -4214,13 +4215,13 @@
             "schema": {
               "type": "string",
               "format": "uuid",
-              "title": "Journal Id"
+              "title": "期刊 ID"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "请求成功",
             "content": {
               "application/json": {
                 "schema": {
@@ -4230,7 +4231,7 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -4245,7 +4246,7 @@
         "tags": [
           "journals"
         ],
-        "summary": "Update Journal",
+        "summary": "更新期刊",
         "operationId": "update_journal_api_v1_journals__journal_id__patch",
         "parameters": [
           {
@@ -4255,7 +4256,7 @@
             "schema": {
               "type": "string",
               "format": "uuid",
-              "title": "Journal Id"
+              "title": "期刊 ID"
             }
           },
           {
@@ -4271,7 +4272,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Origin"
+              "title": "请求来源"
             }
           },
           {
@@ -4287,7 +4288,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Csrf-Token"
+              "title": "CSRF 防护令牌"
             }
           }
         ],
@@ -4303,7 +4304,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "请求成功",
             "content": {
               "application/json": {
                 "schema": {
@@ -4313,7 +4314,7 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -4328,7 +4329,7 @@
         "tags": [
           "journals"
         ],
-        "summary": "Delete Journal",
+        "summary": "删除期刊",
         "operationId": "delete_journal_api_v1_journals__journal_id__delete",
         "parameters": [
           {
@@ -4338,7 +4339,7 @@
             "schema": {
               "type": "string",
               "format": "uuid",
-              "title": "Journal Id"
+              "title": "期刊 ID"
             }
           },
           {
@@ -4354,7 +4355,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Origin"
+              "title": "请求来源"
             }
           },
           {
@@ -4370,16 +4371,16 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Csrf-Token"
+              "title": "CSRF 防护令牌"
             }
           }
         ],
         "responses": {
           "204": {
-            "description": "Successful Response"
+            "description": "操作成功，无返回内容"
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -4396,11 +4397,11 @@
         "tags": [
           "dashboard"
         ],
-        "summary": "Dashboard Summary",
+        "summary": "获取仪表盘摘要",
         "operationId": "dashboard_summary_api_v1_dashboard_summary_get",
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "请求成功",
             "content": {
               "application/json": {
                 "schema": {
@@ -4417,7 +4418,7 @@
         "tags": [
           "audit"
         ],
-        "summary": "List Audit Logs",
+        "summary": "获取审计日志列表",
         "operationId": "list_audit_logs_api_v1_audit_logs_get",
         "parameters": [
           {
@@ -4428,7 +4429,7 @@
               "type": "integer",
               "minimum": 1,
               "default": 1,
-              "title": "Page"
+              "title": "页码"
             }
           },
           {
@@ -4440,7 +4441,7 @@
               "maximum": 100,
               "minimum": 1,
               "default": 20,
-              "title": "Page Size"
+              "title": "每页数量"
             }
           },
           {
@@ -4457,7 +4458,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Actor User Id"
+              "title": "操作用户 ID"
             }
           },
           {
@@ -4474,7 +4475,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Author Id"
+              "title": "作者 ID"
             }
           },
           {
@@ -4496,7 +4497,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Category"
+              "title": "类别"
             }
           },
           {
@@ -4512,7 +4513,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Action"
+              "title": "操作"
             }
           },
           {
@@ -4528,7 +4529,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Target Type"
+              "title": "目标类型"
             }
           },
           {
@@ -4545,7 +4546,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Target Id"
+              "title": "目标 ID"
             }
           },
           {
@@ -4565,7 +4566,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Result"
+              "title": "结果"
             }
           },
           {
@@ -4582,7 +4583,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Request Id"
+              "title": "请求 ID"
             }
           },
           {
@@ -4599,7 +4600,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Created From"
+              "title": "创建时间起始"
             }
           },
           {
@@ -4616,7 +4617,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Created To"
+              "title": "创建时间截止"
             }
           },
           {
@@ -4626,7 +4627,7 @@
             "schema": {
               "type": "string",
               "default": "created_at",
-              "title": "Sort"
+              "title": "排序字段"
             }
           },
           {
@@ -4640,13 +4641,13 @@
               ],
               "type": "string",
               "default": "desc",
-              "title": "Order"
+              "title": "排序方向"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "请求成功",
             "content": {
               "application/json": {
                 "schema": {
@@ -4656,7 +4657,7 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -4673,7 +4674,7 @@
         "tags": [
           "audit"
         ],
-        "summary": "Get Audit Log",
+        "summary": "获取审计日志详情",
         "operationId": "get_audit_log_api_v1_audit_logs__log_id__get",
         "parameters": [
           {
@@ -4683,13 +4684,13 @@
             "schema": {
               "type": "string",
               "format": "uuid",
-              "title": "Log Id"
+              "title": "日志 ID"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "请求成功",
             "content": {
               "application/json": {
                 "schema": {
@@ -4699,7 +4700,7 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -4713,11 +4714,11 @@
     },
     "/api/v1/health": {
       "get": {
-        "summary": "Health",
+        "summary": "服务健康检查",
         "operationId": "health_api_v1_health_get",
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "请求成功",
             "content": {
               "application/json": {
                 "schema": {}
@@ -4742,7 +4743,7 @@
                 "type": "null"
               }
             ],
-            "title": "Language"
+            "title": "语言"
           },
           "given_name": {
             "anyOf": [
@@ -4754,7 +4755,7 @@
                 "type": "null"
               }
             ],
-            "title": "Given Name"
+            "title": "名"
           },
           "middle_name": {
             "anyOf": [
@@ -4766,7 +4767,7 @@
                 "type": "null"
               }
             ],
-            "title": "Middle Name"
+            "title": "中间名"
           },
           "family_name": {
             "anyOf": [
@@ -4778,7 +4779,7 @@
                 "type": "null"
               }
             ],
-            "title": "Family Name"
+            "title": "姓"
           },
           "display_name": {
             "anyOf": [
@@ -4790,19 +4791,19 @@
                 "type": "null"
               }
             ],
-            "title": "Display Name"
+            "title": "显示名称"
           }
         },
         "additionalProperties": false,
         "type": "object",
-        "title": "AlternateName"
+        "title": "作者别名"
       },
       "AuditLogResponse": {
         "properties": {
           "id": {
             "type": "string",
             "format": "uuid",
-            "title": "Id"
+            "title": "资源 ID"
           },
           "actor_user_id": {
             "anyOf": [
@@ -4814,7 +4815,7 @@
                 "type": "null"
               }
             ],
-            "title": "Actor User Id"
+            "title": "操作用户 ID"
           },
           "actor_type": {
             "type": "string",
@@ -4823,7 +4824,7 @@
               "system",
               "anonymous"
             ],
-            "title": "Actor Type"
+            "title": "操作者类型"
           },
           "category": {
             "type": "string",
@@ -4833,12 +4834,12 @@
               "business",
               "sensitive_access"
             ],
-            "title": "Category"
+            "title": "类别"
           },
           "action": {
             "type": "string",
             "maxLength": 100,
-            "title": "Action"
+            "title": "操作"
           },
           "target_type": {
             "anyOf": [
@@ -4850,7 +4851,7 @@
                 "type": "null"
               }
             ],
-            "title": "Target Type"
+            "title": "目标类型"
           },
           "target_id": {
             "anyOf": [
@@ -4862,7 +4863,7 @@
                 "type": "null"
               }
             ],
-            "title": "Target Id"
+            "title": "目标 ID"
           },
           "author_id": {
             "anyOf": [
@@ -4874,12 +4875,12 @@
                 "type": "null"
               }
             ],
-            "title": "Author Id"
+            "title": "作者 ID"
           },
           "request_id": {
             "type": "string",
             "format": "uuid",
-            "title": "Request Id"
+            "title": "请求 ID"
           },
           "result": {
             "type": "string",
@@ -4887,7 +4888,7 @@
               "success",
               "failure"
             ],
-            "title": "Result"
+            "title": "结果"
           },
           "before_summary": {
             "anyOf": [
@@ -4899,7 +4900,7 @@
                 "type": "null"
               }
             ],
-            "title": "Before Summary"
+            "title": "变更前摘要"
           },
           "after_summary": {
             "anyOf": [
@@ -4911,7 +4912,7 @@
                 "type": "null"
               }
             ],
-            "title": "After Summary"
+            "title": "变更后摘要"
           },
           "error_code": {
             "anyOf": [
@@ -4923,7 +4924,7 @@
                 "type": "null"
               }
             ],
-            "title": "Error Code"
+            "title": "错误代码"
           },
           "error_message": {
             "anyOf": [
@@ -4935,12 +4936,12 @@
                 "type": "null"
               }
             ],
-            "title": "Error Message"
+            "title": "错误信息"
           },
           "created_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Created At"
+            "title": "创建时间"
           }
         },
         "additionalProperties": false,
@@ -4959,7 +4960,7 @@
           "after_summary",
           "created_at"
         ],
-        "title": "AuditLogResponse"
+        "title": "审计日志响应"
       },
       "AuthorCreate": {
         "properties": {
@@ -4973,7 +4974,7 @@
                 "type": "null"
               }
             ],
-            "title": "Given Name"
+            "title": "名"
           },
           "middle_name": {
             "anyOf": [
@@ -4985,7 +4986,7 @@
                 "type": "null"
               }
             ],
-            "title": "Middle Name"
+            "title": "中间名"
           },
           "family_name": {
             "anyOf": [
@@ -4997,13 +4998,13 @@
                 "type": "null"
               }
             ],
-            "title": "Family Name"
+            "title": "姓"
           },
           "display_name": {
             "type": "string",
             "maxLength": 255,
             "minLength": 1,
-            "title": "Display Name"
+            "title": "显示名称"
           },
           "alternate_names": {
             "items": {
@@ -5011,7 +5012,7 @@
             },
             "type": "array",
             "maxItems": 20,
-            "title": "Alternate Names"
+            "title": "别名列表"
           },
           "orcid": {
             "anyOf": [
@@ -5022,7 +5023,7 @@
                 "type": "null"
               }
             ],
-            "title": "Orcid"
+            "title": "ORCID（开放研究者与贡献者标识）"
           },
           "phone_country_code": {
             "anyOf": [
@@ -5034,7 +5035,7 @@
                 "type": "null"
               }
             ],
-            "title": "Phone Country Code"
+            "title": "电话国家代码"
           },
           "phone_number": {
             "anyOf": [
@@ -5046,7 +5047,7 @@
                 "type": "null"
               }
             ],
-            "title": "Phone Number"
+            "title": "电话号码"
           },
           "status": {
             "type": "string",
@@ -5054,7 +5055,7 @@
               "active",
               "inactive"
             ],
-            "title": "Status",
+            "title": "状态",
             "default": "active"
           },
           "notes": {
@@ -5066,12 +5067,12 @@
                 "type": "null"
               }
             ],
-            "title": "Notes"
+            "title": "备注"
           },
           "confirm_identity_change": {
             "type": "boolean",
             "const": true,
-            "title": "Confirm Identity Change"
+            "title": "确认身份变更"
           }
         },
         "additionalProperties": false,
@@ -5080,14 +5081,14 @@
           "display_name",
           "confirm_identity_change"
         ],
-        "title": "AuthorCreate"
+        "title": "作者创建请求"
       },
       "AuthorInstitutionLinkCreate": {
         "properties": {
           "institution_id": {
             "type": "string",
             "format": "uuid",
-            "title": "Institution Id"
+            "title": "机构 ID"
           },
           "department": {
             "anyOf": [
@@ -5099,7 +5100,7 @@
                 "type": "null"
               }
             ],
-            "title": "Department"
+            "title": "部门"
           },
           "position_title": {
             "anyOf": [
@@ -5111,7 +5112,7 @@
                 "type": "null"
               }
             ],
-            "title": "Position Title"
+            "title": "职位名称"
           },
           "valid_from": {
             "anyOf": [
@@ -5123,7 +5124,7 @@
                 "type": "null"
               }
             ],
-            "title": "Valid From"
+            "title": "生效时间"
           },
           "valid_to": {
             "anyOf": [
@@ -5135,17 +5136,17 @@
                 "type": "null"
               }
             ],
-            "title": "Valid To"
+            "title": "失效时间"
           },
           "is_current": {
             "type": "boolean",
-            "title": "Is Current",
+            "title": "是否当前机构",
             "default": false
           },
           "display_order": {
             "type": "integer",
             "minimum": 0.0,
-            "title": "Display Order",
+            "title": "显示顺序",
             "default": 0
           }
         },
@@ -5154,29 +5155,29 @@
         "required": [
           "institution_id"
         ],
-        "title": "AuthorInstitutionLinkCreate"
+        "title": "作者机构关联创建请求"
       },
       "AuthorInstitutionLinkResponse": {
         "properties": {
           "id": {
             "type": "string",
             "format": "uuid",
-            "title": "Id"
+            "title": "资源 ID"
           },
           "author_id": {
             "type": "string",
             "format": "uuid",
-            "title": "Author Id"
+            "title": "作者 ID"
           },
           "institution_id": {
             "type": "string",
             "format": "uuid",
-            "title": "Institution Id"
+            "title": "机构 ID"
           },
           "institution_name": {
             "type": "string",
             "maxLength": 255,
-            "title": "Institution Name"
+            "title": "机构名称"
           },
           "department": {
             "anyOf": [
@@ -5188,7 +5189,7 @@
                 "type": "null"
               }
             ],
-            "title": "Department"
+            "title": "部门"
           },
           "position_title": {
             "anyOf": [
@@ -5200,7 +5201,7 @@
                 "type": "null"
               }
             ],
-            "title": "Position Title"
+            "title": "职位名称"
           },
           "valid_from": {
             "anyOf": [
@@ -5212,7 +5213,7 @@
                 "type": "null"
               }
             ],
-            "title": "Valid From"
+            "title": "生效时间"
           },
           "valid_to": {
             "anyOf": [
@@ -5224,16 +5225,16 @@
                 "type": "null"
               }
             ],
-            "title": "Valid To"
+            "title": "失效时间"
           },
           "is_current": {
             "type": "boolean",
-            "title": "Is Current"
+            "title": "是否当前机构"
           },
           "display_order": {
             "type": "integer",
             "minimum": 0.0,
-            "title": "Display Order"
+            "title": "显示顺序"
           },
           "address_line1": {
             "anyOf": [
@@ -5245,7 +5246,7 @@
                 "type": "null"
               }
             ],
-            "title": "Address Line1"
+            "title": "地址行 1"
           },
           "address_line2": {
             "anyOf": [
@@ -5257,7 +5258,7 @@
                 "type": "null"
               }
             ],
-            "title": "Address Line2"
+            "title": "地址行 2"
           },
           "city": {
             "anyOf": [
@@ -5269,7 +5270,7 @@
                 "type": "null"
               }
             ],
-            "title": "City"
+            "title": "城市"
           },
           "region": {
             "anyOf": [
@@ -5281,7 +5282,7 @@
                 "type": "null"
               }
             ],
-            "title": "Region"
+            "title": "省、州或地区"
           },
           "postal_code": {
             "anyOf": [
@@ -5293,7 +5294,7 @@
                 "type": "null"
               }
             ],
-            "title": "Postal Code"
+            "title": "邮政编码"
           },
           "country_code": {
             "anyOf": [
@@ -5305,17 +5306,17 @@
                 "type": "null"
               }
             ],
-            "title": "Country Code"
+            "title": "国家或地区代码"
           },
           "created_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Created At"
+            "title": "创建时间"
           },
           "updated_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Updated At"
+            "title": "更新时间"
           }
         },
         "additionalProperties": false,
@@ -5330,7 +5331,7 @@
           "created_at",
           "updated_at"
         ],
-        "title": "AuthorInstitutionLinkResponse"
+        "title": "作者机构关联响应"
       },
       "AuthorInstitutionLinkUpdate": {
         "properties": {
@@ -5344,7 +5345,7 @@
                 "type": "null"
               }
             ],
-            "title": "Institution Id"
+            "title": "机构 ID"
           },
           "department": {
             "anyOf": [
@@ -5356,7 +5357,7 @@
                 "type": "null"
               }
             ],
-            "title": "Department"
+            "title": "部门"
           },
           "position_title": {
             "anyOf": [
@@ -5368,7 +5369,7 @@
                 "type": "null"
               }
             ],
-            "title": "Position Title"
+            "title": "职位名称"
           },
           "valid_from": {
             "anyOf": [
@@ -5380,7 +5381,7 @@
                 "type": "null"
               }
             ],
-            "title": "Valid From"
+            "title": "生效时间"
           },
           "valid_to": {
             "anyOf": [
@@ -5392,7 +5393,7 @@
                 "type": "null"
               }
             ],
-            "title": "Valid To"
+            "title": "失效时间"
           },
           "is_current": {
             "anyOf": [
@@ -5403,7 +5404,7 @@
                 "type": "null"
               }
             ],
-            "title": "Is Current"
+            "title": "是否当前机构"
           },
           "display_order": {
             "anyOf": [
@@ -5415,19 +5416,19 @@
                 "type": "null"
               }
             ],
-            "title": "Display Order"
+            "title": "显示顺序"
           }
         },
         "additionalProperties": false,
         "type": "object",
-        "title": "AuthorInstitutionLinkUpdate"
+        "title": "作者机构关联更新请求"
       },
       "AuthorResponse": {
         "properties": {
           "id": {
             "type": "string",
             "format": "uuid",
-            "title": "Id"
+            "title": "资源 ID"
           },
           "given_name": {
             "anyOf": [
@@ -5439,7 +5440,7 @@
                 "type": "null"
               }
             ],
-            "title": "Given Name"
+            "title": "名"
           },
           "middle_name": {
             "anyOf": [
@@ -5451,7 +5452,7 @@
                 "type": "null"
               }
             ],
-            "title": "Middle Name"
+            "title": "中间名"
           },
           "family_name": {
             "anyOf": [
@@ -5463,12 +5464,12 @@
                 "type": "null"
               }
             ],
-            "title": "Family Name"
+            "title": "姓"
           },
           "display_name": {
             "type": "string",
             "maxLength": 255,
-            "title": "Display Name"
+            "title": "显示名称"
           },
           "alternate_names": {
             "items": {
@@ -5476,7 +5477,7 @@
             },
             "type": "array",
             "maxItems": 20,
-            "title": "Alternate Names"
+            "title": "别名列表"
           },
           "orcid": {
             "anyOf": [
@@ -5487,7 +5488,7 @@
                 "type": "null"
               }
             ],
-            "title": "Orcid"
+            "title": "ORCID（开放研究者与贡献者标识）"
           },
           "phone_country_code": {
             "anyOf": [
@@ -5499,7 +5500,7 @@
                 "type": "null"
               }
             ],
-            "title": "Phone Country Code"
+            "title": "电话国家代码"
           },
           "phone_number": {
             "anyOf": [
@@ -5511,7 +5512,7 @@
                 "type": "null"
               }
             ],
-            "title": "Phone Number"
+            "title": "电话号码"
           },
           "status": {
             "type": "string",
@@ -5519,7 +5520,7 @@
               "active",
               "inactive"
             ],
-            "title": "Status"
+            "title": "状态"
           },
           "notes": {
             "anyOf": [
@@ -5530,17 +5531,17 @@
                 "type": "null"
               }
             ],
-            "title": "Notes"
+            "title": "备注"
           },
           "created_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Created At"
+            "title": "创建时间"
           },
           "updated_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Updated At"
+            "title": "更新时间"
           }
         },
         "additionalProperties": false,
@@ -5552,7 +5553,7 @@
           "created_at",
           "updated_at"
         ],
-        "title": "AuthorResponse"
+        "title": "作者响应"
       },
       "AuthorUpdate": {
         "properties": {
@@ -5566,7 +5567,7 @@
                 "type": "null"
               }
             ],
-            "title": "Given Name"
+            "title": "名"
           },
           "middle_name": {
             "anyOf": [
@@ -5578,7 +5579,7 @@
                 "type": "null"
               }
             ],
-            "title": "Middle Name"
+            "title": "中间名"
           },
           "family_name": {
             "anyOf": [
@@ -5590,7 +5591,7 @@
                 "type": "null"
               }
             ],
-            "title": "Family Name"
+            "title": "姓"
           },
           "display_name": {
             "anyOf": [
@@ -5603,7 +5604,7 @@
                 "type": "null"
               }
             ],
-            "title": "Display Name"
+            "title": "显示名称"
           },
           "alternate_names": {
             "anyOf": [
@@ -5618,7 +5619,7 @@
                 "type": "null"
               }
             ],
-            "title": "Alternate Names"
+            "title": "别名列表"
           },
           "orcid": {
             "anyOf": [
@@ -5629,7 +5630,7 @@
                 "type": "null"
               }
             ],
-            "title": "Orcid"
+            "title": "ORCID（开放研究者与贡献者标识）"
           },
           "phone_country_code": {
             "anyOf": [
@@ -5641,7 +5642,7 @@
                 "type": "null"
               }
             ],
-            "title": "Phone Country Code"
+            "title": "电话国家代码"
           },
           "phone_number": {
             "anyOf": [
@@ -5653,7 +5654,7 @@
                 "type": "null"
               }
             ],
-            "title": "Phone Number"
+            "title": "电话号码"
           },
           "status": {
             "anyOf": [
@@ -5668,7 +5669,7 @@
                 "type": "null"
               }
             ],
-            "title": "Status"
+            "title": "状态"
           },
           "notes": {
             "anyOf": [
@@ -5679,12 +5680,12 @@
                 "type": "null"
               }
             ],
-            "title": "Notes"
+            "title": "备注"
           },
           "confirm_identity_change": {
             "type": "boolean",
             "const": true,
-            "title": "Confirm Identity Change"
+            "title": "确认身份变更"
           }
         },
         "additionalProperties": false,
@@ -5692,19 +5693,19 @@
         "required": [
           "confirm_identity_change"
         ],
-        "title": "AuthorUpdate"
+        "title": "作者更新请求"
       },
       "AuthorizationCreate": {
         "properties": {
           "author_id": {
             "type": "string",
             "format": "uuid",
-            "title": "Author Id"
+            "title": "作者 ID"
           },
           "user_id": {
             "type": "string",
             "format": "uuid",
-            "title": "User Id"
+            "title": "用户 ID"
           },
           "permissions": {
             "items": {
@@ -5724,17 +5725,17 @@
             "type": "array",
             "maxItems": 9,
             "minItems": 1,
-            "title": "Permissions"
+            "title": "权限列表"
           },
           "valid_from": {
             "type": "string",
             "format": "date-time",
-            "title": "Valid From"
+            "title": "生效时间"
           },
           "valid_to": {
             "type": "string",
             "format": "date-time",
-            "title": "Valid To"
+            "title": "失效时间"
           },
           "evidence_ref": {
             "anyOf": [
@@ -5746,7 +5747,7 @@
                 "type": "null"
               }
             ],
-            "title": "Evidence Ref"
+            "title": "证据引用"
           },
           "notes": {
             "anyOf": [
@@ -5757,7 +5758,7 @@
                 "type": "null"
               }
             ],
-            "title": "Notes"
+            "title": "备注"
           }
         },
         "additionalProperties": false,
@@ -5769,24 +5770,24 @@
           "valid_from",
           "valid_to"
         ],
-        "title": "AuthorizationCreate"
+        "title": "授权创建请求"
       },
       "AuthorizationResponse": {
         "properties": {
           "id": {
             "type": "string",
             "format": "uuid",
-            "title": "Id"
+            "title": "资源 ID"
           },
           "author_id": {
             "type": "string",
             "format": "uuid",
-            "title": "Author Id"
+            "title": "作者 ID"
           },
           "user_id": {
             "type": "string",
             "format": "uuid",
-            "title": "User Id"
+            "title": "用户 ID"
           },
           "permissions": {
             "items": {
@@ -5806,17 +5807,17 @@
             "type": "array",
             "maxItems": 9,
             "minItems": 1,
-            "title": "Permissions"
+            "title": "权限列表"
           },
           "valid_from": {
             "type": "string",
             "format": "date-time",
-            "title": "Valid From"
+            "title": "生效时间"
           },
           "valid_to": {
             "type": "string",
             "format": "date-time",
-            "title": "Valid To"
+            "title": "失效时间"
           },
           "evidence_ref": {
             "anyOf": [
@@ -5828,7 +5829,7 @@
                 "type": "null"
               }
             ],
-            "title": "Evidence Ref"
+            "title": "证据引用"
           },
           "notes": {
             "anyOf": [
@@ -5839,7 +5840,7 @@
                 "type": "null"
               }
             ],
-            "title": "Notes"
+            "title": "备注"
           },
           "revoked_at": {
             "anyOf": [
@@ -5851,7 +5852,7 @@
                 "type": "null"
               }
             ],
-            "title": "Revoked At"
+            "title": "撤销时间"
           },
           "reviewed_by": {
             "anyOf": [
@@ -5863,7 +5864,7 @@
                 "type": "null"
               }
             ],
-            "title": "Reviewed By"
+            "title": "审核用户 ID"
           },
           "reviewed_at": {
             "anyOf": [
@@ -5875,17 +5876,17 @@
                 "type": "null"
               }
             ],
-            "title": "Reviewed At"
+            "title": "审核时间"
           },
           "created_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Created At"
+            "title": "创建时间"
           },
           "updated_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Updated At"
+            "title": "更新时间"
           },
           "validity_status": {
             "type": "string",
@@ -5896,7 +5897,7 @@
               "revoked",
               "inactive_subject"
             ],
-            "title": "Validity Status"
+            "title": "有效期状态"
           }
         },
         "additionalProperties": false,
@@ -5915,7 +5916,7 @@
           "updated_at",
           "validity_status"
         ],
-        "title": "AuthorizationResponse"
+        "title": "授权响应"
       },
       "AuthorizationRevokeRequest": {
         "properties": {
@@ -5929,12 +5930,12 @@
                 "type": "null"
               }
             ],
-            "title": "Reason"
+            "title": "原因"
           }
         },
         "additionalProperties": false,
         "type": "object",
-        "title": "AuthorizationRevokeRequest"
+        "title": "授权撤销请求"
       },
       "AuthorizationUpdate": {
         "properties": {
@@ -5963,7 +5964,7 @@
                 "type": "null"
               }
             ],
-            "title": "Permissions"
+            "title": "权限列表"
           },
           "valid_from": {
             "anyOf": [
@@ -5975,7 +5976,7 @@
                 "type": "null"
               }
             ],
-            "title": "Valid From"
+            "title": "生效时间"
           },
           "valid_to": {
             "anyOf": [
@@ -5987,7 +5988,7 @@
                 "type": "null"
               }
             ],
-            "title": "Valid To"
+            "title": "失效时间"
           },
           "evidence_ref": {
             "anyOf": [
@@ -5999,7 +6000,7 @@
                 "type": "null"
               }
             ],
-            "title": "Evidence Ref"
+            "title": "证据引用"
           },
           "notes": {
             "anyOf": [
@@ -6010,19 +6011,19 @@
                 "type": "null"
               }
             ],
-            "title": "Notes"
+            "title": "备注"
           }
         },
         "additionalProperties": false,
         "type": "object",
-        "title": "AuthorizationUpdate"
+        "title": "授权更新请求"
       },
       "Body_upload_file_api_v1_manuscripts__manuscript_id__versions__version_id__files_post": {
         "properties": {
           "file": {
             "type": "string",
             "format": "binary",
-            "title": "File"
+            "title": "文件"
           },
           "file_type": {
             "anyOf": [
@@ -6033,7 +6034,7 @@
                 "type": "null"
               }
             ],
-            "title": "File Type"
+            "title": "文件类型"
           },
           "display_name": {
             "anyOf": [
@@ -6044,7 +6045,7 @@
                 "type": "null"
               }
             ],
-            "title": "Display Name"
+            "title": "显示名称"
           },
           "file_family_id": {
             "anyOf": [
@@ -6056,14 +6057,14 @@
                 "type": "null"
               }
             ],
-            "title": "File Family Id"
+            "title": "文件族 ID"
           }
         },
         "type": "object",
         "required": [
           "file"
         ],
-        "title": "Body_upload_file_api_v1_manuscripts__manuscript_id__versions__version_id__files_post"
+        "title": "稿件文件上传请求"
       },
       "ChangePasswordRequest": {
         "properties": {
@@ -6071,13 +6072,13 @@
             "type": "string",
             "maxLength": 128,
             "minLength": 1,
-            "title": "Current Password"
+            "title": "当前密码"
           },
           "new_password": {
             "type": "string",
             "maxLength": 128,
             "minLength": 12,
-            "title": "New Password"
+            "title": "新密码"
           }
         },
         "additionalProperties": false,
@@ -6086,14 +6087,14 @@
           "current_password",
           "new_password"
         ],
-        "title": "ChangePasswordRequest"
+        "title": "修改密码请求"
       },
       "CsrfResponse": {
         "properties": {
           "csrf_token": {
             "type": "string",
             "minLength": 1,
-            "title": "Csrf Token"
+            "title": "CSRF 令牌"
           }
         },
         "additionalProperties": false,
@@ -6101,36 +6102,36 @@
         "required": [
           "csrf_token"
         ],
-        "title": "CsrfResponse"
+        "title": "CSRF 令牌响应"
       },
       "DashboardSummary": {
         "properties": {
           "author_count": {
             "type": "integer",
             "minimum": 0.0,
-            "title": "Author Count"
+            "title": "作者数量"
           },
           "manuscript_count": {
             "type": "integer",
             "minimum": 0.0,
-            "title": "Manuscript Count"
+            "title": "稿件数量"
           },
           "current_version_file_count": {
             "type": "integer",
             "minimum": 0.0,
-            "title": "Current Version File Count"
+            "title": "当前版本文件数量"
           },
           "expiring_authorization_count": {
             "type": "integer",
             "minimum": 0.0,
-            "title": "Expiring Authorization Count"
+            "title": "即将到期授权数量"
           },
           "recent_operations": {
             "items": {
               "$ref": "#/components/schemas/RecentOperation"
             },
             "type": "array",
-            "title": "Recent Operations"
+            "title": "近期操作"
           }
         },
         "additionalProperties": false,
@@ -6142,14 +6143,14 @@
           "expiring_authorization_count",
           "recent_operations"
         ],
-        "title": "DashboardSummary"
+        "title": "仪表盘摘要"
       },
       "EmailBindingConfirmation": {
         "properties": {
           "confirm_email_binding": {
             "type": "boolean",
             "const": true,
-            "title": "Confirm Email Binding"
+            "title": "确认邮箱绑定"
           }
         },
         "additionalProperties": false,
@@ -6157,7 +6158,7 @@
         "required": [
           "confirm_email_binding"
         ],
-        "title": "EmailBindingConfirmation"
+        "title": "邮箱绑定确认"
       },
       "EmailCreate": {
         "properties": {
@@ -6165,7 +6166,7 @@
             "type": "string",
             "maxLength": 254,
             "format": "email",
-            "title": "Email"
+            "title": "邮箱"
           },
           "purpose": {
             "type": "string",
@@ -6174,18 +6175,18 @@
               "registration",
               "backup"
             ],
-            "title": "Purpose",
+            "title": "用途",
             "default": "communication"
           },
           "is_primary": {
             "type": "boolean",
-            "title": "Is Primary",
+            "title": "是否主要邮箱",
             "default": false
           },
           "confirm_email_binding": {
             "type": "boolean",
             "const": true,
-            "title": "Confirm Email Binding"
+            "title": "确认邮箱绑定"
           }
         },
         "additionalProperties": false,
@@ -6194,31 +6195,31 @@
           "email",
           "confirm_email_binding"
         ],
-        "title": "EmailCreate"
+        "title": "邮箱创建请求"
       },
       "EmailResponse": {
         "properties": {
           "id": {
             "type": "string",
             "format": "uuid",
-            "title": "Id"
+            "title": "资源 ID"
           },
           "author_id": {
             "type": "string",
             "format": "uuid",
-            "title": "Author Id"
+            "title": "作者 ID"
           },
           "email": {
             "type": "string",
             "maxLength": 254,
             "format": "email",
-            "title": "Email"
+            "title": "邮箱"
           },
           "normalized_email": {
             "type": "string",
             "maxLength": 254,
             "format": "email",
-            "title": "Normalized Email"
+            "title": "规范化邮箱"
           },
           "purpose": {
             "type": "string",
@@ -6227,11 +6228,11 @@
               "registration",
               "backup"
             ],
-            "title": "Purpose"
+            "title": "用途"
           },
           "is_primary": {
             "type": "boolean",
-            "title": "Is Primary"
+            "title": "是否主要邮箱"
           },
           "verification_status": {
             "type": "string",
@@ -6239,7 +6240,7 @@
               "unverified",
               "verified"
             ],
-            "title": "Verification Status"
+            "title": "验证状态"
           },
           "authorization_status": {
             "type": "string",
@@ -6248,17 +6249,17 @@
               "authorized",
               "revoked"
             ],
-            "title": "Authorization Status"
+            "title": "授权状态"
           },
           "created_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Created At"
+            "title": "创建时间"
           },
           "updated_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Updated At"
+            "title": "更新时间"
           }
         },
         "additionalProperties": false,
@@ -6275,7 +6276,7 @@
           "created_at",
           "updated_at"
         ],
-        "title": "EmailResponse"
+        "title": "邮箱响应"
       },
       "EmailUpdate": {
         "properties": {
@@ -6290,7 +6291,7 @@
                 "type": "null"
               }
             ],
-            "title": "Email"
+            "title": "邮箱"
           },
           "purpose": {
             "anyOf": [
@@ -6306,7 +6307,7 @@
                 "type": "null"
               }
             ],
-            "title": "Purpose"
+            "title": "用途"
           },
           "is_primary": {
             "anyOf": [
@@ -6317,7 +6318,7 @@
                 "type": "null"
               }
             ],
-            "title": "Is Primary"
+            "title": "是否主要邮箱"
           },
           "confirm_email_binding": {
             "anyOf": [
@@ -6329,7 +6330,7 @@
                 "type": "null"
               }
             ],
-            "title": "Confirm Email Binding"
+            "title": "确认邮箱绑定"
           },
           "verification_status": {
             "anyOf": [
@@ -6344,7 +6345,7 @@
                 "type": "null"
               }
             ],
-            "title": "Verification Status"
+            "title": "验证状态"
           },
           "authorization_status": {
             "anyOf": [
@@ -6360,34 +6361,34 @@
                 "type": "null"
               }
             ],
-            "title": "Authorization Status"
+            "title": "授权状态"
           }
         },
         "additionalProperties": false,
         "type": "object",
-        "title": "EmailUpdate"
+        "title": "邮箱更新请求"
       },
       "FileResponse": {
         "properties": {
           "id": {
             "type": "string",
             "format": "uuid",
-            "title": "Id"
+            "title": "资源 ID"
           },
           "file_family_id": {
             "type": "string",
             "format": "uuid",
-            "title": "File Family Id"
+            "title": "文件族 ID"
           },
           "manuscript_id": {
             "type": "string",
             "format": "uuid",
-            "title": "Manuscript Id"
+            "title": "稿件 ID"
           },
           "manuscript_version_id": {
             "type": "string",
             "format": "uuid",
-            "title": "Manuscript Version Id"
+            "title": "稿件版本 ID"
           },
           "file_type": {
             "type": "string",
@@ -6403,47 +6404,47 @@
               "other"
             ],
             "maxLength": 32,
-            "title": "File Type"
+            "title": "文件类型"
           },
           "display_name": {
             "type": "string",
             "maxLength": 255,
-            "title": "Display Name"
+            "title": "显示名称"
           },
           "file_version": {
             "type": "integer",
             "minimum": 1.0,
-            "title": "File Version"
+            "title": "文件版本"
           },
           "original_filename": {
             "type": "string",
             "maxLength": 255,
-            "title": "Original Filename"
+            "title": "原始文件名"
           },
           "mime_type": {
             "type": "string",
             "maxLength": 255,
-            "title": "Mime Type"
+            "title": "MIME 类型"
           },
           "extension": {
             "type": "string",
             "maxLength": 16,
-            "title": "Extension"
+            "title": "文件扩展名"
           },
           "size_bytes": {
             "type": "integer",
             "minimum": 0.0,
-            "title": "Size Bytes"
+            "title": "文件大小（字节）"
           },
           "sha256": {
             "type": "string",
             "pattern": "^[0-9a-f]{64}$",
-            "title": "Sha256"
+            "title": "SHA-256 校验值"
           },
           "scan_status": {
             "type": "string",
             "maxLength": 32,
-            "title": "Scan Status"
+            "title": "扫描状态"
           },
           "integrity_status": {
             "type": "string",
@@ -6452,7 +6453,7 @@
               "missing",
               "hash_mismatch"
             ],
-            "title": "Integrity Status"
+            "title": "完整性状态"
           },
           "status": {
             "type": "string",
@@ -6460,17 +6461,17 @@
               "active",
               "deleted"
             ],
-            "title": "Status"
+            "title": "状态"
           },
           "created_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Created At"
+            "title": "创建时间"
           },
           "uploaded_by": {
             "type": "string",
             "format": "uuid",
-            "title": "Uploaded By"
+            "title": "上传用户 ID"
           }
         },
         "additionalProperties": false,
@@ -6494,7 +6495,7 @@
           "created_at",
           "uploaded_by"
         ],
-        "title": "FileResponse"
+        "title": "文件响应"
       },
       "HTTPValidationError": {
         "properties": {
@@ -6503,17 +6504,17 @@
               "$ref": "#/components/schemas/ValidationError"
             },
             "type": "array",
-            "title": "Detail"
+            "title": "详情"
           }
         },
         "type": "object",
-        "title": "HTTPValidationError"
+        "title": "HTTP 请求校验错误"
       },
       "HealthResponse": {
         "properties": {
           "status": {
             "type": "string",
-            "title": "Status"
+            "title": "状态"
           }
         },
         "additionalProperties": false,
@@ -6521,7 +6522,7 @@
         "required": [
           "status"
         ],
-        "title": "HealthResponse"
+        "title": "健康检查响应"
       },
       "InstitutionCreate": {
         "properties": {
@@ -6529,7 +6530,7 @@
             "type": "string",
             "maxLength": 255,
             "minLength": 1,
-            "title": "Name"
+            "title": "名称"
           },
           "institution_type": {
             "anyOf": [
@@ -6541,7 +6542,7 @@
                 "type": "null"
               }
             ],
-            "title": "Institution Type"
+            "title": "机构类型"
           },
           "website_url": {
             "anyOf": [
@@ -6553,7 +6554,7 @@
                 "type": "null"
               }
             ],
-            "title": "Website Url"
+            "title": "网站 URL"
           },
           "address_line1": {
             "anyOf": [
@@ -6565,7 +6566,7 @@
                 "type": "null"
               }
             ],
-            "title": "Address Line1"
+            "title": "地址行 1"
           },
           "address_line2": {
             "anyOf": [
@@ -6577,7 +6578,7 @@
                 "type": "null"
               }
             ],
-            "title": "Address Line2"
+            "title": "地址行 2"
           },
           "city": {
             "anyOf": [
@@ -6589,7 +6590,7 @@
                 "type": "null"
               }
             ],
-            "title": "City"
+            "title": "城市"
           },
           "region": {
             "anyOf": [
@@ -6601,7 +6602,7 @@
                 "type": "null"
               }
             ],
-            "title": "Region"
+            "title": "省、州或地区"
           },
           "postal_code": {
             "anyOf": [
@@ -6613,7 +6614,7 @@
                 "type": "null"
               }
             ],
-            "title": "Postal Code"
+            "title": "邮政编码"
           },
           "country_code": {
             "anyOf": [
@@ -6625,7 +6626,7 @@
                 "type": "null"
               }
             ],
-            "title": "Country Code"
+            "title": "国家或地区代码"
           }
         },
         "additionalProperties": false,
@@ -6633,19 +6634,19 @@
         "required": [
           "name"
         ],
-        "title": "InstitutionCreate"
+        "title": "机构创建请求"
       },
       "InstitutionResponse": {
         "properties": {
           "id": {
             "type": "string",
             "format": "uuid",
-            "title": "Id"
+            "title": "资源 ID"
           },
           "name": {
             "type": "string",
             "maxLength": 255,
-            "title": "Name"
+            "title": "名称"
           },
           "institution_type": {
             "anyOf": [
@@ -6657,7 +6658,7 @@
                 "type": "null"
               }
             ],
-            "title": "Institution Type"
+            "title": "机构类型"
           },
           "website_url": {
             "anyOf": [
@@ -6669,7 +6670,7 @@
                 "type": "null"
               }
             ],
-            "title": "Website Url"
+            "title": "网站 URL"
           },
           "country_code": {
             "anyOf": [
@@ -6681,7 +6682,7 @@
                 "type": "null"
               }
             ],
-            "title": "Country Code"
+            "title": "国家或地区代码"
           },
           "city": {
             "anyOf": [
@@ -6693,7 +6694,7 @@
                 "type": "null"
               }
             ],
-            "title": "City"
+            "title": "城市"
           },
           "address_line1": {
             "anyOf": [
@@ -6705,7 +6706,7 @@
                 "type": "null"
               }
             ],
-            "title": "Address Line1"
+            "title": "地址行 1"
           },
           "address_line2": {
             "anyOf": [
@@ -6717,7 +6718,7 @@
                 "type": "null"
               }
             ],
-            "title": "Address Line2"
+            "title": "地址行 2"
           },
           "region": {
             "anyOf": [
@@ -6729,7 +6730,7 @@
                 "type": "null"
               }
             ],
-            "title": "Region"
+            "title": "省、州或地区"
           },
           "postal_code": {
             "anyOf": [
@@ -6741,17 +6742,17 @@
                 "type": "null"
               }
             ],
-            "title": "Postal Code"
+            "title": "邮政编码"
           },
           "created_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Created At"
+            "title": "创建时间"
           },
           "updated_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Updated At"
+            "title": "更新时间"
           }
         },
         "additionalProperties": false,
@@ -6762,19 +6763,19 @@
           "created_at",
           "updated_at"
         ],
-        "title": "InstitutionResponse"
+        "title": "机构响应"
       },
       "InstitutionSummaryResponse": {
         "properties": {
           "id": {
             "type": "string",
             "format": "uuid",
-            "title": "Id"
+            "title": "资源 ID"
           },
           "name": {
             "type": "string",
             "maxLength": 255,
-            "title": "Name"
+            "title": "名称"
           },
           "institution_type": {
             "anyOf": [
@@ -6786,7 +6787,7 @@
                 "type": "null"
               }
             ],
-            "title": "Institution Type"
+            "title": "机构类型"
           },
           "website_url": {
             "anyOf": [
@@ -6798,7 +6799,7 @@
                 "type": "null"
               }
             ],
-            "title": "Website Url"
+            "title": "网站 URL"
           },
           "country_code": {
             "anyOf": [
@@ -6810,7 +6811,7 @@
                 "type": "null"
               }
             ],
-            "title": "Country Code"
+            "title": "国家或地区代码"
           },
           "city": {
             "anyOf": [
@@ -6822,7 +6823,7 @@
                 "type": "null"
               }
             ],
-            "title": "City"
+            "title": "城市"
           }
         },
         "additionalProperties": false,
@@ -6831,7 +6832,7 @@
           "id",
           "name"
         ],
-        "title": "InstitutionSummaryResponse"
+        "title": "机构摘要响应"
       },
       "InstitutionUpdate": {
         "properties": {
@@ -6846,7 +6847,7 @@
                 "type": "null"
               }
             ],
-            "title": "Name"
+            "title": "名称"
           },
           "institution_type": {
             "anyOf": [
@@ -6858,7 +6859,7 @@
                 "type": "null"
               }
             ],
-            "title": "Institution Type"
+            "title": "机构类型"
           },
           "website_url": {
             "anyOf": [
@@ -6870,7 +6871,7 @@
                 "type": "null"
               }
             ],
-            "title": "Website Url"
+            "title": "网站 URL"
           },
           "address_line1": {
             "anyOf": [
@@ -6882,7 +6883,7 @@
                 "type": "null"
               }
             ],
-            "title": "Address Line1"
+            "title": "地址行 1"
           },
           "address_line2": {
             "anyOf": [
@@ -6894,7 +6895,7 @@
                 "type": "null"
               }
             ],
-            "title": "Address Line2"
+            "title": "地址行 2"
           },
           "city": {
             "anyOf": [
@@ -6906,7 +6907,7 @@
                 "type": "null"
               }
             ],
-            "title": "City"
+            "title": "城市"
           },
           "region": {
             "anyOf": [
@@ -6918,7 +6919,7 @@
                 "type": "null"
               }
             ],
-            "title": "Region"
+            "title": "省、州或地区"
           },
           "postal_code": {
             "anyOf": [
@@ -6930,7 +6931,7 @@
                 "type": "null"
               }
             ],
-            "title": "Postal Code"
+            "title": "邮政编码"
           },
           "country_code": {
             "anyOf": [
@@ -6942,19 +6943,19 @@
                 "type": "null"
               }
             ],
-            "title": "Country Code"
+            "title": "国家或地区代码"
           }
         },
         "additionalProperties": false,
         "type": "object",
-        "title": "InstitutionUpdate"
+        "title": "机构更新请求"
       },
       "JournalCreate": {
         "properties": {
           "publisher_id": {
             "type": "string",
             "format": "uuid",
-            "title": "Publisher Id"
+            "title": "出版商 ID"
           },
           "platform_id": {
             "anyOf": [
@@ -6966,13 +6967,13 @@
                 "type": "null"
               }
             ],
-            "title": "Platform Id"
+            "title": "平台 ID"
           },
           "name": {
             "type": "string",
             "maxLength": 500,
             "minLength": 1,
-            "title": "Name"
+            "title": "名称"
           },
           "issn": {
             "anyOf": [
@@ -6983,7 +6984,7 @@
                 "type": "null"
               }
             ],
-            "title": "Issn"
+            "title": "ISSN（国际标准连续出版物号）"
           },
           "eissn": {
             "anyOf": [
@@ -6994,7 +6995,7 @@
                 "type": "null"
               }
             ],
-            "title": "Eissn"
+            "title": "eISSN（电子国际标准连续出版物号）"
           },
           "website_url": {
             "anyOf": [
@@ -7006,7 +7007,7 @@
                 "type": "null"
               }
             ],
-            "title": "Website Url"
+            "title": "网站 URL"
           },
           "submission_url": {
             "anyOf": [
@@ -7018,7 +7019,7 @@
                 "type": "null"
               }
             ],
-            "title": "Submission Url"
+            "title": "投稿 URL"
           },
           "author_guidelines_url": {
             "anyOf": [
@@ -7030,21 +7031,21 @@
                 "type": "null"
               }
             ],
-            "title": "Author Guidelines Url"
+            "title": "作者指南 URL"
           },
           "subject_categories": {
             "items": {
               "type": "string"
             },
             "type": "array",
-            "title": "Subject Categories"
+            "title": "学科类别"
           },
           "article_types": {
             "items": {
               "type": "string"
             },
             "type": "array",
-            "title": "Article Types"
+            "title": "文章类型列表"
           },
           "requirements": {
             "items": {
@@ -7052,7 +7053,7 @@
             },
             "type": "array",
             "maxItems": 200,
-            "title": "Requirements"
+            "title": "投稿要求"
           },
           "requirements_source_url": {
             "anyOf": [
@@ -7064,7 +7065,7 @@
                 "type": "null"
               }
             ],
-            "title": "Requirements Source Url"
+            "title": "投稿要求来源 URL"
           },
           "requirements_verified_at": {
             "anyOf": [
@@ -7076,13 +7077,13 @@
                 "type": "null"
               }
             ],
-            "title": "Requirements Verified At"
+            "title": "投稿要求核验时间"
           },
           "status": {
             "type": "string",
             "maxLength": 32,
             "minLength": 1,
-            "title": "Status",
+            "title": "状态",
             "default": "active"
           },
           "notes": {
@@ -7094,7 +7095,7 @@
                 "type": "null"
               }
             ],
-            "title": "Notes"
+            "title": "备注"
           }
         },
         "additionalProperties": false,
@@ -7103,7 +7104,7 @@
           "publisher_id",
           "name"
         ],
-        "title": "JournalCreate"
+        "title": "期刊创建请求"
       },
       "JournalPlatformCreate": {
         "properties": {
@@ -7111,17 +7112,17 @@
             "type": "string",
             "maxLength": 64,
             "minLength": 1,
-            "title": "Code"
+            "title": "代码"
           },
           "name": {
             "type": "string",
             "maxLength": 255,
             "minLength": 1,
-            "title": "Name"
+            "title": "名称"
           },
           "description": {
             "type": "string",
-            "title": "Description",
+            "title": "描述",
             "default": ""
           },
           "status": {
@@ -7131,7 +7132,7 @@
               "needs_review",
               "disabled"
             ],
-            "title": "Status",
+            "title": "状态",
             "default": "active"
           }
         },
@@ -7141,28 +7142,28 @@
           "code",
           "name"
         ],
-        "title": "JournalPlatformCreate"
+        "title": "期刊平台创建请求"
       },
       "JournalPlatformResponse": {
         "properties": {
           "id": {
             "type": "string",
             "format": "uuid",
-            "title": "Id"
+            "title": "资源 ID"
           },
           "code": {
             "type": "string",
             "maxLength": 64,
-            "title": "Code"
+            "title": "代码"
           },
           "name": {
             "type": "string",
             "maxLength": 255,
-            "title": "Name"
+            "title": "名称"
           },
           "description": {
             "type": "string",
-            "title": "Description"
+            "title": "描述"
           },
           "status": {
             "type": "string",
@@ -7171,17 +7172,17 @@
               "needs_review",
               "disabled"
             ],
-            "title": "Status"
+            "title": "状态"
           },
           "created_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Created At"
+            "title": "创建时间"
           },
           "updated_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Updated At"
+            "title": "更新时间"
           }
         },
         "additionalProperties": false,
@@ -7195,7 +7196,7 @@
           "created_at",
           "updated_at"
         ],
-        "title": "JournalPlatformResponse"
+        "title": "期刊平台响应"
       },
       "JournalPlatformUpdate": {
         "properties": {
@@ -7210,7 +7211,7 @@
                 "type": "null"
               }
             ],
-            "title": "Code"
+            "title": "代码"
           },
           "name": {
             "anyOf": [
@@ -7223,7 +7224,7 @@
                 "type": "null"
               }
             ],
-            "title": "Name"
+            "title": "名称"
           },
           "description": {
             "anyOf": [
@@ -7234,7 +7235,7 @@
                 "type": "null"
               }
             ],
-            "title": "Description"
+            "title": "描述"
           },
           "status": {
             "anyOf": [
@@ -7250,19 +7251,19 @@
                 "type": "null"
               }
             ],
-            "title": "Status"
+            "title": "状态"
           }
         },
         "additionalProperties": false,
         "type": "object",
-        "title": "JournalPlatformUpdate"
+        "title": "期刊平台更新请求"
       },
       "JournalRequirement": {
         "properties": {
           "key": {
             "type": "string",
             "minLength": 1,
-            "title": "Key"
+            "title": "键"
           },
           "value": {
             "anyOf": [
@@ -7279,22 +7280,22 @@
                 "type": "boolean"
               }
             ],
-            "title": "Value"
+            "title": "值"
           },
           "scope": {
             "type": "string",
             "minLength": 1,
-            "title": "Scope"
+            "title": "适用范围"
           },
           "source_url": {
             "type": "string",
             "maxLength": 1024,
-            "title": "Source Url"
+            "title": "来源 URL"
           },
           "verified_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Verified At"
+            "title": "核验时间"
           }
         },
         "additionalProperties": false,
@@ -7306,19 +7307,19 @@
           "source_url",
           "verified_at"
         ],
-        "title": "JournalRequirement"
+        "title": "期刊投稿要求"
       },
       "JournalResponse": {
         "properties": {
           "id": {
             "type": "string",
             "format": "uuid",
-            "title": "Id"
+            "title": "资源 ID"
           },
           "publisher_id": {
             "type": "string",
             "format": "uuid",
-            "title": "Publisher Id"
+            "title": "出版商 ID"
           },
           "platform_id": {
             "anyOf": [
@@ -7330,12 +7331,12 @@
                 "type": "null"
               }
             ],
-            "title": "Platform Id"
+            "title": "平台 ID"
           },
           "name": {
             "type": "string",
             "maxLength": 500,
-            "title": "Name"
+            "title": "名称"
           },
           "issn": {
             "anyOf": [
@@ -7346,7 +7347,7 @@
                 "type": "null"
               }
             ],
-            "title": "Issn"
+            "title": "ISSN（国际标准连续出版物号）"
           },
           "eissn": {
             "anyOf": [
@@ -7357,7 +7358,7 @@
                 "type": "null"
               }
             ],
-            "title": "Eissn"
+            "title": "eISSN（电子国际标准连续出版物号）"
           },
           "website_url": {
             "anyOf": [
@@ -7369,7 +7370,7 @@
                 "type": "null"
               }
             ],
-            "title": "Website Url"
+            "title": "网站 URL"
           },
           "submission_url": {
             "anyOf": [
@@ -7381,7 +7382,7 @@
                 "type": "null"
               }
             ],
-            "title": "Submission Url"
+            "title": "投稿 URL"
           },
           "author_guidelines_url": {
             "anyOf": [
@@ -7393,21 +7394,21 @@
                 "type": "null"
               }
             ],
-            "title": "Author Guidelines Url"
+            "title": "作者指南 URL"
           },
           "subject_categories": {
             "items": {
               "type": "string"
             },
             "type": "array",
-            "title": "Subject Categories"
+            "title": "学科类别"
           },
           "article_types": {
             "items": {
               "type": "string"
             },
             "type": "array",
-            "title": "Article Types"
+            "title": "文章类型列表"
           },
           "requirements": {
             "items": {
@@ -7415,7 +7416,7 @@
             },
             "type": "array",
             "maxItems": 200,
-            "title": "Requirements"
+            "title": "投稿要求"
           },
           "requirements_source_url": {
             "anyOf": [
@@ -7427,7 +7428,7 @@
                 "type": "null"
               }
             ],
-            "title": "Requirements Source Url"
+            "title": "投稿要求来源 URL"
           },
           "requirements_verified_at": {
             "anyOf": [
@@ -7439,12 +7440,12 @@
                 "type": "null"
               }
             ],
-            "title": "Requirements Verified At"
+            "title": "投稿要求核验时间"
           },
           "status": {
             "type": "string",
             "maxLength": 32,
-            "title": "Status"
+            "title": "状态"
           },
           "notes": {
             "anyOf": [
@@ -7455,17 +7456,17 @@
                 "type": "null"
               }
             ],
-            "title": "Notes"
+            "title": "备注"
           },
           "created_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Created At"
+            "title": "创建时间"
           },
           "updated_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Updated At"
+            "title": "更新时间"
           }
         },
         "additionalProperties": false,
@@ -7485,7 +7486,7 @@
           "created_at",
           "updated_at"
         ],
-        "title": "JournalResponse"
+        "title": "期刊响应"
       },
       "JournalUpdate": {
         "properties": {
@@ -7499,7 +7500,7 @@
                 "type": "null"
               }
             ],
-            "title": "Publisher Id"
+            "title": "出版商 ID"
           },
           "platform_id": {
             "anyOf": [
@@ -7511,7 +7512,7 @@
                 "type": "null"
               }
             ],
-            "title": "Platform Id"
+            "title": "平台 ID"
           },
           "name": {
             "anyOf": [
@@ -7524,7 +7525,7 @@
                 "type": "null"
               }
             ],
-            "title": "Name"
+            "title": "名称"
           },
           "issn": {
             "anyOf": [
@@ -7535,7 +7536,7 @@
                 "type": "null"
               }
             ],
-            "title": "Issn"
+            "title": "ISSN（国际标准连续出版物号）"
           },
           "eissn": {
             "anyOf": [
@@ -7546,7 +7547,7 @@
                 "type": "null"
               }
             ],
-            "title": "Eissn"
+            "title": "eISSN（电子国际标准连续出版物号）"
           },
           "website_url": {
             "anyOf": [
@@ -7558,7 +7559,7 @@
                 "type": "null"
               }
             ],
-            "title": "Website Url"
+            "title": "网站 URL"
           },
           "submission_url": {
             "anyOf": [
@@ -7570,7 +7571,7 @@
                 "type": "null"
               }
             ],
-            "title": "Submission Url"
+            "title": "投稿 URL"
           },
           "author_guidelines_url": {
             "anyOf": [
@@ -7582,7 +7583,7 @@
                 "type": "null"
               }
             ],
-            "title": "Author Guidelines Url"
+            "title": "作者指南 URL"
           },
           "subject_categories": {
             "anyOf": [
@@ -7596,7 +7597,7 @@
                 "type": "null"
               }
             ],
-            "title": "Subject Categories"
+            "title": "学科类别"
           },
           "article_types": {
             "anyOf": [
@@ -7610,7 +7611,7 @@
                 "type": "null"
               }
             ],
-            "title": "Article Types"
+            "title": "文章类型列表"
           },
           "requirements": {
             "anyOf": [
@@ -7625,7 +7626,7 @@
                 "type": "null"
               }
             ],
-            "title": "Requirements"
+            "title": "投稿要求"
           },
           "requirements_source_url": {
             "anyOf": [
@@ -7637,7 +7638,7 @@
                 "type": "null"
               }
             ],
-            "title": "Requirements Source Url"
+            "title": "投稿要求来源 URL"
           },
           "requirements_verified_at": {
             "anyOf": [
@@ -7649,7 +7650,7 @@
                 "type": "null"
               }
             ],
-            "title": "Requirements Verified At"
+            "title": "投稿要求核验时间"
           },
           "status": {
             "anyOf": [
@@ -7662,7 +7663,7 @@
                 "type": "null"
               }
             ],
-            "title": "Status"
+            "title": "状态"
           },
           "notes": {
             "anyOf": [
@@ -7673,12 +7674,12 @@
                 "type": "null"
               }
             ],
-            "title": "Notes"
+            "title": "备注"
           }
         },
         "additionalProperties": false,
         "type": "object",
-        "title": "JournalUpdate"
+        "title": "期刊更新请求"
       },
       "LoginRequest": {
         "properties": {
@@ -7686,13 +7687,13 @@
             "type": "string",
             "maxLength": 64,
             "minLength": 1,
-            "title": "Username"
+            "title": "用户名"
           },
           "password": {
             "type": "string",
             "maxLength": 128,
             "minLength": 1,
-            "title": "Password"
+            "title": "密码"
           }
         },
         "additionalProperties": false,
@@ -7701,7 +7702,7 @@
           "username",
           "password"
         ],
-        "title": "LoginRequest"
+        "title": "登录请求"
       },
       "LoginResponse": {
         "properties": {
@@ -7711,17 +7712,17 @@
           "csrf_token": {
             "type": "string",
             "minLength": 1,
-            "title": "Csrf Token"
+            "title": "CSRF 令牌"
           },
           "idle_expires_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Idle Expires At"
+            "title": "空闲会话过期时间"
           },
           "absolute_expires_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Absolute Expires At"
+            "title": "绝对过期时间"
           }
         },
         "additionalProperties": false,
@@ -7732,23 +7733,23 @@
           "idle_expires_at",
           "absolute_expires_at"
         ],
-        "title": "LoginResponse"
+        "title": "登录响应"
       },
       "ManuscriptAuthorInput": {
         "properties": {
           "author_id": {
             "type": "string",
             "format": "uuid",
-            "title": "Author Id"
+            "title": "作者 ID"
           },
           "position": {
             "type": "integer",
             "minimum": 1.0,
-            "title": "Position"
+            "title": "署名位置"
           },
           "is_corresponding": {
             "type": "boolean",
-            "title": "Is Corresponding"
+            "title": "是否通讯作者"
           }
         },
         "additionalProperties": false,
@@ -7758,26 +7759,26 @@
           "position",
           "is_corresponding"
         ],
-        "title": "ManuscriptAuthorInput"
+        "title": "稿件署名作者输入"
       },
       "ManuscriptAuthorResponse": {
         "properties": {
           "author_id": {
             "type": "string",
             "format": "uuid",
-            "title": "Author Id"
+            "title": "作者 ID"
           },
           "display_name": {
             "type": "string",
-            "title": "Display Name"
+            "title": "显示名称"
           },
           "position": {
             "type": "integer",
-            "title": "Position"
+            "title": "署名位置"
           },
           "is_corresponding": {
             "type": "boolean",
-            "title": "Is Corresponding"
+            "title": "是否通讯作者"
           }
         },
         "additionalProperties": false,
@@ -7788,7 +7789,7 @@
           "position",
           "is_corresponding"
         ],
-        "title": "ManuscriptAuthorResponse"
+        "title": "稿件署名作者响应"
       },
       "ManuscriptAuthorsUpdate": {
         "properties": {
@@ -7799,12 +7800,12 @@
             "type": "array",
             "maxItems": 200,
             "minItems": 1,
-            "title": "Authors"
+            "title": "作者列表"
           },
           "confirm_authorship_change": {
             "type": "boolean",
             "const": true,
-            "title": "Confirm Authorship Change"
+            "title": "确认署名变更"
           }
         },
         "additionalProperties": false,
@@ -7813,25 +7814,25 @@
           "authors",
           "confirm_authorship_change"
         ],
-        "title": "ManuscriptAuthorsUpdate"
+        "title": "稿件署名作者更新请求"
       },
       "ManuscriptCreate": {
         "properties": {
           "owner_author_id": {
             "type": "string",
             "format": "uuid",
-            "title": "Owner Author Id"
+            "title": "所有者作者 ID"
           },
           "title": {
             "type": "string",
             "maxLength": 1000,
             "minLength": 1,
-            "title": "Title"
+            "title": "标题"
           },
           "abstract": {
             "type": "string",
             "minLength": 1,
-            "title": "Abstract"
+            "title": "摘要"
           },
           "keywords": {
             "items": {
@@ -7841,13 +7842,13 @@
             },
             "type": "array",
             "maxItems": 50,
-            "title": "Keywords"
+            "title": "关键词"
           },
           "article_type": {
             "type": "string",
             "maxLength": 100,
             "minLength": 1,
-            "title": "Article Type"
+            "title": "文章类型"
           },
           "subject_field": {
             "anyOf": [
@@ -7859,13 +7860,13 @@
                 "type": "null"
               }
             ],
-            "title": "Subject Field"
+            "title": "学科领域"
           },
           "language": {
             "type": "string",
             "maxLength": 32,
             "minLength": 1,
-            "title": "Language"
+            "title": "语言"
           },
           "funding_statement": {
             "anyOf": [
@@ -7876,7 +7877,7 @@
                 "type": "null"
               }
             ],
-            "title": "Funding Statement"
+            "title": "资助声明"
           },
           "conflict_of_interest_statement": {
             "anyOf": [
@@ -7887,7 +7888,7 @@
                 "type": "null"
               }
             ],
-            "title": "Conflict Of Interest Statement"
+            "title": "利益冲突声明"
           },
           "ethics_statement": {
             "anyOf": [
@@ -7898,7 +7899,7 @@
                 "type": "null"
               }
             ],
-            "title": "Ethics Statement"
+            "title": "伦理声明"
           },
           "data_availability_statement": {
             "anyOf": [
@@ -7909,7 +7910,7 @@
                 "type": "null"
               }
             ],
-            "title": "Data Availability Statement"
+            "title": "数据可用性声明"
           },
           "notes": {
             "anyOf": [
@@ -7920,7 +7921,7 @@
                 "type": "null"
               }
             ],
-            "title": "Notes"
+            "title": "备注"
           },
           "authors": {
             "anyOf": [
@@ -7935,7 +7936,7 @@
                 "type": "null"
               }
             ],
-            "title": "Authors"
+            "title": "作者列表"
           }
         },
         "additionalProperties": false,
@@ -7947,33 +7948,33 @@
           "article_type",
           "language"
         ],
-        "title": "ManuscriptCreate"
+        "title": "稿件创建请求"
       },
       "ManuscriptResponse": {
         "properties": {
           "id": {
             "type": "string",
             "format": "uuid",
-            "title": "Id"
+            "title": "资源 ID"
           },
           "internal_number": {
             "type": "string",
             "maxLength": 64,
-            "title": "Internal Number"
+            "title": "内部编号"
           },
           "owner_author_id": {
             "type": "string",
             "format": "uuid",
-            "title": "Owner Author Id"
+            "title": "所有者作者 ID"
           },
           "title": {
             "type": "string",
             "maxLength": 1000,
-            "title": "Title"
+            "title": "标题"
           },
           "abstract": {
             "type": "string",
-            "title": "Abstract"
+            "title": "摘要"
           },
           "keywords": {
             "items": {
@@ -7983,12 +7984,12 @@
             },
             "type": "array",
             "maxItems": 50,
-            "title": "Keywords"
+            "title": "关键词"
           },
           "article_type": {
             "type": "string",
             "maxLength": 100,
-            "title": "Article Type"
+            "title": "文章类型"
           },
           "subject_field": {
             "anyOf": [
@@ -8000,12 +8001,12 @@
                 "type": "null"
               }
             ],
-            "title": "Subject Field"
+            "title": "学科领域"
           },
           "language": {
             "type": "string",
             "maxLength": 32,
-            "title": "Language"
+            "title": "语言"
           },
           "funding_statement": {
             "anyOf": [
@@ -8016,7 +8017,7 @@
                 "type": "null"
               }
             ],
-            "title": "Funding Statement"
+            "title": "资助声明"
           },
           "conflict_of_interest_statement": {
             "anyOf": [
@@ -8027,7 +8028,7 @@
                 "type": "null"
               }
             ],
-            "title": "Conflict Of Interest Statement"
+            "title": "利益冲突声明"
           },
           "ethics_statement": {
             "anyOf": [
@@ -8038,7 +8039,7 @@
                 "type": "null"
               }
             ],
-            "title": "Ethics Statement"
+            "title": "伦理声明"
           },
           "data_availability_statement": {
             "anyOf": [
@@ -8049,7 +8050,7 @@
                 "type": "null"
               }
             ],
-            "title": "Data Availability Statement"
+            "title": "数据可用性声明"
           },
           "notes": {
             "anyOf": [
@@ -8060,7 +8061,7 @@
                 "type": "null"
               }
             ],
-            "title": "Notes"
+            "title": "备注"
           },
           "status": {
             "type": "string",
@@ -8069,7 +8070,7 @@
               "active",
               "archived"
             ],
-            "title": "Status"
+            "title": "状态"
           },
           "current_version_id": {
             "anyOf": [
@@ -8081,7 +8082,7 @@
                 "type": "null"
               }
             ],
-            "title": "Current Version Id"
+            "title": "当前版本 ID"
           },
           "authors": {
             "items": {
@@ -8089,17 +8090,17 @@
             },
             "type": "array",
             "maxItems": 200,
-            "title": "Authors"
+            "title": "作者列表"
           },
           "created_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Created At"
+            "title": "创建时间"
           },
           "updated_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Updated At"
+            "title": "更新时间"
           }
         },
         "additionalProperties": false,
@@ -8119,23 +8120,23 @@
           "created_at",
           "updated_at"
         ],
-        "title": "ManuscriptResponse"
+        "title": "稿件响应"
       },
       "ManuscriptSnapshot": {
         "properties": {
           "owner_author_id": {
             "type": "string",
             "format": "uuid",
-            "title": "Owner Author Id"
+            "title": "所有者作者 ID"
           },
           "title": {
             "type": "string",
             "maxLength": 1000,
-            "title": "Title"
+            "title": "标题"
           },
           "abstract": {
             "type": "string",
-            "title": "Abstract"
+            "title": "摘要"
           },
           "keywords": {
             "items": {
@@ -8145,12 +8146,12 @@
             },
             "type": "array",
             "maxItems": 50,
-            "title": "Keywords"
+            "title": "关键词"
           },
           "article_type": {
             "type": "string",
             "maxLength": 100,
-            "title": "Article Type"
+            "title": "文章类型"
           },
           "subject_field": {
             "anyOf": [
@@ -8162,12 +8163,12 @@
                 "type": "null"
               }
             ],
-            "title": "Subject Field"
+            "title": "学科领域"
           },
           "language": {
             "type": "string",
             "maxLength": 32,
-            "title": "Language"
+            "title": "语言"
           },
           "funding_statement": {
             "anyOf": [
@@ -8178,7 +8179,7 @@
                 "type": "null"
               }
             ],
-            "title": "Funding Statement"
+            "title": "资助声明"
           },
           "conflict_of_interest_statement": {
             "anyOf": [
@@ -8189,7 +8190,7 @@
                 "type": "null"
               }
             ],
-            "title": "Conflict Of Interest Statement"
+            "title": "利益冲突声明"
           },
           "ethics_statement": {
             "anyOf": [
@@ -8200,7 +8201,7 @@
                 "type": "null"
               }
             ],
-            "title": "Ethics Statement"
+            "title": "伦理声明"
           },
           "data_availability_statement": {
             "anyOf": [
@@ -8211,7 +8212,7 @@
                 "type": "null"
               }
             ],
-            "title": "Data Availability Statement"
+            "title": "数据可用性声明"
           },
           "notes": {
             "anyOf": [
@@ -8222,7 +8223,7 @@
                 "type": "null"
               }
             ],
-            "title": "Notes"
+            "title": "备注"
           },
           "authors": {
             "items": {
@@ -8230,7 +8231,7 @@
             },
             "type": "array",
             "maxItems": 200,
-            "title": "Authors"
+            "title": "作者列表"
           }
         },
         "additionalProperties": false,
@@ -8244,7 +8245,7 @@
           "language",
           "authors"
         ],
-        "title": "ManuscriptSnapshot"
+        "title": "稿件快照"
       },
       "ManuscriptUpdate": {
         "properties": {
@@ -8259,7 +8260,7 @@
                 "type": "null"
               }
             ],
-            "title": "Title"
+            "title": "标题"
           },
           "abstract": {
             "anyOf": [
@@ -8271,7 +8272,7 @@
                 "type": "null"
               }
             ],
-            "title": "Abstract"
+            "title": "摘要"
           },
           "keywords": {
             "anyOf": [
@@ -8288,7 +8289,7 @@
                 "type": "null"
               }
             ],
-            "title": "Keywords"
+            "title": "关键词"
           },
           "article_type": {
             "anyOf": [
@@ -8301,7 +8302,7 @@
                 "type": "null"
               }
             ],
-            "title": "Article Type"
+            "title": "文章类型"
           },
           "subject_field": {
             "anyOf": [
@@ -8313,7 +8314,7 @@
                 "type": "null"
               }
             ],
-            "title": "Subject Field"
+            "title": "学科领域"
           },
           "language": {
             "anyOf": [
@@ -8326,7 +8327,7 @@
                 "type": "null"
               }
             ],
-            "title": "Language"
+            "title": "语言"
           },
           "funding_statement": {
             "anyOf": [
@@ -8337,7 +8338,7 @@
                 "type": "null"
               }
             ],
-            "title": "Funding Statement"
+            "title": "资助声明"
           },
           "conflict_of_interest_statement": {
             "anyOf": [
@@ -8348,7 +8349,7 @@
                 "type": "null"
               }
             ],
-            "title": "Conflict Of Interest Statement"
+            "title": "利益冲突声明"
           },
           "ethics_statement": {
             "anyOf": [
@@ -8359,7 +8360,7 @@
                 "type": "null"
               }
             ],
-            "title": "Ethics Statement"
+            "title": "伦理声明"
           },
           "data_availability_statement": {
             "anyOf": [
@@ -8370,7 +8371,7 @@
                 "type": "null"
               }
             ],
-            "title": "Data Availability Statement"
+            "title": "数据可用性声明"
           },
           "notes": {
             "anyOf": [
@@ -8381,12 +8382,12 @@
                 "type": "null"
               }
             ],
-            "title": "Notes"
+            "title": "备注"
           }
         },
         "additionalProperties": false,
         "type": "object",
-        "title": "ManuscriptUpdate"
+        "title": "稿件更新请求"
       },
       "ManuscriptVersionCreate": {
         "properties": {
@@ -8400,7 +8401,7 @@
                 "type": "null"
               }
             ],
-            "title": "Label"
+            "title": "标签"
           },
           "change_note": {
             "anyOf": [
@@ -8411,29 +8412,29 @@
                 "type": "null"
               }
             ],
-            "title": "Change Note"
+            "title": "变更说明"
           }
         },
         "additionalProperties": false,
         "type": "object",
-        "title": "ManuscriptVersionCreate"
+        "title": "稿件版本创建请求"
       },
       "ManuscriptVersionResponse": {
         "properties": {
           "id": {
             "type": "string",
             "format": "uuid",
-            "title": "Id"
+            "title": "资源 ID"
           },
           "manuscript_id": {
             "type": "string",
             "format": "uuid",
-            "title": "Manuscript Id"
+            "title": "稿件 ID"
           },
           "version_number": {
             "type": "integer",
             "minimum": 1.0,
-            "title": "Version Number"
+            "title": "版本号"
           },
           "label": {
             "anyOf": [
@@ -8445,7 +8446,7 @@
                 "type": "null"
               }
             ],
-            "title": "Label"
+            "title": "标签"
           },
           "change_note": {
             "anyOf": [
@@ -8456,7 +8457,7 @@
                 "type": "null"
               }
             ],
-            "title": "Change Note"
+            "title": "变更说明"
           },
           "metadata_snapshot": {
             "$ref": "#/components/schemas/ManuscriptSnapshot"
@@ -8464,12 +8465,12 @@
           "created_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Created At"
+            "title": "创建时间"
           },
           "created_by": {
             "type": "string",
             "format": "uuid",
-            "title": "Created By"
+            "title": "创建用户 ID"
           }
         },
         "additionalProperties": false,
@@ -8482,7 +8483,7 @@
           "created_at",
           "created_by"
         ],
-        "title": "ManuscriptVersionResponse"
+        "title": "稿件版本响应"
       },
       "Page_AuditLogResponse_": {
         "properties": {
@@ -8491,23 +8492,23 @@
               "$ref": "#/components/schemas/AuditLogResponse"
             },
             "type": "array",
-            "title": "Items"
+            "title": "记录列表"
           },
           "page": {
             "type": "integer",
             "minimum": 1.0,
-            "title": "Page"
+            "title": "页码"
           },
           "page_size": {
             "type": "integer",
             "maximum": 100.0,
             "minimum": 1.0,
-            "title": "Page Size"
+            "title": "每页数量"
           },
           "total": {
             "type": "integer",
             "minimum": 0.0,
-            "title": "Total"
+            "title": "总记录数"
           }
         },
         "additionalProperties": false,
@@ -8518,7 +8519,7 @@
           "page_size",
           "total"
         ],
-        "title": "Page[AuditLogResponse]"
+        "title": "审计日志分页响应"
       },
       "Page_AuthorInstitutionLinkResponse_": {
         "properties": {
@@ -8527,23 +8528,23 @@
               "$ref": "#/components/schemas/AuthorInstitutionLinkResponse"
             },
             "type": "array",
-            "title": "Items"
+            "title": "记录列表"
           },
           "page": {
             "type": "integer",
             "minimum": 1.0,
-            "title": "Page"
+            "title": "页码"
           },
           "page_size": {
             "type": "integer",
             "maximum": 100.0,
             "minimum": 1.0,
-            "title": "Page Size"
+            "title": "每页数量"
           },
           "total": {
             "type": "integer",
             "minimum": 0.0,
-            "title": "Total"
+            "title": "总记录数"
           }
         },
         "additionalProperties": false,
@@ -8554,7 +8555,7 @@
           "page_size",
           "total"
         ],
-        "title": "Page[AuthorInstitutionLinkResponse]"
+        "title": "作者机构关联分页响应"
       },
       "Page_AuthorResponse_": {
         "properties": {
@@ -8563,23 +8564,23 @@
               "$ref": "#/components/schemas/AuthorResponse"
             },
             "type": "array",
-            "title": "Items"
+            "title": "记录列表"
           },
           "page": {
             "type": "integer",
             "minimum": 1.0,
-            "title": "Page"
+            "title": "页码"
           },
           "page_size": {
             "type": "integer",
             "maximum": 100.0,
             "minimum": 1.0,
-            "title": "Page Size"
+            "title": "每页数量"
           },
           "total": {
             "type": "integer",
             "minimum": 0.0,
-            "title": "Total"
+            "title": "总记录数"
           }
         },
         "additionalProperties": false,
@@ -8590,7 +8591,7 @@
           "page_size",
           "total"
         ],
-        "title": "Page[AuthorResponse]"
+        "title": "作者分页响应"
       },
       "Page_AuthorizationResponse_": {
         "properties": {
@@ -8599,23 +8600,23 @@
               "$ref": "#/components/schemas/AuthorizationResponse"
             },
             "type": "array",
-            "title": "Items"
+            "title": "记录列表"
           },
           "page": {
             "type": "integer",
             "minimum": 1.0,
-            "title": "Page"
+            "title": "页码"
           },
           "page_size": {
             "type": "integer",
             "maximum": 100.0,
             "minimum": 1.0,
-            "title": "Page Size"
+            "title": "每页数量"
           },
           "total": {
             "type": "integer",
             "minimum": 0.0,
-            "title": "Total"
+            "title": "总记录数"
           }
         },
         "additionalProperties": false,
@@ -8626,7 +8627,7 @@
           "page_size",
           "total"
         ],
-        "title": "Page[AuthorizationResponse]"
+        "title": "授权分页响应"
       },
       "Page_EmailResponse_": {
         "properties": {
@@ -8635,23 +8636,23 @@
               "$ref": "#/components/schemas/EmailResponse"
             },
             "type": "array",
-            "title": "Items"
+            "title": "记录列表"
           },
           "page": {
             "type": "integer",
             "minimum": 1.0,
-            "title": "Page"
+            "title": "页码"
           },
           "page_size": {
             "type": "integer",
             "maximum": 100.0,
             "minimum": 1.0,
-            "title": "Page Size"
+            "title": "每页数量"
           },
           "total": {
             "type": "integer",
             "minimum": 0.0,
-            "title": "Total"
+            "title": "总记录数"
           }
         },
         "additionalProperties": false,
@@ -8662,7 +8663,7 @@
           "page_size",
           "total"
         ],
-        "title": "Page[EmailResponse]"
+        "title": "邮箱分页响应"
       },
       "Page_FileResponse_": {
         "properties": {
@@ -8671,23 +8672,23 @@
               "$ref": "#/components/schemas/FileResponse"
             },
             "type": "array",
-            "title": "Items"
+            "title": "记录列表"
           },
           "page": {
             "type": "integer",
             "minimum": 1.0,
-            "title": "Page"
+            "title": "页码"
           },
           "page_size": {
             "type": "integer",
             "maximum": 100.0,
             "minimum": 1.0,
-            "title": "Page Size"
+            "title": "每页数量"
           },
           "total": {
             "type": "integer",
             "minimum": 0.0,
-            "title": "Total"
+            "title": "总记录数"
           }
         },
         "additionalProperties": false,
@@ -8698,7 +8699,7 @@
           "page_size",
           "total"
         ],
-        "title": "Page[FileResponse]"
+        "title": "文件分页响应"
       },
       "Page_InstitutionSummaryResponse_": {
         "properties": {
@@ -8707,23 +8708,23 @@
               "$ref": "#/components/schemas/InstitutionSummaryResponse"
             },
             "type": "array",
-            "title": "Items"
+            "title": "记录列表"
           },
           "page": {
             "type": "integer",
             "minimum": 1.0,
-            "title": "Page"
+            "title": "页码"
           },
           "page_size": {
             "type": "integer",
             "maximum": 100.0,
             "minimum": 1.0,
-            "title": "Page Size"
+            "title": "每页数量"
           },
           "total": {
             "type": "integer",
             "minimum": 0.0,
-            "title": "Total"
+            "title": "总记录数"
           }
         },
         "additionalProperties": false,
@@ -8734,7 +8735,7 @@
           "page_size",
           "total"
         ],
-        "title": "Page[InstitutionSummaryResponse]"
+        "title": "机构摘要分页响应"
       },
       "Page_JournalPlatformResponse_": {
         "properties": {
@@ -8743,23 +8744,23 @@
               "$ref": "#/components/schemas/JournalPlatformResponse"
             },
             "type": "array",
-            "title": "Items"
+            "title": "记录列表"
           },
           "page": {
             "type": "integer",
             "minimum": 1.0,
-            "title": "Page"
+            "title": "页码"
           },
           "page_size": {
             "type": "integer",
             "maximum": 100.0,
             "minimum": 1.0,
-            "title": "Page Size"
+            "title": "每页数量"
           },
           "total": {
             "type": "integer",
             "minimum": 0.0,
-            "title": "Total"
+            "title": "总记录数"
           }
         },
         "additionalProperties": false,
@@ -8770,7 +8771,7 @@
           "page_size",
           "total"
         ],
-        "title": "Page[JournalPlatformResponse]"
+        "title": "期刊平台分页响应"
       },
       "Page_JournalResponse_": {
         "properties": {
@@ -8779,23 +8780,23 @@
               "$ref": "#/components/schemas/JournalResponse"
             },
             "type": "array",
-            "title": "Items"
+            "title": "记录列表"
           },
           "page": {
             "type": "integer",
             "minimum": 1.0,
-            "title": "Page"
+            "title": "页码"
           },
           "page_size": {
             "type": "integer",
             "maximum": 100.0,
             "minimum": 1.0,
-            "title": "Page Size"
+            "title": "每页数量"
           },
           "total": {
             "type": "integer",
             "minimum": 0.0,
-            "title": "Total"
+            "title": "总记录数"
           }
         },
         "additionalProperties": false,
@@ -8806,7 +8807,7 @@
           "page_size",
           "total"
         ],
-        "title": "Page[JournalResponse]"
+        "title": "期刊分页响应"
       },
       "Page_ManuscriptResponse_": {
         "properties": {
@@ -8815,23 +8816,23 @@
               "$ref": "#/components/schemas/ManuscriptResponse"
             },
             "type": "array",
-            "title": "Items"
+            "title": "记录列表"
           },
           "page": {
             "type": "integer",
             "minimum": 1.0,
-            "title": "Page"
+            "title": "页码"
           },
           "page_size": {
             "type": "integer",
             "maximum": 100.0,
             "minimum": 1.0,
-            "title": "Page Size"
+            "title": "每页数量"
           },
           "total": {
             "type": "integer",
             "minimum": 0.0,
-            "title": "Total"
+            "title": "总记录数"
           }
         },
         "additionalProperties": false,
@@ -8842,7 +8843,7 @@
           "page_size",
           "total"
         ],
-        "title": "Page[ManuscriptResponse]"
+        "title": "稿件分页响应"
       },
       "Page_ManuscriptVersionResponse_": {
         "properties": {
@@ -8851,23 +8852,23 @@
               "$ref": "#/components/schemas/ManuscriptVersionResponse"
             },
             "type": "array",
-            "title": "Items"
+            "title": "记录列表"
           },
           "page": {
             "type": "integer",
             "minimum": 1.0,
-            "title": "Page"
+            "title": "页码"
           },
           "page_size": {
             "type": "integer",
             "maximum": 100.0,
             "minimum": 1.0,
-            "title": "Page Size"
+            "title": "每页数量"
           },
           "total": {
             "type": "integer",
             "minimum": 0.0,
-            "title": "Total"
+            "title": "总记录数"
           }
         },
         "additionalProperties": false,
@@ -8878,7 +8879,7 @@
           "page_size",
           "total"
         ],
-        "title": "Page[ManuscriptVersionResponse]"
+        "title": "稿件版本分页响应"
       },
       "Page_PublisherResponse_": {
         "properties": {
@@ -8887,23 +8888,23 @@
               "$ref": "#/components/schemas/PublisherResponse"
             },
             "type": "array",
-            "title": "Items"
+            "title": "记录列表"
           },
           "page": {
             "type": "integer",
             "minimum": 1.0,
-            "title": "Page"
+            "title": "页码"
           },
           "page_size": {
             "type": "integer",
             "maximum": 100.0,
             "minimum": 1.0,
-            "title": "Page Size"
+            "title": "每页数量"
           },
           "total": {
             "type": "integer",
             "minimum": 0.0,
-            "title": "Total"
+            "title": "总记录数"
           }
         },
         "additionalProperties": false,
@@ -8914,7 +8915,7 @@
           "page_size",
           "total"
         ],
-        "title": "Page[PublisherResponse]"
+        "title": "出版商分页响应"
       },
       "PublisherCreate": {
         "properties": {
@@ -8922,7 +8923,7 @@
             "type": "string",
             "maxLength": 255,
             "minLength": 1,
-            "title": "Name"
+            "title": "名称"
           },
           "website_url": {
             "anyOf": [
@@ -8934,7 +8935,7 @@
                 "type": "null"
               }
             ],
-            "title": "Website Url"
+            "title": "网站 URL"
           },
           "notes": {
             "anyOf": [
@@ -8945,7 +8946,7 @@
                 "type": "null"
               }
             ],
-            "title": "Notes"
+            "title": "备注"
           }
         },
         "additionalProperties": false,
@@ -8953,19 +8954,19 @@
         "required": [
           "name"
         ],
-        "title": "PublisherCreate"
+        "title": "出版商创建请求"
       },
       "PublisherResponse": {
         "properties": {
           "id": {
             "type": "string",
             "format": "uuid",
-            "title": "Id"
+            "title": "资源 ID"
           },
           "name": {
             "type": "string",
             "maxLength": 255,
-            "title": "Name"
+            "title": "名称"
           },
           "website_url": {
             "anyOf": [
@@ -8977,7 +8978,7 @@
                 "type": "null"
               }
             ],
-            "title": "Website Url"
+            "title": "网站 URL"
           },
           "notes": {
             "anyOf": [
@@ -8988,17 +8989,17 @@
                 "type": "null"
               }
             ],
-            "title": "Notes"
+            "title": "备注"
           },
           "created_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Created At"
+            "title": "创建时间"
           },
           "updated_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Updated At"
+            "title": "更新时间"
           }
         },
         "additionalProperties": false,
@@ -9009,7 +9010,7 @@
           "created_at",
           "updated_at"
         ],
-        "title": "PublisherResponse"
+        "title": "出版商响应"
       },
       "PublisherUpdate": {
         "properties": {
@@ -9024,7 +9025,7 @@
                 "type": "null"
               }
             ],
-            "title": "Name"
+            "title": "名称"
           },
           "website_url": {
             "anyOf": [
@@ -9036,7 +9037,7 @@
                 "type": "null"
               }
             ],
-            "title": "Website Url"
+            "title": "网站 URL"
           },
           "notes": {
             "anyOf": [
@@ -9047,19 +9048,19 @@
                 "type": "null"
               }
             ],
-            "title": "Notes"
+            "title": "备注"
           }
         },
         "additionalProperties": false,
         "type": "object",
-        "title": "PublisherUpdate"
+        "title": "出版商更新请求"
       },
       "RecentOperation": {
         "properties": {
           "action": {
             "type": "string",
             "maxLength": 100,
-            "title": "Action"
+            "title": "操作"
           },
           "target_id": {
             "anyOf": [
@@ -9071,7 +9072,7 @@
                 "type": "null"
               }
             ],
-            "title": "Target Id"
+            "title": "目标 ID"
           },
           "result": {
             "type": "string",
@@ -9079,12 +9080,12 @@
               "success",
               "failure"
             ],
-            "title": "Result"
+            "title": "结果"
           },
           "created_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Created At"
+            "title": "创建时间"
           }
         },
         "additionalProperties": false,
@@ -9095,31 +9096,31 @@
           "result",
           "created_at"
         ],
-        "title": "RecentOperation"
+        "title": "近期操作"
       },
       "UserResponse": {
         "properties": {
           "id": {
             "type": "string",
             "format": "uuid",
-            "title": "Id"
+            "title": "资源 ID"
           },
           "username": {
             "type": "string",
             "maxLength": 64,
-            "title": "Username"
+            "title": "用户名"
           },
           "display_name": {
             "type": "string",
             "maxLength": 128,
-            "title": "Display Name"
+            "title": "显示名称"
           },
           "roles": {
             "items": {
               "type": "string"
             },
             "type": "array",
-            "title": "Roles"
+            "title": "角色列表"
           },
           "status": {
             "type": "string",
@@ -9127,11 +9128,11 @@
               "active",
               "disabled"
             ],
-            "title": "Status"
+            "title": "状态"
           },
           "must_change_password": {
             "type": "boolean",
-            "title": "Must Change Password"
+            "title": "是否必须修改密码"
           },
           "last_login_at": {
             "anyOf": [
@@ -9143,7 +9144,7 @@
                 "type": "null"
               }
             ],
-            "title": "Last Login At"
+            "title": "最近登录时间"
           }
         },
         "additionalProperties": false,
@@ -9157,7 +9158,7 @@
           "must_change_password",
           "last_login_at"
         ],
-        "title": "UserResponse"
+        "title": "用户响应"
       },
       "ValidationError": {
         "properties": {
@@ -9173,15 +9174,15 @@
               ]
             },
             "type": "array",
-            "title": "Location"
+            "title": "位置"
           },
           "msg": {
             "type": "string",
-            "title": "Message"
+            "title": "消息"
           },
           "type": {
             "type": "string",
-            "title": "Error Type"
+            "title": "错误类型"
           }
         },
         "type": "object",
@@ -9190,8 +9191,46 @@
           "msg",
           "type"
         ],
-        "title": "ValidationError"
+        "title": "校验错误详情"
       }
     }
-  }
+  },
+  "tags": [
+    {
+      "name": "authentication",
+      "description": "用户身份认证、会话和密码管理。"
+    },
+    {
+      "name": "authors",
+      "description": "作者资料、邮箱和机构关联管理。"
+    },
+    {
+      "name": "manuscripts",
+      "description": "稿件元数据、署名作者和版本管理。"
+    },
+    {
+      "name": "files",
+      "description": "稿件文件上传、下载和完整性管理。"
+    },
+    {
+      "name": "authorizations",
+      "description": "作者数据访问授权管理。"
+    },
+    {
+      "name": "journals",
+      "description": "出版商、期刊平台和期刊资料管理。"
+    },
+    {
+      "name": "dashboard",
+      "description": "个人仪表盘统计与近期操作。"
+    },
+    {
+      "name": "audit",
+      "description": "操作审计日志查询。"
+    },
+    {
+      "name": "health",
+      "description": "服务健康与数据库就绪检查。"
+    }
+  ]
 }

@@ -88,7 +88,7 @@ describe('ManuscriptDetailView', () => {
 
     const authorship = wrapper.get('[data-test="snapshot-authorship"]')
     expect(authorship.findAll('li').map((item) => item.text())).toEqual([
-      '1. Owner One · Corresponding author',
+      '1. Owner One · 通讯作者',
       '2. Coauthor B',
     ])
     expect(authorship.classes()).toContain('authorship-position-list')
@@ -101,7 +101,7 @@ describe('ManuscriptDetailView', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('Working title')
-    expect(wrapper.text()).toContain('Current version: 2')
+    expect(wrapper.text()).toContain('当前版本：2')
     expect(wrapper.text()).toContain('Snapshot two title')
     expect(wrapper.text()).toContain('Immutable original title')
     expect(wrapper.get('[data-test="current-files"]').text()).toContain('paper.pdf')
@@ -259,7 +259,7 @@ describe('ManuscriptDetailView', () => {
     await flushPromises()
 
     expect(JSON.parse(String(adapter.mock.calls.find(([config]) => config.method === 'post')?.[0].data))).toMatchObject({ label: 'Revision three' })
-    expect(wrapper.text()).toContain('Current version: 3')
+    expect(wrapper.text()).toContain('当前版本：3')
     expect(adapter.mock.calls.some(([config]) => config.url === '/manuscripts/m1/versions/v3/files')).toBe(true)
   })
 
@@ -394,7 +394,7 @@ describe('ManuscriptDetailView', () => {
     await flushPromises()
 
     expect(adapter.mock.calls.filter(([config]) => config.method === 'post')).toHaveLength(1)
-    expect(wrapper.text()).toContain('Current version: 3')
+    expect(wrapper.text()).toContain('当前版本：3')
     expect(wrapper.get('[data-test="version-form"] button[type="submit"]').attributes('disabled')).toBeUndefined()
   })
 
@@ -435,7 +435,7 @@ describe('ManuscriptDetailView', () => {
     finishStaleLoad()
     await flushPromises()
 
-    expect(wrapper.text()).not.toContain('Loading manuscript workspace…')
+    expect(wrapper.text()).not.toContain('正在加载稿件工作区…')
   })
 
   it('revokes Blob URLs and removes anchors after a DOM click exception', async () => {
@@ -453,7 +453,7 @@ describe('ManuscriptDetailView', () => {
     await flushPromises()
     await new Promise<void>((resolve) => setTimeout(resolve, 0))
 
-    expect(wrapper.text()).toContain('Unable to download the file')
+    expect(wrapper.text()).toContain('无法下载文件')
     expect(document.querySelectorAll('a[download="paper.pdf"]')).toHaveLength(0)
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:failed-click')
   })

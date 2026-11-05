@@ -59,7 +59,9 @@ describe('AuditListView', () => {
 
     expect(wrapper.get('[data-test="audit-detail"]').text()).toContain('Before')
     expect(wrapper.get('[data-test="audit-detail"]').text()).toContain('After')
-    expect(wrapper.findAll('button').some((button) => /edit|delete/i.test(button.text()))).toBe(false)
+    expect(wrapper.get('tbody').text()).toContain('稿件')
+    expect(wrapper.get('tbody').text()).not.toContain('manuscript\nm1')
+    expect(wrapper.findAll('button').some((button) => /编辑|删除/.test(button.text()))).toBe(false)
   })
 
   it('ignores a detail response that finishes after newer filters are applied', async () => {
@@ -90,7 +92,7 @@ describe('AuditListView', () => {
     await flushPromises()
 
     expect(adapter.mock.calls[0][0].params.actor_user_id).toBeUndefined()
-    expect(wrapper.text()).toContain('Unable to load audit logs')
-    expect(wrapper.text()).not.toContain('No audit logs found')
+    expect(wrapper.text()).toContain('无法加载审计日志')
+    expect(wrapper.text()).not.toContain('未找到审计日志')
   })
 })

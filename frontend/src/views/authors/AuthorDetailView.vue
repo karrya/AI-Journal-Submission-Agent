@@ -32,6 +32,7 @@ import InstitutionLinkForm from '../../components/InstitutionLinkForm.vue'
 import AuthorForm from '../../components/AuthorForm.vue'
 import { getSafeRequestId } from '../../api/client'
 import { useAuthStore } from '../../stores/auth'
+import { AUTHOR_STATUS_LABELS, displayText } from '../../utils/display'
 
 const props = defineProps<{
   authorId: string
@@ -68,7 +69,7 @@ const canManage = computed(() => canReadInstitutions.value && effectivePermissio
 
 function safeError(error: unknown, fallback: string): string {
   const requestId = getSafeRequestId(error)
-  return requestId ? `${fallback} Request ID: ${requestId}` : fallback
+  return requestId ? `${fallback} 请求 ID：${requestId}` : fallback
 }
 
 function isForbidden(error: unknown): boolean {
@@ -94,15 +95,15 @@ async function load(): Promise<void> {
   editingLink.value = null
   deletingLinkId.value = null
   errorMessage.value = ''
-  emailMessage.value = canReadEmails.value ? '' : 'Email permission is not available.'
-  institutionMessage.value = canReadInstitutions.value ? '' : 'Institution permission is not available.'
+  emailMessage.value = canReadEmails.value ? '' : '当前没有查看邮箱的权限。'
+  institutionMessage.value = canReadInstitutions.value ? '' : '当前没有查看单位的权限。'
   try {
     const result = await getAuthor(authorId)
     if (!isCurrent(sequence, authorId)) return
     author.value = result
   } catch (error) {
     if (isCurrent(sequence, authorId)) {
-      errorMessage.value = safeError(error, 'Unable to load this author.')
+      errorMessage.value = safeError(error, '无法加载该作者。')
       loading.value = false
     }
     return
@@ -116,8 +117,8 @@ async function load(): Promise<void> {
       if (!isCurrent(sequence, authorId)) return
       emails.value = []
       emailMessage.value = isForbidden(error)
-        ? 'Emails are not available for this author.'
-        : safeError(error, 'Unable to load emails.')
+        ? '无法查看该作者的邮箱。'
+        : safeError(error, '无法加载邮箱。')
     }))
   }
   if (canReadInstitutions.value) {
@@ -127,8 +128,8 @@ async function load(): Promise<void> {
       if (!isCurrent(sequence, authorId)) return
       institutions.value = []
       institutionMessage.value = isForbidden(error)
-        ? 'Institutions are not available for this author.'
-        : safeError(error, 'Unable to load institutions.')
+        ? '无法查看该作者的单位。'
+        : safeError(error, '无法加载单位。')
     }))
   }
   await Promise.all(requests)
@@ -148,7 +149,7 @@ async function saveAuthor(payload: AuthorCreate | AuthorUpdate): Promise<void> {
     showAuthorForm.value = false
   } catch (error) {
     if (isCurrent(sequence, authorId)) {
-      authorMutationError.value = safeError(error, 'Unable to update the author.')
+      authorMutationError.value = safeError(error, '无法更新作者。')
     }
   } finally {
     if (isCurrent(sequence, authorId)) authorBusy.value = false
@@ -165,8 +166,8 @@ async function refreshEmails(sequence: number, authorId: string): Promise<void> 
     if (!isCurrent(sequence, authorId)) return
     emails.value = []
     emailMessage.value = isForbidden(error)
-      ? 'Emails are not available for this author.'
-      : safeError(error, 'Unable to load emails.')
+      ? '无法查看该作者的邮箱。'
+      : safeError(error, '无法加载邮箱。')
   }
 }
 
@@ -183,7 +184,7 @@ async function createEmailBinding(payload: EmailCreate): Promise<void> {
     if (isCurrent(sequence, authorId)) emailTableKey.value += 1
   } catch (error) {
     if (isCurrent(sequence, authorId)) {
-      emailMessage.value = safeError(error, 'Unable to create the email binding.')
+      emailMessage.value = safeError(error, '无法创建邮箱绑定。')
     }
   } finally {
     if (isCurrent(sequence, authorId)) emailBusy.value = false
@@ -203,7 +204,7 @@ async function updateEmailBinding(change: { emailId: string; payload: EmailUpdat
     if (isCurrent(sequence, authorId)) emailTableKey.value += 1
   } catch (error) {
     if (isCurrent(sequence, authorId)) {
-      emailMessage.value = safeError(error, 'Unable to update the email binding.')
+      emailMessage.value = safeError(error, '无法更新邮箱绑定。')
     }
   } finally {
     if (isCurrent(sequence, authorId)) emailBusy.value = false
@@ -223,7 +224,7 @@ async function deleteEmailBinding(change: { emailId: string; confirm_email_bindi
     if (isCurrent(sequence, authorId)) emailTableKey.value += 1
   } catch (error) {
     if (isCurrent(sequence, authorId)) {
-      emailMessage.value = safeError(error, 'Unable to unbind the email.')
+      emailMessage.value = safeError(error, '无法解绑邮箱。')
     }
   } finally {
     if (isCurrent(sequence, authorId)) emailBusy.value = false
@@ -263,7 +264,7 @@ async function openAffiliationForm(link?: AuthorInstitutionLinkResponse): Promis
     institutionOptions.value = []
     institutionOptionsLoaded.value = false
     preserveCurrentInstitution(link)
-    affiliationError.value = safeError(error, 'Unable to load institution choices.')
+    affiliationError.value = safeError(error, '无法加载单位选项。')
   }
 }
 
@@ -277,8 +278,8 @@ async function refreshInstitutions(sequence: number, authorId: string): Promise<
     if (!isCurrent(sequence, authorId)) return
     institutions.value = []
     institutionMessage.value = isForbidden(error)
-      ? 'Institutions are not available for this author.'
-      : safeError(error, 'Unable to load institutions.')
+      ? '无法查看该作者的单位。'
+      : safeError(error, '无法加载单位。')
   }
 }
 
@@ -308,7 +309,7 @@ async function saveAffiliation(
     editingLink.value = null
   } catch (error) {
     if (isCurrent(sequence, authorId)) {
-      affiliationError.value = safeError(error, 'Unable to save the affiliation.')
+      affiliationError.value = safeError(error, '无法保存单位关联。')
     }
   } finally {
     if (isCurrent(sequence, authorId)) affiliationBusy.value = false
@@ -326,7 +327,7 @@ function startAffiliationDelete(linkId: string): void {
 async function confirmAffiliationDelete(): Promise<void> {
   if (!deletingLinkId.value || affiliationBusy.value || !canManage.value) return
   if (!affiliationDeleteConfirmed.value) {
-    affiliationError.value = 'Confirm the affiliation removal separately before deleting.'
+    affiliationError.value = '删除前请单独确认移除单位关联。'
     return
   }
   const sequence = loadSequence
@@ -341,7 +342,7 @@ async function confirmAffiliationDelete(): Promise<void> {
     if (isCurrent(sequence, authorId)) deletingLinkId.value = null
   } catch (error) {
     if (isCurrent(sequence, authorId)) {
-      affiliationError.value = safeError(error, 'Unable to remove the affiliation.')
+      affiliationError.value = safeError(error, '无法移除单位关联。')
     }
   } finally {
     if (isCurrent(sequence, authorId)) affiliationBusy.value = false
@@ -353,23 +354,23 @@ watch([() => props.authorId, effectivePermissions], () => void load(), { immedia
 
 <template>
   <section class="management-page" aria-labelledby="author-detail-title">
-    <RouterLink to="/authors">Back to authors</RouterLink>
-    <h1 id="author-detail-title">Author detail</h1>
-    <p v-if="loading">Loading author…</p>
+    <RouterLink to="/authors">返回作者列表</RouterLink>
+    <h1 id="author-detail-title">作者详情</h1>
+    <p v-if="loading">正在加载作者…</p>
     <p v-if="errorMessage" class="form-error" role="alert">{{ errorMessage }}</p>
     <template v-if="author">
       <dl class="detail-grid">
-        <div><dt>Display name</dt><dd>{{ author.display_name }}</dd></div>
-        <div v-if="author.given_name != null"><dt>Given name</dt><dd>{{ author.given_name }}</dd></div>
-        <div v-if="author.middle_name != null"><dt>Middle name</dt><dd>{{ author.middle_name }}</dd></div>
-        <div v-if="author.family_name != null"><dt>Family name</dt><dd>{{ author.family_name }}</dd></div>
+        <div><dt>显示姓名</dt><dd>{{ author.display_name }}</dd></div>
+        <div v-if="author.given_name != null"><dt>名</dt><dd>{{ author.given_name }}</dd></div>
+        <div v-if="author.middle_name != null"><dt>中间名</dt><dd>{{ author.middle_name }}</dd></div>
+        <div v-if="author.family_name != null"><dt>姓</dt><dd>{{ author.family_name }}</dd></div>
         <div v-if="author.orcid != null"><dt>ORCID</dt><dd>{{ author.orcid }}</dd></div>
-        <div><dt>Status</dt><dd>{{ author.status }}</dd></div>
-        <div v-if="author.phone_country_code != null"><dt>Phone country code</dt><dd>{{ author.phone_country_code }}</dd></div>
-        <div v-if="author.phone_number != null"><dt>Phone number</dt><dd>{{ author.phone_number }}</dd></div>
-        <div v-if="author.notes != null"><dt>Notes</dt><dd>{{ author.notes }}</dd></div>
+        <div><dt>状态</dt><dd>{{ displayText(AUTHOR_STATUS_LABELS, author.status) }}</dd></div>
+        <div v-if="author.phone_country_code != null"><dt>电话国家代码</dt><dd>{{ author.phone_country_code }}</dd></div>
+        <div v-if="author.phone_number != null"><dt>电话号码</dt><dd>{{ author.phone_number }}</dd></div>
+        <div v-if="author.notes != null"><dt>备注</dt><dd>{{ author.notes }}</dd></div>
       </dl>
-      <button v-if="canManage && !showAuthorForm" type="button" data-test="edit-author" @click="showAuthorForm = true">Edit author</button>
+      <button v-if="canManage && !showAuthorForm" type="button" data-test="edit-author" @click="showAuthorForm = true">编辑作者</button>
       <p v-if="authorMutationError" class="form-error" role="alert">{{ authorMutationError }}</p>
       <AuthorForm
         v-if="canManage && showAuthorForm"
@@ -382,7 +383,7 @@ watch([() => props.authorId, effectivePermissions], () => void load(), { immedia
     </template>
 
     <section aria-labelledby="email-title">
-      <h2 id="email-title">Emails</h2>
+      <h2 id="email-title">邮箱</h2>
       <p v-if="emailMessage" role="status">{{ emailMessage }}</p>
       <EmailTable
         v-if="canReadEmails"
@@ -395,30 +396,30 @@ watch([() => props.authorId, effectivePermissions], () => void load(), { immedia
         @update="updateEmailBinding"
         @delete="deleteEmailBinding"
       />
-      <p v-else-if="!emailMessage">Email permission is not available.</p>
+      <p v-else-if="!emailMessage">当前没有查看邮箱的权限。</p>
     </section>
 
     <section aria-labelledby="institution-title">
-      <h2 id="institution-title">Institutions</h2>
+      <h2 id="institution-title">单位</h2>
       <p v-if="institutionMessage" role="status">{{ institutionMessage }}</p>
-      <p v-else-if="!loading && institutions.length === 0">No institution links.</p>
+      <p v-else-if="!loading && institutions.length === 0">暂无单位关联。</p>
       <table v-else>
-        <thead><tr><th>Institution</th><th>Department</th><th>Position</th><th>Current</th><th v-if="canManage">Actions</th></tr></thead>
+        <thead><tr><th>单位</th><th>院系</th><th>职务</th><th>当前单位</th><th v-if="canManage">操作</th></tr></thead>
         <tbody><tr v-for="link in institutions" :key="link.id">
-          <td>{{ link.institution_name }}</td><td>{{ link.department ?? '—' }}</td><td>{{ link.position_title ?? '—' }}</td><td>{{ link.is_current ? 'Yes' : 'No' }}</td>
+          <td>{{ link.institution_name }}</td><td>{{ link.department ?? '—' }}</td><td>{{ link.position_title ?? '—' }}</td><td>{{ link.is_current ? '是' : '否' }}</td>
           <td v-if="canManage">
-            <button type="button" :data-test="`edit-affiliation-${link.id}`" @click="openAffiliationForm(link)">Edit</button>
-            <button type="button" :data-test="`delete-affiliation-${link.id}`" @click="startAffiliationDelete(link.id)">Remove</button>
+            <button type="button" :data-test="`edit-affiliation-${link.id}`" @click="openAffiliationForm(link)">编辑</button>
+            <button type="button" :data-test="`delete-affiliation-${link.id}`" @click="startAffiliationDelete(link.id)">移除</button>
           </td>
         </tr></tbody>
       </table>
-      <button v-if="canManage && !showAffiliationForm" type="button" data-test="add-affiliation" @click="openAffiliationForm()">Add affiliation</button>
+      <button v-if="canManage && !showAffiliationForm" type="button" data-test="add-affiliation" @click="openAffiliationForm()">添加单位关联</button>
       <p v-if="affiliationError" class="form-error" role="alert">{{ affiliationError }}</p>
-      <section v-if="canManage && deletingLinkId" class="confirmation-panel" aria-label="Confirm affiliation removal">
-        <p>Remove this affiliation from the author? This action requires separate confirmation.</p>
-        <label class="confirmation-control"><input v-model="affiliationDeleteConfirmed" data-test="affiliation-delete-confirm" type="checkbox"> I confirm this affiliation removal.</label>
-        <button type="button" :data-test="`confirm-delete-affiliation-${deletingLinkId}`" :disabled="affiliationBusy" @click="confirmAffiliationDelete">Confirm removal</button>
-        <button type="button" @click="deletingLinkId = null">Cancel</button>
+      <section v-if="canManage && deletingLinkId" class="confirmation-panel" aria-label="确认移除单位关联">
+        <p>确定从该作者移除单位关联吗？此操作需单独确认。</p>
+        <label class="confirmation-control"><input v-model="affiliationDeleteConfirmed" data-test="affiliation-delete-confirm" type="checkbox"> 我确认移除该单位关联。</label>
+        <button type="button" :data-test="`confirm-delete-affiliation-${deletingLinkId}`" :disabled="affiliationBusy" @click="confirmAffiliationDelete">确认移除</button>
+        <button type="button" @click="deletingLinkId = null">取消</button>
       </section>
       <InstitutionLinkForm
         v-if="canManage && showAffiliationForm"

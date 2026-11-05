@@ -1,4 +1,4 @@
-"""Streaming upload checks and safe download filename construction."""
+"""执行流式上传校验并构造安全的下载文件名。"""
 
 from __future__ import annotations
 
@@ -81,7 +81,7 @@ class ValidatedFile:
 
 
 def safe_download_filename(filename: str) -> str:
-    """Remove header/path controls without using the name as a filesystem path."""
+    """移除响应头和路径控制字符，且不将该名称用作文件系统路径。"""
     cleaned = "".join(
         character
         for character in unicodedata.normalize("NFC", filename)
@@ -101,11 +101,11 @@ def content_disposition(filename: str) -> str:
 class FileValidator:
     def __init__(self, *, max_bytes: int = 100 * 1024 * 1024):
         if not 0 < max_bytes <= 500 * 1024 * 1024:
-            raise ValueError("max_bytes must be between 1 byte and 500 MiB")
+            raise ValueError("max_bytes 必须介于 1 字节和 500 MiB 之间")
         self.max_bytes = max_bytes
 
     def store(self, stream, destination: Path) -> FileDigest:
-        """Write at most 1 MiB per read, removing all partial output on failure."""
+        """每次最多读取 1 MiB；失败时删除所有不完整的输出。"""
         digest = hashlib.sha256()
         size = 0
         try:
@@ -311,10 +311,10 @@ class FileValidator:
             with zipfile.ZipFile(path) as archive:
                 entries = archive.infolist()
                 if len(entries) > MAX_OOXML_ENTRIES:
-                    raise UnsupportedFileType("OOXML entries exceed the 2,000-entry limit")
+                    raise UnsupportedFileType("OOXML（Office 开放 XML）文件条目超过 2,000 个的上限")
                 expanded = sum(entry.file_size for entry in entries)
                 if expanded > MAX_OOXML_EXPANDED_BYTES:
-                    raise UnsupportedFileType("OOXML expanded size exceeds the 500 MiB limit")
+                    raise UnsupportedFileType("OOXML（Office 开放 XML）文件解压后大小超过 500 MiB 上限")
                 for entry in entries:
                     if entry.flag_bits & 1:
                         raise UnsupportedFileType("OOXML 文件不能包含加密条目")
@@ -322,7 +322,7 @@ class FileValidator:
                         entry.compress_size == 0
                         or entry.file_size / entry.compress_size > MAX_OOXML_COMPRESSION_RATIO
                     ):
-                        raise UnsupportedFileType("OOXML entry compression ratio exceeds 100:1")
+                        raise UnsupportedFileType("OOXML（Office 开放 XML）文件条目压缩比超过 100:1")
                 names = {entry.filename for entry in entries}
                 required_names = {"[Content_Types].xml", "_rels/.rels", required_main}
                 if not required_names <= names or len(names) != len(entries):
@@ -389,7 +389,7 @@ class FileValidator:
                         continue
                     with archive.open(entry) as nested:
                         if cls._nested_zip(entry, nested):
-                            raise UnsupportedFileType("OOXML nested ZIP containers are forbidden")
+                            raise UnsupportedFileType("OOXML（Office 开放 XML）文件不得包含嵌套 ZIP 容器")
         except (
             DefusedXmlException,
             EOFError,

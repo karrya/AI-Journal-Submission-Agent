@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 
 from app.api.v1.contract_manifest import CONTRACTS
@@ -18,6 +19,39 @@ def test_exported_openapi_matches_generated_schema():
     project_root = Path(__file__).resolve().parents[2]
     artifact = project_root / "docs" / "api" / "v0.1-openapi.json"
     assert json.loads(artifact.read_text(encoding="utf-8")) == app.openapi()
+
+
+def test_openapi_titles_are_localized_for_readers():
+    document = app.openapi()
+    untranslated = []
+
+    def check_titles(value, location="document"):
+        if isinstance(value, dict):
+            for key, item in value.items():
+                item_location = f"{location}.{key}"
+                if key == "title" and isinstance(item, str):
+                    if re.search(r"[一-鿿]", item) is None:
+                        untranslated.append((item_location, item))
+                else:
+                    check_titles(item, item_location)
+        elif isinstance(value, list):
+            for index, item in enumerate(value):
+                check_titles(item, f"{location}[{index}]")
+
+    check_titles(document)
+    assert untranslated == []
+
+    schemas = document["components"]["schemas"]
+    assert schemas["AuthorUpdate"]["properties"]["display_name"]["title"] == "显示名称"
+    assert schemas["ChangePasswordRequest"]["properties"]["current_password"]["title"] == "当前密码"
+    assert schemas["FileResponse"]["properties"]["original_filename"]["title"] == "原始文件名"
+    assert schemas["FileResponse"]["properties"]["uploaded_by"]["title"] == "上传用户 ID"
+    page_size = next(
+        parameter
+        for parameter in document["paths"]["/api/v1/authors"]["get"]["parameters"]
+        if parameter["name"] == "page_size"
+    )
+    assert page_size["schema"]["title"] == "每页数量"
 
 
 def test_failed_audit_error_fields_are_in_the_openapi_schema():

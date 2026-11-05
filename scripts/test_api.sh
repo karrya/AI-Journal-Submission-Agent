@@ -27,6 +27,11 @@ from sqlalchemy.engine import make_url
 url = make_url(sys.argv[1])
 if not url.drivername.startswith("mysql+") or url.database != sys.argv[2]:
     raise SystemExit("Refusing to run API contracts against a non-test database")
+if url.host not in {"localhost", "127.0.0.1", "::1"}:
+    raise SystemExit(
+        "Refusing to run API contracts: TEST_DATABASE_URL host must be an "
+        "explicit loopback (localhost, 127.0.0.1, or ::1)"
+    )
 PY
 
 "$PYTHON" - <<'PY'

@@ -1233,7 +1233,12 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"HTTP 405\", function () { pm.response.to.have.status(405); });"
+                  "pm.test(\"HTTP 405\", function () { pm.response.to.have.status(405); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"error code is METHOD_NOT_ALLOWED\", function () { pm.expect(body.code).to.eql(\"METHOD_NOT_ALLOWED\"); });",
+                  "pm.test(\"error contract is flat\", function () {",
+                  "    pm.expect(Object.keys(body).sort()).to.eql([\"code\", \"details\", \"message\", \"request_id\"]);",
+                  "});"
                 ]
               }
             }
@@ -1252,7 +1257,12 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"HTTP 405\", function () { pm.response.to.have.status(405); });"
+                  "pm.test(\"HTTP 405\", function () { pm.response.to.have.status(405); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"error code is METHOD_NOT_ALLOWED\", function () { pm.expect(body.code).to.eql(\"METHOD_NOT_ALLOWED\"); });",
+                  "pm.test(\"error contract is flat\", function () {",
+                  "    pm.expect(Object.keys(body).sort()).to.eql([\"code\", \"details\", \"message\", \"request_id\"]);",
+                  "});"
                 ]
               }
             }
@@ -1280,7 +1290,12 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"HTTP 405\", function () { pm.response.to.have.status(405); });"
+                  "pm.test(\"HTTP 405\", function () { pm.response.to.have.status(405); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"error code is METHOD_NOT_ALLOWED\", function () { pm.expect(body.code).to.eql(\"METHOD_NOT_ALLOWED\"); });",
+                  "pm.test(\"error contract is flat\", function () {",
+                  "    pm.expect(Object.keys(body).sort()).to.eql([\"code\", \"details\", \"message\", \"request_id\"]);",
+                  "});"
                 ]
               }
             }

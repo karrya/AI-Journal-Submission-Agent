@@ -6019,10 +6019,10 @@
       },
       "Body_upload_file_api_v1_manuscripts__manuscript_id__versions__version_id__files_post": {
         "properties": {
-          "upload": {
+          "file": {
             "type": "string",
             "format": "binary",
-            "title": "Upload"
+            "title": "File"
           },
           "file_type": {
             "anyOf": [
@@ -6061,7 +6061,7 @@
         },
         "type": "object",
         "required": [
-          "upload"
+          "file"
         ],
         "title": "Body_upload_file_api_v1_manuscripts__manuscript_id__versions__version_id__files_post"
       },

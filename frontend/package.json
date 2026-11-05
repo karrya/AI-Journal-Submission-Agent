@@ -1,5 +1,8 @@
 {
   "devDependencies": {
     "newman": "^6.2.1"
+  },
+  "overrides": {
+    "@postman/form-data": "npm:form-data@4.0.6"
   }
 }

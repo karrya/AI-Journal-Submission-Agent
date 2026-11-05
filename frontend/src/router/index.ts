@@ -23,7 +23,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/dashboard',
     name: 'dashboard',
-    component: () => import('../views/DashboardView.vue'),
+    component: () => import('../views/dashboard/DashboardView.vue'),
     meta: { requiresAuth: true },
   },
   {
@@ -58,6 +58,25 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../views/journals/JournalListView.vue'),
     meta: { requiresAuth: true },
   },
+  {
+    path: '/manuscripts',
+    name: 'manuscript-list',
+    component: () => import('../views/manuscripts/ManuscriptListView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/manuscripts/:manuscriptId',
+    name: 'manuscript-detail',
+    component: () => import('../views/manuscripts/ManuscriptDetailView.vue'),
+    props: (route) => ({ manuscriptId: String(route.params.manuscriptId) }),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/audit',
+    name: 'audit-list',
+    component: () => import('../views/audit/AuditListView.vue'),
+    meta: { requiresAuth: true, roles: ['system_admin', 'auditor'] },
+  },
   { path: '/', redirect: '/dashboard' },
   { path: '/:pathMatch(.*)*', redirect: '/' },
 ]
@@ -74,6 +93,10 @@ export function createAppRouter(history: RouterHistory = createWebHistory()) {
     }
     if (to.meta.requiresAuth && !auth.user) {
       return { name: 'login', query: { redirect: to.fullPath } }
+    }
+    const requiredRoles = to.meta.roles as string[] | undefined
+    if (requiredRoles && !requiredRoles.some((role) => auth.user?.roles.includes(role))) {
+      return { name: 'dashboard' }
     }
     if (to.name === 'login' && auth.user) {
       return { name: 'dashboard' }

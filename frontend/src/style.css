@@ -299,6 +299,68 @@ td button {
   border-radius: 8px;
 }
 
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 16px;
+  margin: 24px 0;
+}
+
+.stat-tile {
+  padding: 20px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.stat-tile dt {
+  color: #64748b;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.stat-tile dd {
+  margin: 10px 0 0;
+  font-size: 40px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.authorship-list {
+  display: grid;
+  gap: 12px;
+  padding-left: 0;
+  list-style: none;
+}
+
+.authorship-row {
+  display: grid;
+  grid-template-columns: auto minmax(140px, 1fr) auto auto repeat(3, auto);
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.author-position {
+  color: #64748b;
+  font-weight: 600;
+}
+
+.upload-hint {
+  margin: 0;
+  color: #64748b;
+  font-size: 13px;
+}
+
+pre {
+  max-width: 100%;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 @media (max-width: 760px) {
   .app-header {
     flex-wrap: wrap;

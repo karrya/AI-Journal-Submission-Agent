@@ -62,10 +62,13 @@ and every subdirectory.
 
 The command rejects the development database, malformed or non-`_test` names,
 non-empty targets, live-storage paths, unsafe archive members, and hash mismatches.
-A MySQL-aware tokenizer accepts only expected mysqldump statement forms and rejects
-every schema-qualified reference, including quoted, comment-split, and executable
-comment variants. The import uses `mysql --one-database` and prepends only the
-validated isolated target `USE` statement after archive validation.
+A MySQL-aware tokenizer accepts only expected mysqldump statement forms and exact
+initialization/cleanup `SET` signatures; arbitrary SQL modes, user variables, and
+parser-affecting statements are rejected. It rejects every schema-qualified
+reference, including quoted, comment-split, and executable comment variants. The
+import establishes `NO_AUTO_VALUE_ON_ZERO` itself, uses `mysql --one-database`, and
+prepends only the validated isolated target `USE` statement after archive
+validation.
 
 The command compares dumped tables before migration, runs `alembic upgrade head`
 and `alembic check`, compares all source row counts except excluded sessions,

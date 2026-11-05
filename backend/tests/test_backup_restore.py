@@ -6,6 +6,7 @@ import json
 import subprocess
 import sys
 import tarfile
+import traceback
 from pathlib import Path
 
 import pytest
@@ -437,6 +438,10 @@ def test_extract_verified_backup_rejects_path_traversal(tmp_path, age_identity):
         "CREATE TABLE x AS SELECT * FROM academic_submission_agent.authors;",
         'SET sql_mode=\'ANSI_QUOTES\'; DROP TABLE "academic_submission_agent" . "authors";',
         "DROP TABLE 'academic_submission_agent'.'authors';",
+        "SET sql_mode=CONCAT('NO_BACKSLASH','_ESCAPES'); DROP TABLE authors;",
+        "SET SQL_MODE=@OLD_SQL_MODE; DROP TABLE authors;",
+        "SET NAMES latin1; DROP TABLE authors;",
+        "SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE=CONCAT('NO_BACKSLASH','_ESCAPES'); DROP TABLE authors;",
     ],
 )
 def test_hash_valid_cross_database_sql_never_reaches_mysql(
@@ -449,7 +454,7 @@ def test_hash_valid_cross_database_sql_never_reaches_mysql(
     executed = []
 
     def mysql_runner(*args):
-        executed.append(args)
+        executed.append(True)
 
     with pytest.raises(RestoreFailed):
         restore_backup(
@@ -495,8 +500,47 @@ Path(os.environ['MYSQL_INPUT_CAPTURE']).write_bytes(sys.stdin.buffer.read())
 
     assert capture.read_text(encoding="utf-8") == (
         "USE `academic_submission_agent_restore_test`;\n"
+        "SET SESSION SQL_MODE='NO_AUTO_VALUE_ON_ZERO';\n"
         "CREATE TABLE `authors` (`id` INT);\n"
     )
+
+
+def test_exact_parser_differential_is_rejected_at_set_statement(tmp_path, age_identity):
+    statement = (
+        r"SET sql_mode=CONCAT('NO_BACKSLASH','_ESCAPES'); "
+        r"SET @x=('\\'); "
+        "DROP TABLE academic_submission_agent.authors; -- ');"
+    )
+    archive, key_file = make_sql_archive(tmp_path, age_identity, statement.encode())
+
+    with pytest.raises(RestoreFailed, match="unsupported mysqldump SET statement"):
+        extract_verified_backup(archive, key_file, tmp_path / "verified")
+    assert not (tmp_path / "verified").exists()
+
+
+def test_subprocess_failure_diagnostics_are_sanitized(tmp_path, monkeypatch):
+    canary = "test-only-environment-canary"
+    monkeypatch.setenv("TASK_16_SECRET_CANARY", canary)
+    executable = tmp_path / "failing-mysql.py"
+    executable.write_text(
+        "#!/usr/bin/env python3\nimport sys; sys.stdin.buffer.read(); sys.exit(1)",
+        encoding="utf-8",
+    )
+    executable.chmod(0o700)
+    command, environment = _mysql_restore_arguments(
+        "mysql+pymysql://asa_test:target-unit-password@127.0.0.1/academic_submission_agent_restore_test"
+    )
+    command[0] = str(executable)
+    dump = tmp_path / "database.sql"
+    dump.write_text("CREATE TABLE `authors` (`id` INT);", encoding="utf-8")
+
+    with pytest.raises(RestoreFailed) as exc_info:
+        _run_mysql_restore(command, environment, dump)
+    diagnostics = "".join(traceback.format_exception(exc_info.value))
+    assert canary not in diagnostics
+    assert "target-unit-password" not in diagnostics
+    assert "MYSQL_PWD" not in diagnostics
+    assert "AGE_SECRET_KEY_FILE" not in diagnostics
 
 
 def test_dump_validator_accepts_unqualified_mysqldump_statements(tmp_path):
@@ -504,11 +548,14 @@ def test_dump_validator_accepts_unqualified_mysqldump_statements(tmp_path):
     dump.write_text(
         """/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 DROP TABLE IF EXISTS `authors`;
+/*!40101 SET @SAVED_CS_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET CHARACTER_SET_CLIENT=UTF8MB4 */;
 CREATE TABLE `authors` (`id` INT, `note` VARCHAR(100));
 LOCK TABLES `authors` WRITE;
 /*!40000 ALTER TABLE `authors` DISABLE KEYS */;
 INSERT INTO `authors` VALUES (1,'literal academic_submission_agent.authors');
 /*!40000 ALTER TABLE `authors` ENABLE KEYS */;
+/*!40101 SET CHARACTER_SET_CLIENT=@SAVED_CS_CLIENT */;
 UNLOCK TABLES;
 """,
         encoding="utf-8",
@@ -669,7 +716,8 @@ def test_restore_compares_database_files_hashes_and_source_snapshot(
     def mysql_runner(command, environment, dump_path):
         assert "--database=academic_submission_agent_restore_test" in command
         assert "--one-database" in command
-        assert environment["MYSQL_PWD"] == "target-unit-password"
+        password_is_expected = environment.get("MYSQL_PWD") == "target-unit-password"
+        assert password_is_expected
         assert "target-unit-password" not in command
         assert dump_path.read_bytes().startswith(b"CREATE TABLE `authors`")
         target.tables.update({"authors": 1, "alembic_version": 1})

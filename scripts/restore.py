@@ -225,21 +225,53 @@ def _mysql_tokens(dump: str) -> list[tuple[str, str]]:
     return tokens
 
 
+def _canonical_statement(
+    statement: list[tuple[str, str]],
+) -> tuple[tuple[str, str], ...]:
+    return tuple(
+        (kind, value.upper() if kind == "ident" else value) for kind, value in statement
+    )
+
+
+_INITIAL_MYSQLDUMP_SETS = (
+    "SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT",
+    "SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS",
+    "SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION",
+    "SET NAMES utf8mb4",
+    "SET @SAVED_CS_CLIENT=@@CHARACTER_SET_CLIENT",
+    "SET CHARACTER_SET_CLIENT=UTF8MB4",
+    "SET CHARACTER_SET_CLIENT=@SAVED_CS_CLIENT",
+    "SET @OLD_TIME_ZONE=@@TIME_ZONE",
+    "SET TIME_ZONE='+00:00'",
+    "SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0",
+    "SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0",
+    "SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO'",
+    "SET SQL_MODE='NO_AUTO_VALUE_ON_ZERO'",
+    "SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0",
+)
+_CLOSING_MYSQLDUMP_SETS = (
+    "SET TIME_ZONE=@OLD_TIME_ZONE",
+    "SET SQL_MODE=@OLD_SQL_MODE",
+    "SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS",
+    "SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS",
+    "SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT",
+    "SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS",
+    "SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION",
+    "SET SQL_NOTES=@OLD_SQL_NOTES",
+)
+_INITIAL_SET_SIGNATURES = {
+    _canonical_statement(_mysql_tokens(statement))
+    for statement in _INITIAL_MYSQLDUMP_SETS
+}
+_CLOSING_SET_SIGNATURES = {
+    _canonical_statement(_mysql_tokens(statement))
+    for statement in _CLOSING_MYSQLDUMP_SETS
+}
+
+
 def _validate_dump(dump_path: Path) -> None:
     dump = dump_path.read_text(encoding="utf-8")
     tokens = _mysql_tokens(dump)
-    for index in range(len(tokens) - 2):
-        left, dot, right = tokens[index : index + 3]
-        if (
-            left[0] in {"ident", "string"}
-            and dot == ("punct", ".")
-            and right[0] in {"ident", "string"}
-            and not (
-                left[0] == "ident" and index > 0 and tokens[index - 1] == ("punct", "@")
-            )
-        ):
-            raise RestoreFailed("database dump contains a schema-qualified reference")
-
     statements: list[list[tuple[str, str]]] = []
     statement: list[tuple[str, str]] = []
     for token in tokens:
@@ -253,7 +285,6 @@ def _validate_dump(dump_path: Path) -> None:
         statements.append(statement)
 
     allowed_second_keywords = {
-        "SET": set(),
         "DROP": {"TABLE"},
         "CREATE": {"TABLE"},
         "ALTER": {"TABLE"},
@@ -261,23 +292,44 @@ def _validate_dump(dump_path: Path) -> None:
         "LOCK": {"TABLES"},
         "UNLOCK": {"TABLES"},
     }
+    closing_seen = False
     for statement in statements:
         if statement[0][0] != "ident":
             raise RestoreFailed("database dump contains an unsupported statement")
         keyword = statement[0][1].upper()
+        if keyword == "SET":
+            signature = _canonical_statement(statement)
+            if signature in _CLOSING_SET_SIGNATURES:
+                closing_seen = True
+            elif signature in _INITIAL_SET_SIGNATURES and not closing_seen:
+                pass
+            else:
+                raise RestoreFailed(
+                    "database dump contains unsupported mysqldump SET statement"
+                )
+            continue
+        if closing_seen:
+            raise RestoreFailed(
+                "database dump contains statements after mysqldump cleanup"
+            )
         if keyword not in allowed_second_keywords:
             raise RestoreFailed("database dump contains an unsupported statement")
-        if keyword == "SET":
-            if any(
-                kind == "string" and "NO_BACKSLASH_ESCAPES" in value.upper()
-                for kind, value in statement
-            ):
-                raise RestoreFailed("database dump changes SQL string escaping")
-            continue
         if len(statement) < 2 or statement[1][0] != "ident":
             raise RestoreFailed("database dump contains an unsupported statement")
         if statement[1][1].upper() not in allowed_second_keywords[keyword]:
             raise RestoreFailed("database dump contains an unsupported statement")
+
+    for index in range(len(tokens) - 2):
+        left, dot, right = tokens[index : index + 3]
+        if (
+            left[0] in {"ident", "string"}
+            and dot == ("punct", ".")
+            and right[0] in {"ident", "string"}
+            and not (
+                left[0] == "ident" and index > 0 and tokens[index - 1] == ("punct", "@")
+            )
+        ):
+            raise RestoreFailed("database dump contains a schema-qualified reference")
 
 
 def extract_verified_backup(
@@ -396,6 +448,7 @@ def _run_mysql_restore(
             assert process.stdin is not None
             with process.stdin as stdin:
                 stdin.write(f"USE `{database}`;\n".encode("ascii"))
+                stdin.write(b"SET SESSION SQL_MODE='NO_AUTO_VALUE_ON_ZERO';\n")
                 shutil.copyfileobj(dump, stdin)
             return_code = process.wait()
         except BaseException:

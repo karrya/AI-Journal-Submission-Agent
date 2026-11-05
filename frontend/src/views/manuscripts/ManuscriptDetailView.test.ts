@@ -230,6 +230,149 @@ describe('ManuscriptDetailView', () => {
     expect(wrapper.get('[data-test="snapshot-history"]').text()).toContain('Version 101 immutable title')
   })
 
+  it('does not restore stale authorship when metadata finishes after authorship', async () => {
+    const baseAdapter = adapter.getMockImplementation()!
+    let finishPatch!: () => void
+    let finishAuthorship!: () => void
+    adapter.mockImplementation(async (config) => {
+      if (config.method === 'patch') {
+        return new Promise<AxiosResponse>((resolve) => {
+          finishPatch = () => resolve(success(config, { ...manuscript, title: 'Updated working title' }))
+        })
+      }
+      if (config.method === 'put') {
+        return new Promise<AxiosResponse>((resolve) => {
+          finishAuthorship = () => resolve(success(config, [owner]))
+        })
+      }
+      return baseAdapter(config)
+    })
+    const wrapper = mountDetail()
+    await flushPromises()
+    await wrapper.get('[data-test="metadata-title"]').setValue('Updated working title')
+    await wrapper.get('[data-test="metadata-form"]').trigger('submit')
+    await wrapper.get('[data-test="authorship-confirm"]').setValue(true)
+    await wrapper.get('[data-test="authorship-form"]').trigger('submit')
+
+    finishAuthorship()
+    await flushPromises()
+    expect(wrapper.get('.authorship-list').text()).not.toContain('Coauthor B')
+    finishPatch()
+    await flushPromises()
+
+    expect(wrapper.get('.authorship-list').text()).not.toContain('Coauthor B')
+    expect(wrapper.get('h1').text()).toBe('Updated working title')
+  })
+
+  it('keeps version creation locked when a refresh supersedes it', async () => {
+    const third = { ...versions[0], id: 'v3', version_number: 3, label: 'Revision three' }
+    let refreshed = false
+    let created = false
+    let finishCreate!: () => void
+    adapter.mockImplementation(async (config) => {
+      if (config.method === 'post') {
+        if (!finishCreate) {
+          return new Promise<AxiosResponse>((resolve) => {
+            finishCreate = () => {
+              created = true
+              resolve(success(config, third, 201))
+            }
+          })
+        }
+        return success(config, third, 201)
+      }
+      if (config.url === '/manuscripts/m1') {
+        return success(config, { ...manuscript, current_version_id: refreshed || created ? 'v3' : 'v2' })
+      }
+      if (config.url === '/manuscripts/m1/versions') {
+        return success(config, {
+          items: refreshed || created ? [third, ...versions] : versions,
+          page: 1, page_size: 100, total: refreshed || created ? 3 : 2,
+        })
+      }
+      if (config.url === '/manuscripts/m1/versions/v3') return success(config, third)
+      if (config.url === '/manuscripts/m1/versions/v3/files') return success(config, { items: [], page: 1, page_size: 100, total: 0 })
+      if (config.url === '/manuscripts/m1/versions/v2') return success(config, versions[0])
+      if (config.url === '/manuscripts/m1/versions/v2/files') return success(config, { items: [file], page: 1, page_size: 100, total: 1 })
+      if (config.url === '/authors') return success(config, { items: authorOptions, page: 1, page_size: 100, total: 2 })
+      throw new Error(`Unexpected request: ${config.method} ${config.url}`)
+    })
+    const wrapper = mountDetail()
+    await flushPromises()
+    await wrapper.get('[data-test="version-form"]').trigger('submit')
+
+    refreshed = true
+    wrapper.findComponent(FileFamilyUpload).vm.$emit('uploaded', file)
+    await flushPromises()
+    await wrapper.get('[data-test="version-form"]').trigger('submit')
+    finishCreate()
+    await flushPromises()
+
+    expect(adapter.mock.calls.filter(([config]) => config.method === 'post')).toHaveLength(1)
+    expect(wrapper.text()).toContain('Current version: 3')
+    expect(wrapper.get('[data-test="version-form"] button[type="submit"]').attributes('disabled')).toBeUndefined()
+  })
+
+  it('clears loading when a refresh supersedes a full workspace load', async () => {
+    const third = { ...versions[0], id: 'v3', version_number: 3, label: 'Revision three' }
+    let created = false
+    let holdNextLoad = false
+    let finishStaleLoad!: () => void
+    adapter.mockImplementation(async (config) => {
+      if (config.method === 'post') {
+        created = true
+        holdNextLoad = true
+        return success(config, third, 201)
+      }
+      if (config.url === '/manuscripts/m1') {
+        if (holdNextLoad) {
+          holdNextLoad = false
+          return new Promise<AxiosResponse>((resolve) => {
+            finishStaleLoad = () => resolve(success(config, { ...manuscript, current_version_id: 'v3' }))
+          })
+        }
+        return success(config, { ...manuscript, current_version_id: created ? 'v3' : 'v2' })
+      }
+      if (config.url === '/manuscripts/m1/versions') return success(config, { items: created ? [third, ...versions] : versions, page: 1, page_size: 100, total: created ? 3 : 2 })
+      if (config.url === '/manuscripts/m1/versions/v3') return success(config, third)
+      if (config.url === '/manuscripts/m1/versions/v3/files') return success(config, { items: [], page: 1, page_size: 100, total: 0 })
+      if (config.url === '/manuscripts/m1/versions/v2') return success(config, versions[0])
+      if (config.url === '/manuscripts/m1/versions/v2/files') return success(config, { items: [file], page: 1, page_size: 100, total: 1 })
+      if (config.url === '/authors') return success(config, { items: authorOptions, page: 1, page_size: 100, total: 2 })
+      throw new Error(`Unexpected request: ${config.method} ${config.url}`)
+    })
+    const wrapper = mountDetail()
+    await flushPromises()
+    await wrapper.get('[data-test="version-form"]').trigger('submit')
+    await flushPromises()
+
+    wrapper.findComponent(FileFamilyUpload).vm.$emit('uploaded', file)
+    finishStaleLoad()
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('Loading manuscript workspace…')
+  })
+
+  it('revokes Blob URLs and removes anchors after a DOM click exception', async () => {
+    const createObjectURL = vi.fn(() => 'blob:failed-click')
+    const revokeObjectURL = vi.fn()
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectURL })
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectURL })
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {
+      throw new Error('DOM click blocked')
+    })
+    const wrapper = mountDetail()
+    await flushPromises()
+    adapter.mockImplementationOnce(async (config) => success(config, new Blob(['authorized content'])))
+    await wrapper.get('[data-test="download-f1"]').trigger('click')
+    await flushPromises()
+    await new Promise<void>((resolve) => setTimeout(resolve, 0))
+
+    expect(wrapper.text()).toContain('Unable to download the file')
+    expect(document.querySelectorAll('a[download="paper.pdf"]')).toHaveLength(0)
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:failed-click')
+  })
+
   it('downloads through the authorized endpoint rather than a storage path', async () => {
     const createObjectURL = vi.fn(() => 'blob:authorized-download')
     const revokeObjectURL = vi.fn()
@@ -241,6 +384,7 @@ describe('ManuscriptDetailView', () => {
     adapter.mockImplementationOnce(async (config) => success(config, new Blob(['authorized content'])))
     await wrapper.get('[data-test="download-f1"]').trigger('click')
     await flushPromises()
+    await new Promise<void>((resolve) => setTimeout(resolve, 0))
 
     const download = adapter.mock.calls.find(([config]) => config.url === '/files/f1/download')
     expect(download?.[0]).toMatchObject({ method: 'get', responseType: 'blob' })

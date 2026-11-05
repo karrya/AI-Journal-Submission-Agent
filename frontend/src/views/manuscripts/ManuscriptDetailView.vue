@@ -97,7 +97,6 @@ async function loadWorkspace(): Promise<void> {
   errorMessage.value = ''
   metadataBusy.value = false
   authorshipBusy.value = false
-  versionBusy.value = false
   try {
     const result = await getManuscript(props.manuscriptId)
     if (!isCurrent(sequence)) return
@@ -127,9 +126,9 @@ async function loadWorkspace(): Promise<void> {
 
 async function refreshCurrentWorkspace(): Promise<void> {
   const sequence = ++loadSequence
+  loading.value = true
   metadataBusy.value = false
   authorshipBusy.value = false
-  versionBusy.value = false
   fileError.value = ''
   try {
     const result = await getManuscript(props.manuscriptId)
@@ -142,6 +141,8 @@ async function refreshCurrentWorkspace(): Promise<void> {
     currentVersion.value = null
     currentFiles.value = []
     fileError.value = safeError(error, 'Unable to refresh the current version and files.')
+  } finally {
+    if (isCurrent(sequence)) loading.value = false
   }
 }
 
@@ -172,8 +173,22 @@ async function saveMetadata(): Promise<void> {
       data_availability_statement: nullable(metadata.data_availability_statement),
       notes: nullable(metadata.notes),
     })
-    if (!isCurrent(sequence)) return
-    manuscript.value = result
+    if (!isCurrent(sequence) || !manuscript.value) return
+    manuscript.value = {
+      ...manuscript.value,
+      title: result.title,
+      abstract: result.abstract,
+      keywords: result.keywords,
+      article_type: result.article_type,
+      subject_field: result.subject_field,
+      language: result.language,
+      funding_statement: result.funding_statement,
+      conflict_of_interest_statement: result.conflict_of_interest_statement,
+      ethics_statement: result.ethics_statement,
+      data_availability_statement: result.data_availability_statement,
+      notes: result.notes,
+      updated_at: result.updated_at,
+    }
     syncMetadata(result)
   } catch (error) {
     if (isCurrent(sequence)) metadataError.value = safeError(error, 'Unable to update manuscript metadata.')
@@ -201,6 +216,7 @@ async function saveAuthorship(payload: ManuscriptAuthorsUpdate): Promise<void> {
 
 async function saveVersion(): Promise<void> {
   if (versionBusy.value || !manuscript.value || !canManage.value) return
+  const sequence = loadSequence
   versionBusy.value = true
   versionError.value = ''
   try {
@@ -208,6 +224,10 @@ async function saveVersion(): Promise<void> {
       label: nullable(versionLabel.value),
       change_note: nullable(versionNote.value),
     })
+    if (!isCurrent(sequence)) {
+      versionError.value = 'The version was created. Refresh the workspace before creating another version.'
+      return
+    }
     versionLabel.value = ''
     versionNote.value = ''
     await loadWorkspace()
@@ -222,20 +242,29 @@ async function download(file: ManuscriptFile): Promise<void> {
   if (downloadingId.value) return
   downloadingId.value = file.id
   fileError.value = ''
+  let objectUrl: string | null = null
+  let anchor: HTMLAnchorElement | null = null
   try {
     const blob = await downloadFile(file.id)
-    const url = URL.createObjectURL(blob)
-    const anchor = document.createElement('a')
-    anchor.href = url
+    objectUrl = URL.createObjectURL(blob)
+    anchor = document.createElement('a')
+    anchor.href = objectUrl
     anchor.download = file.original_filename
     anchor.rel = 'noopener'
     document.body.appendChild(anchor)
     anchor.click()
-    anchor.remove()
-    URL.revokeObjectURL(url)
   } catch (error) {
     fileError.value = safeError(error, 'Unable to download the file.')
   } finally {
+    try {
+      anchor?.remove()
+    } catch {
+      // Cleanup must still revoke the object URL if DOM removal fails.
+    }
+    if (objectUrl) {
+      const url = objectUrl
+      setTimeout(() => URL.revokeObjectURL(url), 0)
+    }
     downloadingId.value = null
   }
 }

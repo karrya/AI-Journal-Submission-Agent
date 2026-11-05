@@ -364,6 +364,7 @@ class FileService(DomainService):
                 and relative is not None
                 and final is not None
                 and not final_preexisting
+                and not isinstance(exc, FileExistsError)
                 and final.exists()
             ):
                 self._compensate_certain_rollback(

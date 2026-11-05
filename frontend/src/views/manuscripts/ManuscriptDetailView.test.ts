@@ -5,6 +5,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { api } from '../../api/client'
 import { useAuthStore, type User } from '../../stores/auth'
 import FileFamilyUpload from '../../components/FileFamilyUpload.vue'
+import AuthorshipEditor from '../../components/AuthorshipEditor.vue'
 import ManuscriptDetailView from './ManuscriptDetailView.vue'
 
 function success(config: InternalAxiosRequestConfig, data: unknown, status = 200): AxiosResponse {
@@ -159,6 +160,46 @@ describe('ManuscriptDetailView', () => {
     expect(JSON.parse(String(patch?.[0].data)).title).toBe('Updated working title')
     expect(wrapper.get('[data-test="snapshot-history"]').text()).toContain('Snapshot two title')
     expect(wrapper.get('[data-test="snapshot-history"]').text()).toContain('Immutable original title')
+  })
+
+  it('reloads on m1 to m2 route reuse without submitting stale authorship to m2', async () => {
+    const secondOwner = { author_id: 'a2', display_name: 'Owner Two', position: 1, is_corresponding: true }
+    const secondManuscript = {
+      ...manuscript,
+      id: 'm2', internal_number: 'MS-2', owner_author_id: 'a2', title: 'Second working title',
+      current_version_id: null, authors: [secondOwner],
+    }
+    const secondAuthorOption = {
+      ...authorOptions[0], id: 'a2', display_name: 'Owner Two',
+    }
+    adapter.mockImplementation(async (config) => {
+      if (config.url === '/manuscripts/m1') return success(config, manuscript)
+      if (config.url === '/manuscripts/m1/versions') return success(config, { items: versions, page: 1, page_size: 100, total: 2 })
+      if (config.url === '/manuscripts/m1/versions/v2') return success(config, versions[0])
+      if (config.url === '/manuscripts/m1/versions/v2/files') return success(config, { items: [file], page: 1, page_size: 100, total: 1 })
+      if (config.url === '/manuscripts/m2') return success(config, secondManuscript)
+      if (config.url === '/manuscripts/m2/versions') return success(config, { items: [], page: 1, page_size: 100, total: 0 })
+      if (config.url === '/authors') return success(config, { items: [...authorOptions, secondAuthorOption], page: 1, page_size: 100, total: 3 })
+      if (config.method === 'put') return success(config, [secondOwner])
+      throw new Error(`Unexpected request: ${config.method} ${config.url}`)
+    })
+    const wrapper = mountDetail()
+    await flushPromises()
+    const staleEditor = wrapper.findComponent(AuthorshipEditor)
+
+    await wrapper.setProps({ manuscriptId: 'm2' })
+    staleEditor.vm.$emit('submit', {
+      authors: [owner, coauthor].map(({ author_id, position, is_corresponding }) => ({ author_id, position, is_corresponding })),
+      confirm_authorship_change: true,
+    })
+    await flushPromises()
+
+    expect(adapter.mock.calls.filter(([config]) => config.method === 'put')).toHaveLength(0)
+    expect(adapter.mock.calls.some(([config]) => config.method === 'get' && config.url === '/manuscripts/m2')).toBe(true)
+    expect(wrapper.get('h1').text()).toBe('Second working title')
+    expect(wrapper.text()).not.toContain('Working abstract')
+    expect(wrapper.get('[data-test="snapshot-history"]').text()).not.toContain('Snapshot two title')
+    expect(wrapper.get('[data-test="current-files"]').text()).not.toContain('paper.pdf')
   })
 
   it('replaces authorship with ids, positions, flags, and confirmation only', async () => {

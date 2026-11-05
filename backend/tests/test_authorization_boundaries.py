@@ -250,6 +250,40 @@ def assert_no_sensitive_values(response):
         assert key not in serialized
 
 
+def assert_denial_audit(
+    db_session,
+    response,
+    *,
+    actor,
+    author,
+    permission,
+    error_code,
+    action,
+):
+    logs = db_session.scalars(
+        select(OperationLog).where(
+            OperationLog.request_id == response.json()["request_id"]
+        )
+    ).all()
+    assert len(logs) == 1
+    log = logs[0]
+    assert log.actor_user_id == actor.id
+    assert log.actor_type == "user"
+    assert log.category == "authorization"
+    assert log.action == action
+    assert log.target_type == "author"
+    assert log.target_id == author.id
+    assert log.author_id == author.id
+    assert log.result == "failure"
+    assert log.error_code == error_code
+    assert log.before_summary is None
+    assert log.after_summary == {"permission": permission}
+    serialized = json.dumps(
+        [log.before_summary, log.after_summary, log.error_message]
+    )
+    assert all(value not in serialized for value in SENSITIVE_VALUES)
+
+
 def test_role_01_system_admin_precedes_auditor_without_grants(
     client, user_factory, auth_context_factory, isolation_workspace
 ):
@@ -311,6 +345,15 @@ def test_role_01_reviewer_alone_remains_read_only_even_with_write_grant(
         json={"title": "Reviewer must not write"},
     )
     assert_error(response, 403, "PERMISSION_DENIED")
+    assert_denial_audit(
+        db_session,
+        response,
+        actor=reviewer,
+        author=isolation_workspace.owner,
+        permission="manuscript:update",
+        error_code="PERMISSION_DENIED",
+        action="authorization.permission_denied",
+    )
     assert "title" not in response.json()
     db_session.expire_all()
     assert db_session.get(Manuscript, isolation_workspace.own.manuscript.id).title == original_title
@@ -338,6 +381,7 @@ def test_authz_01_unauthorized_and_missing_uuids_are_indistinguishable(
 @pytest.mark.parametrize("state", ["not_yet_active", "expired", "revoked"])
 def test_authz_02_inactive_grant_returns_authorization_expired(
     client,
+    db_session,
     user_factory,
     auth_context_factory,
     grant_factory,
@@ -363,6 +407,15 @@ def test_authz_02_inactive_grant_returns_authorization_expired(
     auth_context_factory(user)
     response = client.get(f"/api/v1/authors/{isolation_workspace.owner.id}")
     body = assert_error(response, 403, "AUTHORIZATION_EXPIRED")
+    assert_denial_audit(
+        db_session,
+        response,
+        actor=user,
+        author=isolation_workspace.owner,
+        permission="author:profile:read",
+        error_code="AUTHORIZATION_EXPIRED",
+        action="authorization.expired",
+    )
     assert "display_name" not in body and "phone_number" not in body
 
 
@@ -388,6 +441,15 @@ def test_authz_03_read_only_mutation_is_denied_without_data_or_sensitive_audit(
         json={"title": "Denied sensitive replacement"},
     )
     assert_error(response, 403, "PERMISSION_DENIED")
+    assert_denial_audit(
+        db_session,
+        response,
+        actor=user,
+        author=isolation_workspace.owner,
+        permission="manuscript:update",
+        error_code="PERMISSION_DENIED",
+        action="authorization.permission_denied",
+    )
     assert "title" not in response.json()
     db_session.expire_all()
     assert db_session.get(Manuscript, isolation_workspace.own.manuscript.id).title == original_title

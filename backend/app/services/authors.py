@@ -138,7 +138,7 @@ class DomainService:
         author = None
         for permission in permissions:
             author = require_author_permission(
-                self.db, self.user, author_id, permission
+                self.db, self.user, author_id, permission, request_id=self.request_id
             )
         if author is None or author.deleted_at is not None:
             raise _not_found()

@@ -182,6 +182,7 @@ def client(db_engine, db_session, monkeypatch: pytest.MonkeyPatch):
 
     from app.core import database
 
+    monkeypatch.setattr(database, "engine", db_engine)
     monkeypatch.setattr(database, "SessionLocal", testing_session_local)
     app.dependency_overrides[get_db] = override_get_db
 

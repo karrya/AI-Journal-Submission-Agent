@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { listAuthors, type AuthorResponse } from '../../api/authors'
 import { getSafeRequestId } from '../../api/client'
@@ -77,34 +77,52 @@ function syncMetadata(value: Manuscript): void {
   })
 }
 
-async function loadCurrentVersion(sequence: number, versionId: string | null): Promise<void> {
+async function loadCurrentVersion(sequence: number, manuscriptId: string, versionId: string | null): Promise<void> {
   currentVersion.value = null
   currentFiles.value = []
   if (!versionId) return
-  const version = await getManuscriptVersion(props.manuscriptId, versionId)
+  const version = await getManuscriptVersion(manuscriptId, versionId)
   if (!isCurrent(sequence)) return
   currentVersion.value = version
   const files = await fetchAllPages((page, pageSize) => listFiles(
-    props.manuscriptId, versionId, { page, page_size: pageSize },
+    manuscriptId, versionId, { page, page_size: pageSize },
   ))
   if (!isCurrent(sequence)) return
   currentFiles.value = files.items
 }
 
+function clearWorkspace(): void {
+  manuscript.value = null
+  versions.value = []
+  currentVersion.value = null
+  currentFiles.value = []
+  authorOptions.value = []
+  Object.assign(metadata, {
+    title: '', abstract: '', keywords: '', article_type: '', subject_field: '', language: '',
+    funding_statement: '', conflict_of_interest_statement: '', ethics_statement: '',
+    data_availability_statement: '', notes: '',
+  })
+  metadataError.value = ''
+  authorshipError.value = ''
+  versionError.value = ''
+  fileError.value = ''
+}
+
 async function loadWorkspace(): Promise<void> {
+  const manuscriptId = props.manuscriptId
   const sequence = ++loadSequence
   loading.value = true
   errorMessage.value = ''
   metadataBusy.value = false
   authorshipBusy.value = false
   try {
-    const result = await getManuscript(props.manuscriptId)
+    const result = await getManuscript(manuscriptId)
     if (!isCurrent(sequence)) return
     manuscript.value = result
     syncMetadata(result)
     const [versionPage, authors] = await Promise.all([
       fetchAllPages((page, pageSize) => listManuscriptVersions(
-        props.manuscriptId, { page, page_size: pageSize },
+        manuscriptId, { page, page_size: pageSize },
       )),
       fetchAllPages((page, pageSize) => listAuthors({
         page, page_size: pageSize, sort: 'display_name', order: 'asc',
@@ -113,7 +131,7 @@ async function loadWorkspace(): Promise<void> {
     if (!isCurrent(sequence)) return
     versions.value = versionPage.items
     authorOptions.value = authors.items
-    await loadCurrentVersion(sequence, result.current_version_id)
+    await loadCurrentVersion(sequence, manuscriptId, result.current_version_id)
   } catch (error) {
     if (!isCurrent(sequence)) return
     errorMessage.value = safeError(error, 'Unable to load the manuscript workspace.')
@@ -125,17 +143,18 @@ async function loadWorkspace(): Promise<void> {
 }
 
 async function refreshCurrentWorkspace(): Promise<void> {
+  const manuscriptId = props.manuscriptId
   const sequence = ++loadSequence
   loading.value = true
   metadataBusy.value = false
   authorshipBusy.value = false
   fileError.value = ''
   try {
-    const result = await getManuscript(props.manuscriptId)
+    const result = await getManuscript(manuscriptId)
     if (!isCurrent(sequence)) return
     manuscript.value = result
     syncMetadata(result)
-    await loadCurrentVersion(sequence, result.current_version_id)
+    await loadCurrentVersion(sequence, manuscriptId, result.current_version_id)
   } catch (error) {
     if (!isCurrent(sequence)) return
     currentVersion.value = null
@@ -151,7 +170,9 @@ function nullable(value: string): string | null {
 }
 
 async function saveMetadata(): Promise<void> {
-  if (metadataBusy.value || !manuscript.value || !canManage.value) return
+  const current = manuscript.value
+  if (metadataBusy.value || !current || current.id !== props.manuscriptId || !canManage.value) return
+  const manuscriptId = current.id
   metadataError.value = ''
   if (!metadata.title.trim() || !metadata.abstract.trim() || !metadata.article_type.trim() || !metadata.language.trim()) {
     metadataError.value = 'Title, abstract, article type, and language are required.'
@@ -160,7 +181,7 @@ async function saveMetadata(): Promise<void> {
   const sequence = loadSequence
   metadataBusy.value = true
   try {
-    const result = await updateManuscript(props.manuscriptId, {
+    const result = await updateManuscript(manuscriptId, {
       title: metadata.title.trim(),
       abstract: metadata.abstract.trim(),
       keywords: metadata.keywords.split(',').map((keyword) => keyword.trim()).filter(Boolean),
@@ -198,12 +219,14 @@ async function saveMetadata(): Promise<void> {
 }
 
 async function saveAuthorship(payload: ManuscriptAuthorsUpdate): Promise<void> {
-  if (authorshipBusy.value || !manuscript.value || !canManage.value) return
+  const current = manuscript.value
+  if (authorshipBusy.value || !current || current.id !== props.manuscriptId || !canManage.value) return
+  const manuscriptId = current.id
   const sequence = loadSequence
   authorshipBusy.value = true
   authorshipError.value = ''
   try {
-    const authors = await replaceManuscriptAuthors(props.manuscriptId, payload)
+    const authors = await replaceManuscriptAuthors(manuscriptId, payload)
     if (!isCurrent(sequence) || !manuscript.value) return
     manuscript.value = { ...manuscript.value, authors }
     authorshipFormKey.value += 1
@@ -215,12 +238,14 @@ async function saveAuthorship(payload: ManuscriptAuthorsUpdate): Promise<void> {
 }
 
 async function saveVersion(): Promise<void> {
-  if (versionBusy.value || !manuscript.value || !canManage.value) return
+  const current = manuscript.value
+  if (versionBusy.value || !current || current.id !== props.manuscriptId || !canManage.value) return
+  const manuscriptId = current.id
   const sequence = loadSequence
   versionBusy.value = true
   versionError.value = ''
   try {
-    await createManuscriptVersion(props.manuscriptId, {
+    await createManuscriptVersion(manuscriptId, {
       label: nullable(versionLabel.value),
       change_note: nullable(versionNote.value),
     })
@@ -269,7 +294,10 @@ async function download(file: ManuscriptFile): Promise<void> {
   }
 }
 
-onMounted(() => void loadWorkspace())
+watch(() => props.manuscriptId, () => {
+  clearWorkspace()
+  void loadWorkspace()
+}, { immediate: true, flush: 'sync' })
 </script>
 
 <template>

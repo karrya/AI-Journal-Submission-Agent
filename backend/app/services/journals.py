@@ -320,9 +320,10 @@ class JournalService(JournalResourceService):
             requirements = []
             for requirement in normalized["requirements"]:
                 item = dict(requirement)
-                verified_at = _utc(item["verified_at"])
-                assert verified_at is not None
-                item["verified_at"] = verified_at.isoformat()
+                verified_at = item["verified_at"]
+                if verified_at.tzinfo is None or verified_at.utcoffset() is None:
+                    raise _validation("Requirement verified_at must be timezone-aware")
+                item["verified_at"] = verified_at.astimezone(UTC).isoformat()
                 requirements.append(item)
             normalized["requirements"] = requirements
         if "requirements_verified_at" in normalized:

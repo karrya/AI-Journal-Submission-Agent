@@ -95,7 +95,7 @@ export function getSafeRequestId(error: unknown): string | null {
   const body = error.response?.data as ApiErrorBody | undefined
   const header = error.response?.headers?.['x-request-id']
   const candidate = body?.request_id ?? (typeof header === 'string' ? header : null)
-  if (!candidate) return null
+  if (typeof candidate !== 'string' || !candidate) return null
   const requestId = candidate.trim()
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(requestId)
     ? requestId

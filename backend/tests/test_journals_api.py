@@ -178,6 +178,37 @@ def test_journal_crud_normalizes_issn_and_preserves_provenance(
     assert client.get(f"/api/v1/journals/{body['id']}").status_code == 404
 
 
+def test_journal_requirement_offsets_are_normalized_to_utc_before_storage_and_response(
+    client, db_session, admin_context, publisher
+):
+    from app.models import Journal
+
+    requirement = {
+        "key": "abstract_words",
+        "value": 250,
+        "scope": "research",
+        "source_url": "https://journal.example/guide",
+        "verified_at": "2026-11-04T08:30:00+08:30",
+    }
+    created = client.post(
+        "/api/v1/journals",
+        json=journal_payload(publisher, requirements=[requirement]),
+    )
+    assert created.status_code == 201, created.text
+    assert created.json()["requirements"][0]["verified_at"] == "2026-11-04T00:00:00Z"
+
+    db_session.expire_all()
+    stored = db_session.get(Journal, created.json()["id"])
+    assert stored is not None
+    assert stored.requirements[0]["verified_at"] in {
+        "2026-11-04T00:00:00+00:00",
+        "2026-11-04T00:00:00Z",
+    }
+    detail = client.get(f"/api/v1/journals/{created.json()['id']}")
+    assert detail.status_code == 200
+    assert detail.json()["requirements"][0]["verified_at"] == "2026-11-04T00:00:00Z"
+
+
 @pytest.mark.parametrize("role", ["system_admin", "submission_operator", "reviewer"])
 @pytest.mark.parametrize(
     "path", ["/api/v1/publishers", "/api/v1/journal-platforms", "/api/v1/journals"]
@@ -256,6 +287,7 @@ def test_journal_rejects_invalid_issn_checksum_or_format(
     [
         {"key": "abstract", "value": 250, "scope": "research", "verified_at": "2026-11-04T00:00:00Z"},
         {"key": "abstract", "value": 250, "scope": "research", "source_url": "https://journal.example/guide"},
+        {"key": "abstract", "value": 250, "scope": "research", "source_url": "https://journal.example/guide", "verified_at": "2026-11-04T00:00:00"},
         {"key": "abstract", "value": 250, "scope": "research", "source_url": "http://journal.example/guide", "verified_at": "2026-11-04T00:00:00Z"},
     ],
 )

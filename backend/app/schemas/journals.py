@@ -1,5 +1,5 @@
 import re
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Annotated, Literal
 from uuid import UUID
 
@@ -96,6 +96,13 @@ class JournalRequirement(InputModel):
     scope: str = Field(min_length=1)
     source_url: SecureUrl = Field(max_length=1024)
     verified_at: datetime
+
+    @field_validator("verified_at")
+    @classmethod
+    def normalize_verified_at(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("Requirement verified_at must be timezone-aware")
+        return value.astimezone(UTC)
 
     @field_validator("value")
     @classmethod

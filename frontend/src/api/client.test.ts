@@ -1,5 +1,5 @@
 import { AxiosError, AxiosHeaders, type AxiosAdapter, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios'
-import { api, setCsrfToken } from './client'
+import { api, getSafeRequestId, setCsrfToken } from './client'
 import router from '../router'
 import { useAuthStore, type User } from '../stores/auth'
 import { createPinia, setActivePinia } from 'pinia'
@@ -99,6 +99,18 @@ describe('typed API client', () => {
       response: { data: { code: 'PERMISSION_DENIED' } },
     })
     expect(adapter).toHaveBeenCalledTimes(1)
+  })
+
+  it.each([
+    ['numeric', 12345],
+    ['object', { value: 'not-a-string' }],
+    ['null', null],
+  ])('returns null for a %s runtime request_id without throwing', (_label, requestId) => {
+    const config = { headers: new AxiosHeaders() } as InternalAxiosRequestConfig
+    const error = failure(config, 403, { code: 'PERMISSION_DENIED', request_id: requestId })
+
+    expect(() => getSafeRequestId(error)).not.toThrow()
+    expect(getSafeRequestId(error)).toBeNull()
   })
 
   it('clears authentication and routes to login on 401', async () => {

@@ -2,7 +2,8 @@
 
 from datetime import UTC, datetime
 from enum import Enum
-from typing import Annotated
+from typing import Annotated, NoReturn
+from uuid import uuid4
 
 from fastapi import Depends
 from sqlalchemy import select
@@ -12,6 +13,7 @@ from app.api.v1.deps import Principal, get_principal
 from app.core.errors import AppError
 from app.models import Author, Role, User, UserRole, utc_now
 from app.repositories.authorizations import AuthorizationRepository
+from app.services.audit import AuditService
 
 
 class Permission(str, Enum):
@@ -93,16 +95,57 @@ def has_author_permission(
     )
 
 
+def _deny_author_permission(
+    db: Session,
+    user: User,
+    author_id: str,
+    permission: Permission,
+    request_id: str | None,
+    error_code: str,
+) -> NoReturn:
+    """Persist a sanitized denial without converting unknown resources into 404s."""
+    message = (
+        "作者授权未生效、已过期或已撤销"
+        if error_code == "AUTHORIZATION_EXPIRED"
+        else "当前用户无权执行此操作"
+    )
+    author = db.get(Author, author_id)
+    AuditService(db).record(
+        actor_user_id=user.id,
+        actor_type="user",
+        category="authorization",
+        action=(
+            "authorization.expired"
+            if error_code == "AUTHORIZATION_EXPIRED"
+            else "authorization.permission_denied"
+        ),
+        target_type="author",
+        target_id=author_id,
+        author_id=author.id if author is not None else None,
+        request_id=request_id or str(uuid4()),
+        result="failure",
+        after={"permission": permission.value},
+        allowed_fields={"permission"},
+        error_code=error_code,
+        error_message=message,
+    )
+    db.commit()
+    raise AppError(403, error_code, message)
+
+
 def require_author_permission(
     db: Session,
     user: User,
     author_id: str,
     permission: Permission,
     now_utc: datetime | None = None,
+    request_id: str | None = None,
 ) -> Author:
     roles = _active_role_codes(db, user)
     if not _role_allows(roles, permission):
-        raise AppError(403, "PERMISSION_DENIED", "当前用户无权执行此操作")
+        _deny_author_permission(
+            db, user, author_id, permission, request_id, "PERMISSION_DENIED"
+        )
 
     if "system_admin" in roles:
         author = db.get(Author, author_id)
@@ -123,9 +166,13 @@ def require_author_permission(
             raise AppError(404, "RESOURCE_NOT_FOUND", "资源不存在")
         return author
     if repository.any_current(user_id=user.id, author_id=author_id, now_utc=now):
-        raise AppError(403, "PERMISSION_DENIED", "当前用户无权执行此操作")
+        _deny_author_permission(
+            db, user, author_id, permission, request_id, "PERMISSION_DENIED"
+        )
     if repository.any_record(user_id=user.id, author_id=author_id):
-        raise AppError(403, "AUTHORIZATION_EXPIRED", "作者授权未生效、已过期或已撤销")
+        _deny_author_permission(
+            db, user, author_id, permission, request_id, "AUTHORIZATION_EXPIRED"
+        )
     raise AppError(404, "RESOURCE_NOT_FOUND", "资源不存在")
 
 

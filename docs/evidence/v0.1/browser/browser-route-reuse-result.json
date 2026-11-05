@@ -1,0 +1,174 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-11-05T16:02:19.951Z",
+  "browser": "Google Chrome 156.0.8078.80 via temporary playwright-core",
+  "synthetic_data_only": true,
+  "route_reuse": "m1 to m2 through Vue Router popstate with delayed m2 GET",
+  "old_representation_cleared_before_m2_response": true,
+  "detached_m1_authorship_submit_attempted": true,
+  "authorship_put_request_count": 0,
+  "second_manuscript_rendered": true,
+  "redaction": "Only synthetic assertions, API methods, paths, and statuses are retained. No credentials, headers, cookies, bodies, origins, or query strings are retained.",
+  "events": [
+    {
+      "event": "request",
+      "method": "GET",
+      "path": "/api/v1/auth/me"
+    },
+    {
+      "event": "response",
+      "method": "GET",
+      "path": "/api/v1/auth/me",
+      "status": 401
+    },
+    {
+      "event": "request",
+      "method": "POST",
+      "path": "/api/v1/auth/login"
+    },
+    {
+      "event": "response",
+      "method": "POST",
+      "path": "/api/v1/auth/login",
+      "status": 200
+    },
+    {
+      "event": "request",
+      "method": "GET",
+      "path": "/api/v1/dashboard/summary"
+    },
+    {
+      "event": "request",
+      "method": "GET",
+      "path": "/api/v1/auth/me"
+    },
+    {
+      "event": "response",
+      "method": "GET",
+      "path": "/api/v1/auth/me",
+      "status": 200
+    },
+    {
+      "event": "request",
+      "method": "GET",
+      "path": "/api/v1/auth/csrf"
+    },
+    {
+      "event": "response",
+      "method": "GET",
+      "path": "/api/v1/auth/csrf",
+      "status": 200
+    },
+    {
+      "event": "request",
+      "method": "GET",
+      "path": "/api/v1/manuscripts/f2170d5c-b1dd-4ab9-80a1-35588b4ae808"
+    },
+    {
+      "event": "response",
+      "method": "GET",
+      "path": "/api/v1/manuscripts/f2170d5c-b1dd-4ab9-80a1-35588b4ae808",
+      "status": 200
+    },
+    {
+      "event": "request",
+      "method": "GET",
+      "path": "/api/v1/manuscripts/f2170d5c-b1dd-4ab9-80a1-35588b4ae808/versions"
+    },
+    {
+      "event": "request",
+      "method": "GET",
+      "path": "/api/v1/authors"
+    },
+    {
+      "event": "response",
+      "method": "GET",
+      "path": "/api/v1/manuscripts/f2170d5c-b1dd-4ab9-80a1-35588b4ae808/versions",
+      "status": 200
+    },
+    {
+      "event": "response",
+      "method": "GET",
+      "path": "/api/v1/authors",
+      "status": 200
+    },
+    {
+      "event": "request",
+      "method": "GET",
+      "path": "/api/v1/manuscripts/f2170d5c-b1dd-4ab9-80a1-35588b4ae808/versions/3a07f350-ed12-4ba8-9973-a415f9beb44e"
+    },
+    {
+      "event": "response",
+      "method": "GET",
+      "path": "/api/v1/manuscripts/f2170d5c-b1dd-4ab9-80a1-35588b4ae808/versions/3a07f350-ed12-4ba8-9973-a415f9beb44e",
+      "status": 200
+    },
+    {
+      "event": "request",
+      "method": "GET",
+      "path": "/api/v1/manuscripts/f2170d5c-b1dd-4ab9-80a1-35588b4ae808/versions/3a07f350-ed12-4ba8-9973-a415f9beb44e/files"
+    },
+    {
+      "event": "response",
+      "method": "GET",
+      "path": "/api/v1/manuscripts/f2170d5c-b1dd-4ab9-80a1-35588b4ae808/versions/3a07f350-ed12-4ba8-9973-a415f9beb44e/files",
+      "status": 200
+    },
+    {
+      "event": "request",
+      "method": "GET",
+      "path": "/api/v1/manuscripts/7bd08505-2d34-4003-a088-42d1ff495f28"
+    },
+    {
+      "event": "response",
+      "method": "GET",
+      "path": "/api/v1/manuscripts/7bd08505-2d34-4003-a088-42d1ff495f28",
+      "status": 200
+    },
+    {
+      "event": "request",
+      "method": "GET",
+      "path": "/api/v1/manuscripts/7bd08505-2d34-4003-a088-42d1ff495f28/versions"
+    },
+    {
+      "event": "request",
+      "method": "GET",
+      "path": "/api/v1/authors"
+    },
+    {
+      "event": "response",
+      "method": "GET",
+      "path": "/api/v1/manuscripts/7bd08505-2d34-4003-a088-42d1ff495f28/versions",
+      "status": 200
+    },
+    {
+      "event": "response",
+      "method": "GET",
+      "path": "/api/v1/authors",
+      "status": 200
+    },
+    {
+      "event": "request",
+      "method": "GET",
+      "path": "/api/v1/manuscripts/7bd08505-2d34-4003-a088-42d1ff495f28/versions/5ae0b061-b986-431c-9b2b-c6d6a219c5c7"
+    },
+    {
+      "event": "response",
+      "method": "GET",
+      "path": "/api/v1/manuscripts/7bd08505-2d34-4003-a088-42d1ff495f28/versions/5ae0b061-b986-431c-9b2b-c6d6a219c5c7",
+      "status": 200
+    },
+    {
+      "event": "request",
+      "method": "GET",
+      "path": "/api/v1/manuscripts/7bd08505-2d34-4003-a088-42d1ff495f28/versions/5ae0b061-b986-431c-9b2b-c6d6a219c5c7/files"
+    },
+    {
+      "event": "response",
+      "method": "GET",
+      "path": "/api/v1/manuscripts/7bd08505-2d34-4003-a088-42d1ff495f28/versions/5ae0b061-b986-431c-9b2b-c6d6a219c5c7/files",
+      "status": 200
+    }
+  ],
+  "status": "passed"
+}

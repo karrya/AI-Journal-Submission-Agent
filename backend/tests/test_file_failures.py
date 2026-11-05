@@ -7,7 +7,7 @@ from pathlib import Path
 from uuid import UUID, uuid4
 
 import pytest
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.errors import AppError
@@ -136,6 +136,30 @@ def upload_direct(service, manuscript):
     )
 
 
+def test_default_recovery_connections_never_escape_the_test_schema(
+    client, db_engine, db_session, test_storage_root, operator
+):
+    service = FileService(
+        db_session,
+        operator,
+        str(uuid4()),
+        storage=StorageService(test_storage_root),
+    )
+    original_factory = service.session_factory
+    observed_schemas = []
+
+    def checked_recovery_session():
+        session = original_factory()
+        # Fail before issuing SQL if the production global engine escapes the fixture.
+        assert session.get_bind() is db_engine
+        observed_schemas.append(session.scalar(text("SELECT DATABASE()")))
+        return session
+
+    service.session_factory = checked_recovery_session
+    assert service._record_absent_on_new_connection(str(uuid4())) is True
+    assert observed_schemas == ["academic_submission_agent_test"]
+
+
 def test_move_failure_rolls_back_and_cleans_temp(
     db_session, test_storage_root, manuscript, operator, monkeypatch
 ):
@@ -219,6 +243,42 @@ def test_failed_move_never_deletes_a_preexisting_formal_file(
         upload_direct(service, manuscript)
     assert final.read_bytes() == SECOND_PDF
     assert db_session.scalar(select(func.count()).select_from(ManuscriptFile)) == 0
+
+
+def test_destination_created_during_publication_is_never_overwritten_or_compensated(
+    db_session, test_storage_root, manuscript, operator, monkeypatch
+):
+    service = direct_service(db_session, operator, test_storage_root)
+    file_id = str(uuid4())
+    monkeypatch.setattr("app.services.files.uuid4", lambda: UUID(file_id))
+    relative = service.storage.relative_path(
+        manuscript.owner_author_id,
+        manuscript.id,
+        manuscript.current_version_id,
+        file_id,
+        ".pdf",
+    )
+    final = service.storage.resolve(relative)
+    original_replace = os.replace
+    original_link = os.link
+
+    def destination_race(operation):
+        def create_then_publish(source, destination, *args, **kwargs):
+            final.parent.mkdir(parents=True, exist_ok=True)
+            final.write_bytes(SECOND_PDF)
+            return operation(source, destination, *args, **kwargs)
+
+        return create_then_publish
+
+    # Hook both the vulnerable and fixed primitives so the race is deterministic.
+    monkeypatch.setattr(os, "replace", destination_race(original_replace))
+    monkeypatch.setattr(os, "link", destination_race(original_link))
+    with pytest.raises(FileExistsError):
+        upload_direct(service, manuscript)
+
+    assert final.read_bytes() == SECOND_PDF
+    assert db_session.scalar(select(func.count()).select_from(ManuscriptFile)) == 0
+    assert not (test_storage_root / "reconciliation.jsonl").exists()
 
 
 def test_unknown_commit_outcome_preserves_file_and_appends_manifest(

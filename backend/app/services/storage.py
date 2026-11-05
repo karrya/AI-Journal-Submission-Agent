@@ -71,7 +71,8 @@ class StorageService:
         if final.exists():
             raise FileExistsError("formal file already exists")
         final.parent.mkdir(parents=True, exist_ok=True)
-        os.replace(temporary, final)
+        os.link(temporary, final)
+        os.unlink(temporary)
         return final
 
     @staticmethod

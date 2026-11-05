@@ -1,0 +1,932 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-11-05T13:45:09.506Z",
+  "redaction": "Only API methods, URL paths, statuses, and sequence numbers are retained. No origins, query strings, headers, cookies, CSRF/session tokens, request/response bodies, passwords, or credentials are retained.",
+  "synthetic_data_only": true,
+  "events": [
+    {
+      "sequence": 1,
+      "event": "request",
+      "actor": "operator",
+      "method": "GET",
+      "path": "/api/v1/auth/me"
+    },
+    {
+      "sequence": 2,
+      "event": "response",
+      "actor": "operator",
+      "request_sequence": 1,
+      "method": "GET",
+      "path": "/api/v1/auth/me",
+      "status": 401
+    },
+    {
+      "sequence": 3,
+      "event": "request",
+      "actor": "operator",
+      "method": "POST",
+      "path": "/api/v1/auth/login"
+    },
+    {
+      "sequence": 4,
+      "event": "response",
+      "actor": "operator",
+      "request_sequence": 3,
+      "method": "POST",
+      "path": "/api/v1/auth/login",
+      "status": 200
+    },
+    {
+      "sequence": 5,
+      "event": "request",
+      "actor": "operator",
+      "method": "GET",
+      "path": "/api/v1/dashboard/summary"
+    },
+    {
+      "sequence": 6,
+      "event": "request",
+      "actor": "operator",
+      "method": "GET",
+      "path": "/api/v1/auth/me"
+    },
+    {
+      "sequence": 7,
+      "event": "response",
+      "actor": "operator",
+      "request_sequence": 6,
+      "method": "GET",
+      "path": "/api/v1/auth/me",
+      "status": 200
+    },
+    {
+      "sequence": 8,
+      "event": "request",
+      "actor": "operator",
+      "method": "GET",
+      "path": "/api/v1/auth/csrf"
+    },
+    {
+      "sequence": 9,
+      "event": "response",
+      "actor": "operator",
+      "request_sequence": 8,
+      "method": "GET",
+      "path": "/api/v1/auth/csrf",
+      "status": 200
+    },
+    {
+      "sequence": 10,
+      "event": "request",
+      "actor": "operator",
+      "method": "GET",
+      "path": "/api/v1/manuscripts/c7fc4cb3-d218-4d7c-b1b6-80986e9354a4"
+    },
+    {
+      "sequence": 11,
+      "event": "response",
+      "actor": "operator",
+      "request_sequence": 10,
+      "method": "GET",
+      "path": "/api/v1/manuscripts/c7fc4cb3-d218-4d7c-b1b6-80986e9354a4",
+      "status": 200
+    },
+    {
+      "sequence": 12,
+      "event": "request",
+      "actor": "operator",
+      "method": "GET",
+      "path": "/api/v1/manuscripts/c7fc4cb3-d218-4d7c-b1b6-80986e9354a4/versions"
+    },
+    {
+      "sequence": 13,
+      "event": "request",
+      "actor": "operator",
+      "method": "GET",
+      "path": "/api/v1/authors"
+    },
+    {
+      "sequence": 14,
+      "event": "response",
+      "actor": "operator",
+      "request_sequence": 12,
+      "method": "GET",
+      "path": "/api/v1/manuscripts/c7fc4cb3-d218-4d7c-b1b6-80986e9354a4/versions",
+      "status": 200
+    },
+    {
+      "sequence": 15,
+      "event": "response",
+      "actor": "operator",
+      "request_sequence": 13,
+      "method": "GET",
+      "path": "/api/v1/authors",
+      "status": 200
+    },
+    {
+      "sequence": 16,
+      "event": "request",
+      "actor": "operator",
+      "method": "GET",
+      "path": "/api/v1/manuscripts/c7fc4cb3-d218-4d7c-b1b6-80986e9354a4/versions/68e87dec-b2f8-49f4-a7bd-341365910bc5"
+    },
+    {
+      "sequence": 17,
+      "event": "response",
+      "actor": "operator",
+      "request_sequence": 16,
+      "method": "GET",
+      "path": "/api/v1/manuscripts/c7fc4cb3-d218-4d7c-b1b6-80986e9354a4/versions/68e87dec-b2f8-49f4-a7bd-341365910bc5",
+      "status": 200
+    },
+    {
+      "sequence": 18,
+      "event": "request",
+      "actor": "operator",
+      "method": "GET",
+      "path": "/api/v1/manuscripts/c7fc4cb3-d218-4d7c-b1b6-80986e9354a4/versions/68e87dec-b2f8-49f4-a7bd-341365910bc5/files"
+    },
+    {
+      "sequence": 19,
+      "event": "response",
+      "actor": "operator",
+      "request_sequence": 18,
+      "method": "GET",
+      "path": "/api/v1/manuscripts/c7fc4cb3-d218-4d7c-b1b6-80986e9354a4/versions/68e87dec-b2f8-49f4-a7bd-341365910bc5/files",
+      "status": 200
+    },
+    {
+      "sequence": 20,
+      "event": "request",
+      "actor": "operator",
+      "method": "POST",
+      "path": "/api/v1/manuscripts/c7fc4cb3-d218-4d7c-b1b6-80986e9354a4/versions/68e87dec-b2f8-49f4-a7bd-341365910bc5/files"
+    },
+    {
+      "sequence": 21,
+      "event": "response",
+      "actor": "operator",
+      "request_sequence": 20,
+      "method": "POST",
+      "path": "/api/v1/manuscripts/c7fc4cb3-d218-4d7c-b1b6-80986e9354a4/versions/68e87dec-b2f8-49f4-a7bd-341365910bc5/files",
+      "status": 201
+    },
+    {
+      "sequence": 22,
+      "event": "request",
+      "actor": "operator",
+      "method": "GET",
+      "path": "/api/v1/manuscripts/c7fc4cb3-d218-4d7c-b1b6-80986e9354a4"
+    },
+    {
+      "sequence": 23,
+      "event": "response",
+      "actor": "operator",
+      "request_sequence": 22,
+      "method": "GET",
+      "path": "/api/v1/manuscripts/c7fc4cb3-d218-4d7c-b1b6-80986e9354a4",
+      "status": 200
+    },
+    {
+      "sequence": 24,
+      "event": "request",
+      "actor": "operator",
+      "method": "GET",
+      "path": "/api/v1/manuscripts/c7fc4cb3-d218-4d7c-b1b6-80986e9354a4/versions/68e87dec-b2f8-49f4-a7bd-341365910bc5"
+    },
+    {
+      "sequence": 25,
+      "event": "response",
+      "actor": "operator",
+      "request_sequence": 24,
+      "method": "GET",
+      "path": "/api/v1/manuscripts/c7fc4cb3-d218-4d7c-b1b6-80986e9354a4/versions/68e87dec-b2f8-49f4-a7bd-341365910bc5",
+      "status": 200
+    },
+    {
+      "sequence": 26,
+      "event": "request",
+      "actor": "operator",
+      "method": "GET",
+      "path": "/api/v1/manuscripts/c7fc4cb3-d218-4d7c-b1b6-80986e9354a4/versions/68e87dec-b2f8-49f4-a7bd-341365910bc5/files"
+    },
+    {
+      "sequence": 27,
+      "event": "response",
+      "actor": "operator",
+      "request_sequence": 26,
+      "method": "GET",
+      "path": "/api/v1/manuscripts/c7fc4cb3-d218-4d7c-b1b6-80986e9354a4/versions/68e87dec-b2f8-49f4-a7bd-341365910bc5/files",
+      "status": 200
+    },
+    {
+      "sequence": 28,
+      "event": "request",
+      "actor": "operator",
+      "method": "POST",
+      "path": "/api/v1/manuscripts/c7fc4cb3-d218-4d7c-b1b6-80986e9354a4/versions/68e87dec-b2f8-49f4-a7bd-341365910bc5/files"
+    },
+    {
+      "sequence": 29,
+      "event": "response",
+      "actor": "operator",
+      "request_sequence": 28,
+      "method": "POST",
+      "path": "/api/v1/manuscripts/c7fc4cb3-d218-4d7c-b1b6-80986e9354a4/versions/68e87dec-b2f8-49f4-a7bd-341365910bc5/files",
+      "status": 201
+    },
+    {
+      "sequence": 30,
+      "event": "request",
+      "actor": "operator",
+      "method": "GET",
+      "path": "/api/v1/manuscripts/c7fc4cb3-d218-4d7c-b1b6-80986e9354a4"
+    },
+    {
+      "sequence": 31,
+      "event": "response",
+      "actor": "operator",
+      "request_sequence": 30,
+      "method": "GET",
+      "path": "/api/v1/manuscripts/c7fc4cb3-d218-4d7c-b1b6-80986e9354a4",
+      "status": 200
+    },
+    {
+      "sequence": 32,
+      "event": "request",
+      "actor": "operator",
+      "method": "GET",
+      "path": "/api/v1/manuscripts/c7fc4cb3-d218-4d7c-b1b6-80986e9354a4/versions/68e87dec-b2f8-49f4-a7bd-341365910bc5"
+    },
+    {
+      "sequence": 33,
+      "event": "response",
+      "actor": "operator",
+      "request_sequence": 32,
+      "method": "GET",
+      "path": "/api/v1/manuscripts/c7fc4cb3-d218-4d7c-b1b6-80986e9354a4/versions/68e87dec-b2f8-49f4-a7bd-341365910bc5",
+      "status": 200
+    },
+    {
+      "sequence": 34,
+      "event": "request",
+      "actor": "operator",
+      "method": "GET",
+      "path": "/api/v1/manuscripts/c7fc4cb3-d218-4d7c-b1b6-80986e9354a4/versions/68e87dec-b2f8-49f4-a7bd-341365910bc5/files"
+    },
+    {
+      "sequence": 35,
+      "event": "response",
+      "actor": "operator",
+      "request_sequence": 34,
+      "method": "GET",
+      "path": "/api/v1/manuscripts/c7fc4cb3-d218-4d7c-b1b6-80986e9354a4/versions/68e87dec-b2f8-49f4-a7bd-341365910bc5/files",
+      "status": 200
+    },
+    {
+      "sequence": 36,
+      "event": "request",
+      "actor": "operator",
+      "method": "GET",
+      "path": "/api/v1/files/e219d833-5bc9-4d10-8da7-8ce239d2df92/download"
+    },
+    {
+      "sequence": 37,
+      "event": "response",
+      "actor": "operator",
+      "request_sequence": 36,
+      "method": "GET",
+      "path": "/api/v1/files/e219d833-5bc9-4d10-8da7-8ce239d2df92/download",
+      "status": 200
+    },
+    {
+      "sequence": 38,
+      "event": "request",
+      "actor": "stale",
+      "method": "GET",
+      "path": "/api/v1/auth/me"
+    },
+    {
+      "sequence": 39,
+      "event": "response",
+      "actor": "stale",
+      "request_sequence": 38,
+      "method": "GET",
+      "path": "/api/v1/auth/me",
+      "status": 200
+    },
+    {
+      "sequence": 40,
+      "event": "request",
+      "actor": "stale",
+      "method": "GET",
+      "path": "/api/v1/auth/csrf"
+    },
+    {
+      "sequence": 41,
+      "event": "response",
+      "actor": "stale",
+      "request_sequence": 40,
+      "method": "GET",
+      "path": "/api/v1/auth/csrf",
+      "status": 200
+    },
+    {
+      "sequence": 42,
+      "event": "request",
+      "actor": "stale",
+      "method": "GET",
+      "path": "/api/v1/manuscripts/c7fc4cb3-d218-4d7c-b1b6-80986e9354a4"
+    },
+    {
+      "sequence": 43,
+      "event": "response",
+      "actor": "stale",
+      "request_sequence": 42,
+      "method": "GET",
+      "path": "/api/v1/manuscripts/c7fc4cb3-d218-4d7c-b1b6-80986e9354a4",
+      "status": 200
+    },
+    {
+      "sequence": 44,
+      "event": "request",
+      "actor": "stale",
+      "method": "GET",
+      "path": "/api/v1/manuscripts/c7fc4cb3-d218-4d7c-b1b6-80986e9354a4/versions"
+    },
+    {
+      "sequence": 45,
+      "event": "request",
+      "actor": "stale",
+      "method": "GET",
+      "path": "/api/v1/authors"
+    },
+    {
+      "sequence": 46,
+      "event": "response",
+      "actor": "stale",
+      "request_sequence": 44,
+      "method": "GET",
+      "path": "/api/v1/manuscripts/c7fc4cb3-d218-4d7c-b1b6-80986e9354a4/versions",
+      "status": 200
+    },
+    {
+      "sequence": 47,
+      "event": "response",
+      "actor": "stale",
+      "request_sequence": 45,
+      "method": "GET",
+      "path": "/api/v1/authors",
+      "status": 200
+    },
+    {
+      "sequence": 48,
+      "event": "request",
+      "actor": "stale",
+      "method": "GET",
+      "path": "/api/v1/manuscripts/c7fc4cb3-d218-4d7c-b1b6-80986e9354a4/versions/68e87dec-b2f8-49f4-a7bd-341365910bc5"
+    },
+    {
+      "sequence": 49,
+      "event": "response",
+      "actor": "stale",
+      "request_sequence": 48,
+      "method": "GET",
+      "path": "/api/v1/manuscripts/c7fc4cb3-d218-4d7c-b1b6-80986e9354a4/versions/68e87dec-b2f8-49f4-a7bd-341365910bc5",
+      "status": 200
+    },
+    {
+      "sequence": 50,
+      "event": "request",
+      "actor": "stale",
+      "method": "GET",
+      "path": "/api/v1/manuscripts/c7fc4cb3-d218-4d7c-b1b6-80986e9354a4/versions/68e87dec-b2f8-49f4-a7bd-341365910bc5/files"
+    },
+    {
+      "sequence": 51,
+      "event": "response",
+      "actor": "stale",
+      "request_sequence": 50,
+      "method": "GET",
+      "path": "/api/v1/manuscripts/c7fc4cb3-d218-4d7c-b1b6-80986e9354a4/versions/68e87dec-b2f8-49f4-a7bd-341365910bc5/files",
+      "status": 200
+    },
+    {
+      "sequence": 52,
+      "event": "request",
+      "actor": "operator",
+      "method": "POST",
+      "path": "/api/v1/manuscripts/c7fc4cb3-d218-4d7c-b1b6-80986e9354a4/versions"
+    },
+    {
+      "sequence": 53,
+      "event": "response",
+      "actor": "operator",
+      "request_sequence": 52,
+      "method": "POST",
+      "path": "/api/v1/manuscripts/c7fc4cb3-d218-4d7c-b1b6-80986e9354a4/versions",
+      "status": 201
+    },
+    {
+      "sequence": 54,
+      "event": "request",
+      "actor": "operator",
+      "method": "GET",
+      "path": "/api/v1/manuscripts/c7fc4cb3-d218-4d7c-b1b6-80986e9354a4"
+    },
+    {
+      "sequence": 55,
+      "event": "response",
+      "actor": "operator",
+      "request_sequence": 54,
+      "method": "GET",
+      "path": "/api/v1/manuscripts/c7fc4cb3-d218-4d7c-b1b6-80986e9354a4",
+      "status": 200
+    },
+    {
+      "sequence": 56,
+      "event": "request",
+      "actor": "operator",
+      "method": "GET",
+      "path": "/api/v1/manuscripts/c7fc4cb3-d218-4d7c-b1b6-80986e9354a4/versions"
+    },
+    {
+      "sequence": 57,
+      "event": "request",
+      "actor": "operator",
+      "method": "GET",
+      "path": "/api/v1/authors"
+    },
+    {
+      "sequence": 58,
+      "event": "response",
+      "actor": "operator",
+      "request_sequence": 56,
+      "method": "GET",
+      "path": "/api/v1/manuscripts/c7fc4cb3-d218-4d7c-b1b6-80986e9354a4/versions",
+      "status": 200
+    },
+    {
+      "sequence": 59,
+      "event": "response",
+      "actor": "operator",
+      "request_sequence": 57,
+      "method": "GET",
+      "path": "/api/v1/authors",
+      "status": 200
+    },
+    {
+      "sequence": 60,
+      "event": "request",
+      "actor": "operator",
+      "method": "GET",
+      "path": "/api/v1/manuscripts/c7fc4cb3-d218-4d7c-b1b6-80986e9354a4/versions/8950ce1b-ed71-4625-bb7d-ee2320f5cd25"
+    },
+    {
+      "sequence": 61,
+      "event": "response",
+      "actor": "operator",
+      "request_sequence": 60,
+      "method": "GET",
+      "path": "/api/v1/manuscripts/c7fc4cb3-d218-4d7c-b1b6-80986e9354a4/versions/8950ce1b-ed71-4625-bb7d-ee2320f5cd25",
+      "status": 200
+    },
+    {
+      "sequence": 62,
+      "event": "request",
+      "actor": "operator",
+      "method": "GET",
+      "path": "/api/v1/manuscripts/c7fc4cb3-d218-4d7c-b1b6-80986e9354a4/versions/8950ce1b-ed71-4625-bb7d-ee2320f5cd25/files"
+    },
+    {
+      "sequence": 63,
+      "event": "response",
+      "actor": "operator",
+      "request_sequence": 62,
+      "method": "GET",
+      "path": "/api/v1/manuscripts/c7fc4cb3-d218-4d7c-b1b6-80986e9354a4/versions/8950ce1b-ed71-4625-bb7d-ee2320f5cd25/files",
+      "status": 200
+    },
+    {
+      "sequence": 64,
+      "event": "request",
+      "actor": "stale",
+      "method": "POST",
+      "path": "/api/v1/manuscripts/c7fc4cb3-d218-4d7c-b1b6-80986e9354a4/versions/68e87dec-b2f8-49f4-a7bd-341365910bc5/files"
+    },
+    {
+      "sequence": 65,
+      "event": "response",
+      "actor": "stale",
+      "request_sequence": 64,
+      "method": "POST",
+      "path": "/api/v1/manuscripts/c7fc4cb3-d218-4d7c-b1b6-80986e9354a4/versions/68e87dec-b2f8-49f4-a7bd-341365910bc5/files",
+      "status": 409
+    },
+    {
+      "sequence": 66,
+      "event": "request",
+      "actor": "operator",
+      "method": "GET",
+      "path": "/api/v1/auth/me"
+    },
+    {
+      "sequence": 67,
+      "event": "response",
+      "actor": "operator",
+      "request_sequence": 66,
+      "method": "GET",
+      "path": "/api/v1/auth/me",
+      "status": 200
+    },
+    {
+      "sequence": 68,
+      "event": "request",
+      "actor": "operator",
+      "method": "GET",
+      "path": "/api/v1/auth/csrf"
+    },
+    {
+      "sequence": 69,
+      "event": "response",
+      "actor": "operator",
+      "request_sequence": 68,
+      "method": "GET",
+      "path": "/api/v1/auth/csrf",
+      "status": 200
+    },
+    {
+      "sequence": 70,
+      "event": "request",
+      "actor": "operator",
+      "method": "GET",
+      "path": "/api/v1/dashboard/summary"
+    },
+    {
+      "sequence": 71,
+      "event": "response",
+      "actor": "operator",
+      "request_sequence": 70,
+      "method": "GET",
+      "path": "/api/v1/dashboard/summary",
+      "status": 200
+    },
+    {
+      "sequence": 72,
+      "event": "request",
+      "actor": "admin",
+      "method": "GET",
+      "path": "/api/v1/auth/me"
+    },
+    {
+      "sequence": 73,
+      "event": "response",
+      "actor": "admin",
+      "request_sequence": 72,
+      "method": "GET",
+      "path": "/api/v1/auth/me",
+      "status": 401
+    },
+    {
+      "sequence": 74,
+      "event": "request",
+      "actor": "admin",
+      "method": "POST",
+      "path": "/api/v1/auth/login"
+    },
+    {
+      "sequence": 75,
+      "event": "response",
+      "actor": "admin",
+      "request_sequence": 74,
+      "method": "POST",
+      "path": "/api/v1/auth/login",
+      "status": 200
+    },
+    {
+      "sequence": 76,
+      "event": "request",
+      "actor": "admin",
+      "method": "GET",
+      "path": "/api/v1/dashboard/summary"
+    },
+    {
+      "sequence": 77,
+      "event": "request",
+      "actor": "admin",
+      "method": "GET",
+      "path": "/api/v1/auth/me"
+    },
+    {
+      "sequence": 78,
+      "event": "response",
+      "actor": "admin",
+      "request_sequence": 77,
+      "method": "GET",
+      "path": "/api/v1/auth/me",
+      "status": 200
+    },
+    {
+      "sequence": 79,
+      "event": "request",
+      "actor": "admin",
+      "method": "GET",
+      "path": "/api/v1/auth/csrf"
+    },
+    {
+      "sequence": 80,
+      "event": "response",
+      "actor": "admin",
+      "request_sequence": 79,
+      "method": "GET",
+      "path": "/api/v1/auth/csrf",
+      "status": 200
+    },
+    {
+      "sequence": 81,
+      "event": "request",
+      "actor": "admin",
+      "method": "GET",
+      "path": "/api/v1/audit-logs"
+    },
+    {
+      "sequence": 82,
+      "event": "response",
+      "actor": "admin",
+      "request_sequence": 81,
+      "method": "GET",
+      "path": "/api/v1/audit-logs",
+      "status": 200
+    },
+    {
+      "sequence": 83,
+      "event": "request",
+      "actor": "auditor",
+      "method": "GET",
+      "path": "/api/v1/auth/me"
+    },
+    {
+      "sequence": 84,
+      "event": "response",
+      "actor": "auditor",
+      "request_sequence": 83,
+      "method": "GET",
+      "path": "/api/v1/auth/me",
+      "status": 401
+    },
+    {
+      "sequence": 85,
+      "event": "request",
+      "actor": "auditor",
+      "method": "POST",
+      "path": "/api/v1/auth/login"
+    },
+    {
+      "sequence": 86,
+      "event": "response",
+      "actor": "auditor",
+      "request_sequence": 85,
+      "method": "POST",
+      "path": "/api/v1/auth/login",
+      "status": 200
+    },
+    {
+      "sequence": 87,
+      "event": "request",
+      "actor": "auditor",
+      "method": "GET",
+      "path": "/api/v1/dashboard/summary"
+    },
+    {
+      "sequence": 88,
+      "event": "request",
+      "actor": "auditor",
+      "method": "GET",
+      "path": "/api/v1/auth/me"
+    },
+    {
+      "sequence": 89,
+      "event": "response",
+      "actor": "auditor",
+      "request_sequence": 88,
+      "method": "GET",
+      "path": "/api/v1/auth/me",
+      "status": 200
+    },
+    {
+      "sequence": 90,
+      "event": "request",
+      "actor": "auditor",
+      "method": "GET",
+      "path": "/api/v1/auth/csrf"
+    },
+    {
+      "sequence": 91,
+      "event": "response",
+      "actor": "auditor",
+      "request_sequence": 90,
+      "method": "GET",
+      "path": "/api/v1/auth/csrf",
+      "status": 200
+    },
+    {
+      "sequence": 92,
+      "event": "request",
+      "actor": "auditor",
+      "method": "GET",
+      "path": "/api/v1/dashboard/summary"
+    },
+    {
+      "sequence": 93,
+      "event": "response",
+      "actor": "auditor",
+      "request_sequence": 92,
+      "method": "GET",
+      "path": "/api/v1/dashboard/summary",
+      "status": 403
+    },
+    {
+      "sequence": 94,
+      "event": "request",
+      "actor": "auditor",
+      "method": "GET",
+      "path": "/api/v1/auth/me"
+    },
+    {
+      "sequence": 95,
+      "event": "response",
+      "actor": "auditor",
+      "request_sequence": 94,
+      "method": "GET",
+      "path": "/api/v1/auth/me",
+      "status": 200
+    },
+    {
+      "sequence": 96,
+      "event": "request",
+      "actor": "auditor",
+      "method": "GET",
+      "path": "/api/v1/auth/csrf"
+    },
+    {
+      "sequence": 97,
+      "event": "response",
+      "actor": "auditor",
+      "request_sequence": 96,
+      "method": "GET",
+      "path": "/api/v1/auth/csrf",
+      "status": 200
+    },
+    {
+      "sequence": 98,
+      "event": "request",
+      "actor": "auditor",
+      "method": "GET",
+      "path": "/api/v1/audit-logs"
+    },
+    {
+      "sequence": 99,
+      "event": "response",
+      "actor": "auditor",
+      "request_sequence": 98,
+      "method": "GET",
+      "path": "/api/v1/audit-logs",
+      "status": 200
+    }
+  ],
+  "inspected_field_allowlists": [
+    {
+      "response_sequence": 11,
+      "json_path": "authors[]",
+      "allowlist": [
+        "author_id",
+        "display_name",
+        "is_corresponding",
+        "position"
+      ],
+      "observed": [
+        [
+          "author_id",
+          "display_name",
+          "is_corresponding",
+          "position"
+        ],
+        [
+          "author_id",
+          "display_name",
+          "is_corresponding",
+          "position"
+        ]
+      ],
+      "passed": true
+    },
+    {
+      "response_sequence": 17,
+      "json_path": "metadata_snapshot.authors[]",
+      "allowlist": [
+        "author_id",
+        "display_name",
+        "is_corresponding",
+        "position"
+      ],
+      "observed": [
+        [
+          "author_id",
+          "display_name",
+          "is_corresponding",
+          "position"
+        ],
+        [
+          "author_id",
+          "display_name",
+          "is_corresponding",
+          "position"
+        ]
+      ],
+      "passed": true
+    }
+  ],
+  "network_scan": {
+    "response_sequences": [
+      11,
+      14,
+      17,
+      19,
+      21,
+      23,
+      25,
+      27,
+      29,
+      31,
+      33,
+      35,
+      37,
+      53,
+      55,
+      58,
+      61,
+      63,
+      71
+    ],
+    "response_count": 19,
+    "json_response_count": 18,
+    "non_json_response_sequences": [
+      37
+    ],
+    "forbidden_synthetic_marker_classes": [
+      "owner_notes",
+      "owner_email",
+      "owner_phone",
+      "coauthor_notes",
+      "coauthor_email",
+      "coauthor_phone"
+    ],
+    "forbidden_field_names": [
+      "storage_path",
+      "stored_filename"
+    ],
+    "passed": true
+  },
+  "stale_upload_timeline": [
+    {
+      "event": "stale_tab_opened",
+      "elapsed_ms": 0
+    },
+    {
+      "event": "stale_version_2_loaded",
+      "elapsed_ms": 220
+    },
+    {
+      "event": "competing_version_3_created",
+      "elapsed_ms": 343,
+      "status": 201
+    },
+    {
+      "event": "retry_watch_started",
+      "elapsed_ms": 353
+    },
+    {
+      "event": "stale_upload_request",
+      "elapsed_ms": 422,
+      "request_sequence": 64
+    },
+    {
+      "event": "stale_upload_response",
+      "elapsed_ms": 442,
+      "response_sequence": 65,
+      "status": 409
+    },
+    {
+      "event": "non_retry_warning_and_refresh_visible",
+      "elapsed_ms": 446
+    },
+    {
+      "event": "retry_watch_finished",
+      "elapsed_ms": 1449,
+      "upload_post_count": 1
+    }
+  ],
+  "operator_audit_request_sequences": [],
+  "authorized_download_sha256": "453c8ccf889936826ae6e01dbda5cd2038f4a5b0c0aea9b3cb659efcd0e628cf",
+  "status": "passed"
+}

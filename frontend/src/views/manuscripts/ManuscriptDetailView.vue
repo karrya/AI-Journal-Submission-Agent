@@ -365,7 +365,7 @@ onMounted(() => void loadWorkspace())
             <div><dt>Data availability</dt><dd>{{ version.metadata_snapshot.data_availability_statement ?? '—' }}</dd></div>
             <div><dt>Notes</dt><dd>{{ version.metadata_snapshot.notes ?? '—' }}</dd></div>
           </dl>
-          <ol>
+          <ol class="authorship-position-list" data-test="snapshot-authorship">
             <li v-for="author in version.metadata_snapshot.authors" :key="author.author_id">
               {{ author.position }}. {{ author.display_name }}<span v-if="author.is_corresponding"> · Corresponding author</span>
             </li>

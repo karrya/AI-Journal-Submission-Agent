@@ -10,7 +10,7 @@ The tested change is based on commit `fddff14` plus the Task 18 documentation an
 - macOS on arm64; Homebrew `mysql@8.0` 8.0.46 (final runtime), Python 3.13.3, Node 26.13.0, npm 11.20.0.
 - Backend: `/Users/didi/PycharmProjects/AI Journal Submission Agent/.venv/bin/python`.
 - Browser: actual Google Chrome 156.0.8078.80, headless, driven by temporary `playwright-core` tooling outside the application dependencies.
-- Raw logs, non-secret snapshots, and synthetic-data screenshots are under `.superpowers/sdd/2026-11-04-v0-1-implementation/acceptance/`; that workspace is not a release artifact and is not committed.
+- Committed, sanitized request-level Network evidence, the executable browser harness, and synthetic-data screenshots are under [`docs/evidence/v0.1/browser/`](evidence/v0.1/browser/). Original raw logs and non-secret snapshots remain under `.superpowers/sdd/2026-11-04-v0-1-implementation/acceptance/`; that workspace is not a release artifact and is not committed.
 
 ## 1. Clean installation from the documentation
 
@@ -41,12 +41,12 @@ Observed results:
 
 ## 2. Complete verification, coverage, and contracts
 
-`bash scripts/verify.sh` passed after clean installation and again on the final repaired MySQL runtime (`verify-clean.log`, `verify-final-pre-doc.log`).
+`bash scripts/verify.sh` passed after clean installation, again on the final repaired MySQL runtime, and after the fix-round origin/snapshot changes (`verify-clean.log`, `verify-final-pre-doc.log`, `verify-fix-round-1.log`).
 
 | Gate | Result |
 |---|---|
 | Ruff and mypy | Passed; all checks clean |
-| Backend pytest | **458 passed**, 0 failed (latest final run 27.78 s) |
+| Backend pytest | **459 passed**, 0 failed (latest final run 27.89 s) |
 | Focused executable security matrix | **36 passed**, 0 failed (`test_security_matrix.py` plus `test_authorization_boundaries.py`) |
 | Backend overall coverage | **95.69%** (floor 80%) |
 | Permissions coverage | **98.65%** (floor 95%) |
@@ -57,12 +57,12 @@ Observed results:
 | API coverage | **96.91%** (floor 80%) |
 | OpenAPI | Generated, validated with `openapi-spec-validator`, and `git diff --exit-code` clean |
 | Newman | **40/40 requests, 97/97 assertions**, 0 failures; isolated backend port 8001 and temporary storage |
-| Frontend unit tests | **22 files, 121 tests passed**, repeated for the coverage run |
+| Frontend unit tests | **22 files, 122 tests passed**, repeated for the coverage run |
 | Frontend statement coverage | **82.66%** (1645/1990) |
 | Frontend branch coverage | **85.84%** (1946/2267) |
 | Frontend function coverage | **77.61%** (437/563) |
 | Frontend line coverage | **86.52%** (1516/1752) |
-| Frontend production build | `vue-tsc --noEmit && vite build` passed; latest final Vite build completed in 2.07 s |
+| Frontend production build | `vue-tsc --noEmit && vite build` passed; latest final Vite build completed in 2.24 s |
 
 The redundant direct Faker override was absent during these successful Newman runs. Production `npm audit --omit=dev` returned zero vulnerabilities. Full development `npm audit` returned five high-severity entries, as detailed under limitations.
 
@@ -96,23 +96,38 @@ The first authorized restart exposed a Homebrew runtime defect: `mysqld` 8.0.42 
 
 ## 4. Actual browser Network and visual acceptance (WEB-01)
 
-The browser harness used `/tmp/asa-v01-browser-tool` and did not add Playwright to application dependencies. Axios-adapter/Vitest mocks were **not** used as browser evidence. The run captured actual Chrome responses and rendered screenshots; `browser-result.json` records `status=passed`.
+The browser harness used temporary `playwright-core` tooling and did not add Playwright to application dependencies. Axios-adapter/Vitest mocks were **not** used as browser evidence. The original persistence/browser run passed at 13:19 UTC. A supplementary browser-only capture at **2026-11-05T13:45:09Z** preserved the request-level evidence missing from the original boolean summary; it added synthetic fixtures to the isolated test schema without dropping/resetting any database and did not repeat MySQL restart or BACKUP-01. Temporary storage and web processes were removed afterward.
 
-An operator authorized only for the owner loaded a manuscript containing a coauthor with synthetic private email, phone, and notes markers. Results:
+Committed artifacts:
 
-- Manuscript and immutable snapshot author objects contained exactly `author_id`, `display_name`, `position`, and `is_corresponding`.
-- Nineteen captured business Network responses contained none of the synthetic private markers and no `storage_path` or `stored_filename`. The rendered DOM also contained none of those markers or path fields.
-- New-family upload returned **201**, file version 1. Existing-family upload returned **201**, file version 2 in the original family.
-- Authorized browser download returned **200**; saved-file SHA-256 was `453c8ccf889936826ae6e01dbda5cd2038f4a5b0c0aea9b3cb659efcd0e628cf`, matching the uploaded second PDF.
-- A second tab retained stale version 2 while the first tab created version 3. Its upload returned **409 `INVALID_MANUSCRIPT_STATE`**. Exactly **one** upload POST was observed, including after a one-second retry watch; the UI displayed that the upload was not retried and offered explicit refresh.
-- Operator dashboard returned **200** and showed one authorized author. Navigating that operator to `/audit` redirected to dashboard with **zero audit API requests**.
-- Administrator audit returned **200** with visible records. Auditor dashboard returned **403**, while auditor audit returned **200** with visible records.
+- [`browser-network.json`](evidence/v0.1/browser/browser-network.json): 99 ordered request/response events with methods, paths, statuses, and request/response linkage; inspected author-field allowlists; the 19-response business scan; stale-upload timeline; and zero operator audit requests. Only synthetic resource IDs and API paths are retained. Origins, query strings, headers, cookies, CSRF/session tokens, credentials, and request/response bodies are excluded.
+- [`browser-result.json`](evidence/v0.1/browser/browser-result.json) and [`browser-run.log`](evidence/v0.1/browser/browser-run.log): passed assertion summary.
+- [`acceptance.cjs`](evidence/v0.1/browser/acceptance.cjs): exact harness source used for the supplementary capture (SHA-256 `1498c205ad93159fe187433103eee729d653c19eca78e265b2b0b35d3028a238`).
+- [`browser-authorized-download.pdf`](evidence/v0.1/browser/browser-authorized-download.pdf): 69-byte synthetic PDF used for the independent download-hash check.
 
-The following actual screenshots were opened and visually inspected after the run: `browser-manuscript.png`, `browser-stale-409.png`, `browser-dashboard-operator.png`, `browser-audit-admin.png`, and `browser-audit-auditor.png`. Pages, forms, files, conflict messaging, dashboard aggregates, and audit tables rendered with content; no sensitive markers or storage paths were visible. There is no browser-execution blocker to report.
+With generated credentials and fixture variables already exported in the acceptance shell, the exact browser invocation was:
+
+```bash
+NODE_PATH=/tmp/asa-v01-browser-tool/node_modules node "$ROOT/docs/evidence/v0.1/browser/acceptance.cjs" > "$EVIDENCE/browser-run.log" 2>&1
+```
+
+Here `ROOT` was the documented project root, `EVIDENCE` was `$ROOT/docs/evidence/v0.1/browser`, `EVIDENCE_DIR` was exported with that same value, `FIXTURE_FILE=/tmp/asa-v01-browser-tool/evidence-fixture.json`, and `PDF_FIXTURE=$ROOT/backend/tests/fixtures/minimal.pdf`. Passwords remained in process environment variables and are absent from all committed artifacts.
+
+An operator authorized only for the synthetic owner loaded a manuscript containing a coauthor with synthetic private email, phone, and notes markers. The linked request-level evidence proves:
+
+- Response sequences **11** and **17** contain manuscript and immutable-snapshot author objects with exactly `author_id`, `display_name`, `position`, and `is_corresponding`; observed key sets and the allowlist are recorded explicitly.
+- The operator's **19** business responses (sequences listed in `network_scan.response_sequences`) contain no synthetic private markers or `storage_path`/`stored_filename`: 18 JSON bodies were scanned, while response **37** is the separately hash-verified PDF. The rendered DOM also contained none of those markers or path fields.
+- New-family upload response **21** returned **201**, file version 1. Existing-family upload response **29** returned **201**, file version 2 in the original family.
+- Authorized download response **37** returned **200**; saved-file SHA-256 `453c8ccf889936826ae6e01dbda5cd2038f4a5b0c0aea9b3cb659efcd0e628cf` matches the uploaded second PDF.
+- Competing version creation response **53** returned **201** while the second tab retained version 2. Stale upload request **64** produced exactly one response, **65**, with **409 `INVALID_MANUSCRIPT_STATE`**. The recorded timeline shows the request at 422 ms, conflict at 442 ms, non-retry warning and refresh action at 446 ms, and still exactly one upload POST when the explicit watch ended at 1449 ms (a 1000 ms watch after the conflict).
+- Operator dashboard response **71** returned **200** and showed one authorized author. `operator_audit_request_sequences` is empty after navigating that operator to `/audit` and being redirected to dashboard.
+- Administrator audit response **82** returned **200** with visible records. Auditor dashboard response **93** returned **403**, while auditor audit response **99** returned **200** with visible records.
+
+The following actual screenshots from the supplementary run were opened and visually inspected: [`browser-manuscript.png`](evidence/v0.1/browser/browser-manuscript.png), [`browser-stale-409.png`](evidence/v0.1/browser/browser-stale-409.png), [`browser-dashboard-operator.png`](evidence/v0.1/browser/browser-dashboard-operator.png), [`browser-audit-admin.png`](evidence/v0.1/browser/browser-audit-admin.png), and [`browser-audit-auditor.png`](evidence/v0.1/browser/browser-audit-auditor.png). Pages, forms, files, conflict messaging, dashboard aggregates, and audit tables rendered with synthetic content; no sensitive markers or storage paths were visible. The manuscript screenshot also confirms the fixed snapshot authorship list shows one position marker per author. There is no browser-execution blocker to report.
 
 ## 5. Encrypted backup and isolated restore (BACKUP-01)
 
-With application writers stopped, an empty `academic_submission_agent_restore_test` was prepared using the existing test-scoped account. The real proof was executed:
+With application writers stopped, the proof used its protected `RESTORE_ADMIN_URL` provisioning path: `RESTORE_DATABASE_URL` was not used, the fixed empty `academic_submission_agent_restore_test` schema was created if absent and rejected if nonempty, and the existing `asa_test` identity received `ALL PRIVILEGES` on that restore schema only for the import. This did not assume or require preexisting `asa_test` privileges on the restore schema. The [`operations runbook`](operations.md#8-age-keys-encrypted-backup-and-isolated-restore) now documents both this protected path and a dedicated `asa_restore` alternative, with schema-scoped least-privilege provisioning. The real proof was executed:
 
 ```bash
 .venv/bin/python scripts/test_backup_restore.py
@@ -137,13 +152,13 @@ The encrypted backup remains in Git-ignored `backups/`; its private age key was 
 - OpenAPI exposes only GET for `/api/v1/audit-logs` and `/api/v1/audit-logs/{log_id}`. Automated POST/PATCH/DELETE 405 and immutable-snapshot assertions also passed.
 - Development and fixed test database names are distinct, the test host is loopback, and all destructive test/API commands used temporary non-live storage. Guard tests require explicit environment and host arguments.
 - Unknown-commit preservation, reconciliation, orphan/missing handling, certain rollback compensation, stale-version races, and download-integrity blocking passed in the executable security matrix and full suite.
+- Snapshot authorship now uses `authorship-position-list` to suppress the native ordered-list marker while retaining the stored position. A focused component/CSS regression passed, and the committed manuscript screenshot shows `1. Synthetic Evidence Owner` rather than `1. 1. ...`.
 - `git diff --check` passed. The unrelated `.idea/AI Journal Submission Agent.iml` modification was left untouched and was not staged.
 
 ## 7. Residual limitations (not skipped gates)
 
 1. **Development dependency audit is not clean.** Full `npm audit` reports five high-severity entries associated with CVE-2026-73231 in the Postman/Newman development dependency chain. Removing the redundant Faker override did not remove the required transitive dependency and did not break Newman. There is no supported Postman-compatible fixed release in the pinned toolchain. Production audit is clean at **0 vulnerabilities**.
 2. V0.1 remains a loopback local deployment: no production TLS/reverse proxy, distributed login-rate limiting, malware-scanner integration, database-trigger immutability, or off-site age-key escrow is claimed. `scan_status=not_scanned` is not a malware-safety assertion.
-3. Snapshot authorship lists visually combine the HTML ordered-list marker with the stored author position (for example, `1. 1.`). This is a cosmetic presentation issue only; stored positions, Network payloads, and authorization checks were correct.
-4. Homebrew warns that the `mysql@8.0` formula is deprecated and scheduled for disablement on 2027-04-30. V0.1 intentionally targets MySQL 8.0; plan a reviewed database upgrade before that support boundary.
+3. Homebrew warns that the `mysql@8.0` formula is deprecated and scheduled for disablement on 2027-04-30. V0.1 intentionally targets MySQL 8.0; plan a reviewed database upgrade before that support boundary.
 
 No required clean-install, migration, persistence, browser, isolation, file-recovery, coverage, OpenAPI/Newman, frontend-build, or BACKUP-01 gate was skipped or left failed.

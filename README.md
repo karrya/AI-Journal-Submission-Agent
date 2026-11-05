@@ -38,7 +38,7 @@ cd "/Users/didi/PycharmProjects/AI Journal Submission Agent"
 bash scripts/dev_frontend.sh
 ```
 
-The backend listens on `127.0.0.1:8000`; open the frontend at `http://127.0.0.1:5173`. The Vite `/api` proxy preserves the browser origin and forwards to the backend. Health is available at `http://127.0.0.1:8000/api/v1/health`.
+The backend listens on `127.0.0.1:8000`; open the frontend at `http://127.0.0.1:5173`. The default `ALLOWED_ORIGINS` trusts both this URL and `http://localhost:5173`, so login and CSRF-protected password changes work at the documented address. The Vite `/api` proxy preserves the browser origin and forwards to the backend. Health is available at `http://127.0.0.1:8000/api/v1/health`.
 
 Run every backend, contract, frontend, coverage, OpenAPI/Newman, and production-build gate with:
 

@@ -242,7 +242,41 @@ cd "$PROJECT_ROOT"
 
 The default destination is the Git-ignored `backups/` directory. The archive contains a single-transaction MySQL dump, storage files, `.env.example`, and per-member SHA-256/size metadata. It excludes `.env`, plaintext passwords, reusable cookies, and `auth_sessions`. Tar bytes stream directly to age; only a completed `.tar.age` is atomically published. A failure removes temporary plaintext and `.partial` output.
 
-For restore, provision an **empty** `academic_submission_agent_restore_test` schema and an account authorized only for that isolated target. Set `RESTORE_DATABASE_URL` in the protected environment and ensure it matches `--database`. The target directory must be new or empty and outside the configured live storage tree.
+For restore, provision an **empty** `academic_submission_agent_restore_test` schema and an account authorized only for that isolated target. The example below creates `asa_restore@127.0.0.1` with no global, development, test, or grant-option privileges. `ALL PRIVILEGES` is scoped to the restore schema because import and Alembic need DDL, row writes, and `LOCK TABLES`; it does not grant access to any other schema. The generated password stays in shell variables and is written only to protected `.env`, not command arguments or output:
+
+```bash
+cd "$PROJECT_ROOT"
+RESTORE_PASSWORD="$(.venv/bin/python -c 'import secrets; print(secrets.token_urlsafe(36))')"
+mysql --user="${MYSQL_ADMIN_USER:-root}" \
+  --host="${MYSQL_ADMIN_HOST:-localhost}" --port="${MYSQL_ADMIN_PORT:-3306}" \
+  --password <<SQL
+CREATE DATABASE IF NOT EXISTS academic_submission_agent_restore_test
+  CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+CREATE USER IF NOT EXISTS 'asa_restore'@'127.0.0.1' IDENTIFIED BY '${RESTORE_PASSWORD}';
+ALTER USER 'asa_restore'@'127.0.0.1' IDENTIFIED BY '${RESTORE_PASSWORD}';
+GRANT ALL PRIVILEGES ON academic_submission_agent_restore_test.*
+  TO 'asa_restore'@'127.0.0.1';
+SQL
+export RESTORE_DATABASE_URL="mysql+pymysql://asa_restore:${RESTORE_PASSWORD}@127.0.0.1:3306/academic_submission_agent_restore_test"
+.venv/bin/python - <<'PY'
+import os
+from pathlib import Path
+
+path = Path('.env')
+lines = path.read_text(encoding='utf-8').splitlines()
+setting = f"RESTORE_DATABASE_URL={os.environ['RESTORE_DATABASE_URL']}"
+lines = [setting if line.startswith('RESTORE_DATABASE_URL=') else line for line in lines]
+if not any(line.startswith('RESTORE_DATABASE_URL=') for line in lines):
+    lines.append(setting)
+temporary = path.with_name('.env.restore-tmp')
+temporary.write_text('\n'.join(lines) + '\n', encoding='utf-8')
+temporary.chmod(0o600)
+temporary.replace(path)
+PY
+unset RESTORE_PASSWORD RESTORE_DATABASE_URL
+```
+
+This deliberately rotates the dedicated restore password if rerun; do not use it as a routine startup step. Ensure the protected `RESTORE_DATABASE_URL` matches `--database`. The target directory must be new or empty and outside the configured live storage tree.
 
 ```bash
 cd "$PROJECT_ROOT"
@@ -255,11 +289,48 @@ cd "$PROJECT_ROOT"
 
 Restore rejects development/non-`_test` targets, nonempty targets, live storage, unsafe archive members, unexpected SQL, schema-qualified SQL references, and every hash mismatch. It verifies the dump, imports only into the validated target, recreates excluded sessions empty, runs `alembic upgrade head` and `alembic check`, and compares row counts, restored files, and hashes. Standalone restore checks source table names and row counts for stability; it does not by itself prove source content or schema immutability.
 
-The stronger real BACKUP-01 proof also compares development table checksums, schema DDL hashes, and storage hashes before/after, verifies age framing and no plaintext/partial artifacts, and removes decrypted restore data:
+The stronger real BACKUP-01 proof also compares development table checksums, schema DDL hashes, and storage hashes before/after, verifies age framing and no plaintext/partial artifacts, and removes decrypted restore data. It supports two mutually exclusive target paths:
+
+1. Set `RESTORE_DATABASE_URL` to the dedicated `asa_restore` account above, with the schema already empty. `RESTORE_ADMIN_URL` is then unnecessary and is not used.
+2. Leave `RESTORE_DATABASE_URL` unset or empty and set protected `RESTORE_ADMIN_URL` to a schema-scoped provisioning account. The proof uses `TEST_DATABASE_URL` for the import identity, creates the fixed restore schema if absent, rejects it if nonempty, and grants that test identity `ALL PRIVILEGES` on the restore schema only. The import URL never receives development privileges.
+
+Provision the second path with a separate `asa_restore_admin@127.0.0.1` account. Its grant option and every other privilege are confined to the fixed restore schema:
+
+```bash
+cd "$PROJECT_ROOT"
+RESTORE_ADMIN_PASSWORD="$(.venv/bin/python -c 'import secrets; print(secrets.token_urlsafe(36))')"
+mysql --user="${MYSQL_ADMIN_USER:-root}" \
+  --host="${MYSQL_ADMIN_HOST:-localhost}" --port="${MYSQL_ADMIN_PORT:-3306}" \
+  --password <<SQL
+CREATE USER IF NOT EXISTS 'asa_restore_admin'@'127.0.0.1' IDENTIFIED BY '${RESTORE_ADMIN_PASSWORD}';
+ALTER USER 'asa_restore_admin'@'127.0.0.1' IDENTIFIED BY '${RESTORE_ADMIN_PASSWORD}';
+GRANT ALL PRIVILEGES ON academic_submission_agent_restore_test.*
+  TO 'asa_restore_admin'@'127.0.0.1' WITH GRANT OPTION;
+SQL
+export RESTORE_ADMIN_URL="mysql+pymysql://asa_restore_admin:${RESTORE_ADMIN_PASSWORD}@127.0.0.1:3306"
+.venv/bin/python - <<'PY'
+import os
+from pathlib import Path
+
+path = Path('.env')
+lines = path.read_text(encoding='utf-8').splitlines()
+setting = f"RESTORE_ADMIN_URL={os.environ['RESTORE_ADMIN_URL']}"
+lines = [setting if line.startswith('RESTORE_ADMIN_URL=') else line for line in lines]
+if not any(line.startswith('RESTORE_ADMIN_URL=') for line in lines):
+    lines.append(setting)
+temporary = path.with_name('.env.restore-tmp')
+temporary.write_text('\n'.join(lines) + '\n', encoding='utf-8')
+temporary.chmod(0o600)
+temporary.replace(path)
+PY
+unset RESTORE_ADMIN_PASSWORD RESTORE_ADMIN_URL
+```
+
+The generated URL is written only to protected `.env`; no URL or password is printed. Keep `RESTORE_DATABASE_URL` unset or empty when using this path. Run the proof only with application writers stopped:
 
 ```bash
 cd "$PROJECT_ROOT"
 .venv/bin/python scripts/test_backup_restore.py
 ```
 
-The proof requires the fixed empty restore schema (or an explicitly protected `RESTORE_ADMIN_URL` that can provision only that schema) and the dedicated age key. If development storage is empty, it creates and then deletes one uniquely named proof file; it refuses to touch nonempty development storage. The encrypted archive remains in Git-ignored `backups/`. See `backups/README.md` for format details and limitations.
+If development storage is empty, the proof creates and then deletes one uniquely named proof file; it refuses to touch nonempty development storage. The encrypted archive remains in Git-ignored `backups/`. See `backups/README.md` for format details and limitations.

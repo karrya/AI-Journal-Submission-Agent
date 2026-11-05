@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { flushPromises, mount } from '@vue/test-utils'
 import type { AxiosAdapter, AxiosResponse, InternalAxiosRequestConfig } from 'axios'
 import { createPinia, setActivePinia } from 'pinia'
@@ -79,6 +80,20 @@ describe('ManuscriptDetailView', () => {
       global: { stubs: { RouterLink: { template: '<a><slot /></a>' } } },
     })
   }
+
+  it('renders stored snapshot positions without a second ordered-list marker', async () => {
+    const wrapper = mountDetail()
+    await flushPromises()
+
+    const authorship = wrapper.get('[data-test="snapshot-authorship"]')
+    expect(authorship.findAll('li').map((item) => item.text())).toEqual([
+      '1. Owner One · Corresponding author',
+      '2. Coauthor B',
+    ])
+    expect(authorship.classes()).toContain('authorship-position-list')
+    const stylesheet = readFileSync('src/style.css', 'utf8')
+    expect(stylesheet).toMatch(/\.authorship-position-list\s*\{[^}]*list-style:\s*none;/s)
+  })
 
   it('defensively hides cached coauthor secrets and unexpected storage paths', async () => {
     const wrapper = mountDetail()

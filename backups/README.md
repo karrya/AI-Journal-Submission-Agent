@@ -46,11 +46,13 @@ partial artifact and unencrypted temporary files.
 
 Provision an **empty** database named `academic_submission_agent_restore_test` and
 an account that can import and migrate only that database. Supply its URL through
-`RESTORE_DATABASE_URL` in the protected environment. Use a dedicated account with
-privileges on that database alone whenever possible. The restore target directory
-must be new or empty and outside the actual configured `STORAGE_ROOT`; standalone
-restore reads that root from the protected environment and rejects both the root
-and every subdirectory.
+`RESTORE_DATABASE_URL` in the protected environment. Use the dedicated
+`asa_restore` example and exact schema-scoped provisioning commands in
+[the operations runbook](../docs/operations.md#8-age-keys-encrypted-backup-and-isolated-restore);
+do not assume that `asa_test` has restore-schema privileges. The restore target
+directory must be new or empty and outside the actual configured `STORAGE_ROOT`;
+standalone restore reads that root from the protected environment and rejects both
+the root and every subdirectory.
 
 ```bash
 .venv/bin/python scripts/restore.py \
@@ -89,11 +91,14 @@ restore directory afterward. It retains the encrypted backup in `backups/`:
 ```
 
 By default the proof derives target credentials from `TEST_DATABASE_URL` and
-requires the fixed restore database to exist already. Alternatively, set
-`RESTORE_ADMIN_URL` in the protected environment. The proof then uses that
-administrative connection only to create the fixed `_test` database if absent,
-reject a non-empty one, and grant the existing test account access to it. It never
-creates, grants on, imports into, or overwrites the development database.
+requires the fixed restore database to exist already. Alternatively, leave
+`RESTORE_DATABASE_URL` unset or empty and set `RESTORE_ADMIN_URL` in the protected
+environment. The operations runbook provisions a dedicated `asa_restore_admin`
+whose privileges and grant option are limited to the fixed restore schema. The
+proof then uses that administrative connection only to create the fixed `_test`
+database if absent, reject a non-empty one, and grant the existing test account
+access to that schema alone. It never creates, grants on, imports into, or
+overwrites the development database.
 
 When development storage is empty, the proof creates one exclusively named,
 clearly labeled temporary text file so the real run verifies a non-zero storage

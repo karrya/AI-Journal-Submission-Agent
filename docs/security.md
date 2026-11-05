@@ -2,7 +2,7 @@
 
 ## Local trust boundary
 
-V0.1 is a loopback-only local application, not an Internet-hardened deployment. The backend and Vite listeners bind to `127.0.0.1`; the only default trusted browser origin is `http://localhost:5173` (use the equivalent loopback origin only when it is explicitly configured). MySQL accounts are fixed to `127.0.0.1` and scoped to their own databases. Do not expose the development servers, publish MySQL, or reuse local credentials elsewhere.
+V0.1 is a loopback-only local application, not an Internet-hardened deployment. The backend and Vite listeners bind to `127.0.0.1`; the default trusted browser origins are `http://127.0.0.1:5173` and `http://localhost:5173`, matching the documented quickstart. MySQL accounts are fixed to `127.0.0.1` and scoped to their own databases. Do not expose the development servers, publish MySQL, or reuse local credentials elsewhere.
 
 The real `.env`, storage, encrypted backups, Python/Node dependencies, coverage output, and IDE state are Git-ignored. `.env.example` contains placeholders only. Do not put database URLs, passwords, CSRF secrets, reusable cookies, age private keys, personal files, or server storage paths into source, tests, screenshots, logs, issues, or acceptance evidence.
 

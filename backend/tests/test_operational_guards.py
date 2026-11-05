@@ -6,12 +6,24 @@ from pathlib import Path
 
 import pytest
 
+from app.core.config import Settings
 from app.core.test_guards import validate_test_environment
 from conftest import validate_test_database_url
 
 
 TEST_DATABASE = "academic_submission_agent_test"
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+
+def test_default_origins_include_documented_loopback_frontend(monkeypatch):
+    monkeypatch.delenv("ALLOWED_ORIGINS", raising=False)
+
+    settings = Settings(_env_file=None)
+
+    assert set(settings.allowed_origins) == {
+        "http://127.0.0.1:5173",
+        "http://localhost:5173",
+    }
 
 
 def test_test_guard_requires_explicit_environment_and_host():

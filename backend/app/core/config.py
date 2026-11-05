@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     alembic_database_url: str | None = None
     test_database_url: str | None = None
     csrf_secret_key: str = ""
-    allowed_origins: list[str] = ["http://localhost:5173"]
+    allowed_origins: list[str] = ["http://127.0.0.1:5173", "http://localhost:5173"]
     session_idle_minutes: int = Field(default=30, gt=0)
     session_absolute_hours: int = Field(default=8, gt=0)
     session_cookie_secure: bool | None = None

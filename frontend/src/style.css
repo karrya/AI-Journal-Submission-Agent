@@ -333,6 +333,10 @@ td button {
   list-style: none;
 }
 
+.authorship-position-list {
+  list-style: none;
+}
+
 .authorship-row {
   display: grid;
   grid-template-columns: auto minmax(140px, 1fr) auto auto repeat(3, auto);

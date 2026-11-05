@@ -3,6 +3,7 @@
 .env
 storage/*
 backups/*
+!backups/README.md
 *.log
 logs/
 node_modules/

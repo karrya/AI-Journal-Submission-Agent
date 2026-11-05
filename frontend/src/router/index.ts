@@ -26,6 +26,38 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../views/DashboardView.vue'),
     meta: { requiresAuth: true },
   },
+  {
+    path: '/authors',
+    name: 'author-list',
+    component: () => import('../views/authors/AuthorListView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/authors/:authorId/authorizations',
+    name: 'author-authorizations',
+    component: () => import('../views/authors/AuthorizationView.vue'),
+    props: (route) => ({ authorId: String(route.params.authorId) }),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/authors/:authorId',
+    name: 'author-detail',
+    component: () => import('../views/authors/AuthorDetailView.vue'),
+    props: (route) => ({ authorId: String(route.params.authorId) }),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/authorizations',
+    name: 'authorization-list',
+    component: () => import('../views/authors/AuthorizationView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/journals',
+    name: 'journal-list',
+    component: () => import('../views/journals/JournalListView.vue'),
+    meta: { requiresAuth: true },
+  },
   { path: '/', redirect: '/dashboard' },
   { path: '/:pathMatch(.*)*', redirect: '/' },
 ]

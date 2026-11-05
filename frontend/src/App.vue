@@ -23,6 +23,11 @@ async function logout(): Promise<void> {
   <el-container class="app-shell">
     <el-header v-if="auth.isAuthenticated" class="app-header">
       <router-link class="app-brand" to="/dashboard">Academic Submission Agent</router-link>
+      <nav class="app-nav" aria-label="Primary navigation">
+        <router-link to="/authors">Authors</router-link>
+        <router-link to="/authorizations">Authorizations</router-link>
+        <router-link to="/journals">Journals</router-link>
+      </nav>
       <div class="account-actions">
         <span>{{ auth.user?.display_name }}</span>
         <el-button :loading="loggingOut" :disabled="loggingOut" @click="logout">

@@ -62,4 +62,23 @@ describe('protected router', () => {
 
     expect(router.currentRoute.value.name).toBe('dashboard')
   })
+
+  it('exposes protected author, authorization, and journal management routes', async () => {
+    const auth = useAuthStore()
+    auth.setSession(activeUser, 'csrf')
+    const router = createAppRouter(createMemoryHistory())
+
+    await router.push('/authors')
+    expect(router.currentRoute.value.name).toBe('author-list')
+    await router.push('/authors/a1')
+    expect(router.currentRoute.value.name).toBe('author-detail')
+    expect(router.currentRoute.value.params.authorId).toBe('a1')
+    await router.push('/authors/a1/authorizations')
+    expect(router.currentRoute.value.name).toBe('author-authorizations')
+    expect(router.currentRoute.value.params.authorId).toBe('a1')
+    await router.push('/authorizations')
+    expect(router.currentRoute.value.name).toBe('authorization-list')
+    await router.push('/journals')
+    expect(router.currentRoute.value.name).toBe('journal-list')
+  })
 })

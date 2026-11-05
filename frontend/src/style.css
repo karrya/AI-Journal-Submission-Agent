@@ -16,7 +16,9 @@ body {
 }
 
 button,
-input {
+input,
+select,
+textarea {
   font: inherit;
 }
 
@@ -104,5 +106,217 @@ input {
     align-items: flex-start;
     height: auto;
     padding: 16px 12px;
+  }
+}
+
+.app-nav,
+.dashboard-links,
+.table-actions,
+.form-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.app-nav a,
+.dashboard-links a {
+  color: #315efb;
+  text-decoration: none;
+}
+
+.dashboard-links {
+  align-items: flex-start;
+  flex-direction: column;
+}
+
+.management-page {
+  width: min(100%, 1440px);
+  justify-self: center;
+}
+
+.management-page > section,
+.stacked-form,
+.confirmation-panel {
+  margin-top: 20px;
+  padding: 20px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.tabs,
+.toolbar,
+.pagination {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.tabs button[aria-selected="true"] {
+  border-color: #315efb;
+  background: #315efb;
+  color: #ffffff;
+}
+
+.toolbar label,
+.stacked-form > label,
+.form-grid label,
+.confirmation-panel label {
+  display: grid;
+  gap: 6px;
+  color: #475569;
+  font-size: 14px;
+}
+
+.form-grid,
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.detail-grid {
+  padding: 20px;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.detail-grid div {
+  min-width: 0;
+}
+
+.detail-grid dt {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.detail-grid dd {
+  margin: 5px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.stacked-form {
+  display: grid;
+  gap: 16px;
+}
+
+.stacked-form fieldset {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #dbe3ee;
+  border-radius: 8px;
+}
+
+input:not([type="checkbox"]),
+select,
+textarea {
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #182230;
+}
+
+textarea {
+  resize: vertical;
+}
+
+button {
+  padding: 8px 13px;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #182230;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  border-color: #315efb;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.confirmation-control,
+.permission-option {
+  display: flex !important;
+  align-items: center;
+  gap: 8px !important;
+}
+
+.confirmation-panel {
+  border-color: #d97706;
+  background: #fffbeb;
+}
+
+.form-error {
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+table {
+  width: 100%;
+  margin-top: 16px;
+  border-collapse: collapse;
+  background: #ffffff;
+}
+
+th,
+td {
+  padding: 12px;
+  border-bottom: 1px solid #e2e8f0;
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+th {
+  color: #475569;
+  font-size: 13px;
+}
+
+td button {
+  margin: 0 6px 6px 0;
+}
+
+.pagination {
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.requirement-row {
+  padding: 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+@media (max-width: 760px) {
+  .app-header {
+    flex-wrap: wrap;
+  }
+
+  .app-nav {
+    order: 3;
+    width: 100%;
+  }
+
+  .management-page > section,
+  .stacked-form,
+  .confirmation-panel {
+    padding: 14px;
+  }
+
+  table {
+    display: block;
+    overflow-x: auto;
   }
 }

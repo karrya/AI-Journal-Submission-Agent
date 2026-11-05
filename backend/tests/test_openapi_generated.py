@@ -20,6 +20,18 @@ def test_exported_openapi_matches_generated_schema():
     assert json.loads(artifact.read_text(encoding="utf-8")) == app.openapi()
 
 
+def test_failed_audit_error_fields_are_in_the_openapi_schema():
+    schema = app.openapi()["components"]["schemas"]["AuditLogResponse"]
+    assert schema["properties"]["error_code"]["anyOf"][0] == {
+        "type": "string",
+        "maxLength": 64,
+    }
+    assert schema["properties"]["error_message"]["anyOf"][0] == {
+        "type": "string",
+        "maxLength": 1024,
+    }
+
+
 def test_file_upload_multipart_field_matches_approved_contract():
     document = app.openapi()
     operation = document["paths"][

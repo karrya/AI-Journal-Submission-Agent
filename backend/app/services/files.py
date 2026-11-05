@@ -169,7 +169,7 @@ class FileService(DomainService):
         if family_id is None:
             if file_type is None or normalized_display is None:
                 raise _validation("New file families require file_type and display_name")
-            family = self.repository.add_family(
+            new_family = self.repository.add_family(
                 FileFamily(
                     author_id=author_id,
                     manuscript_id=manuscript_id,
@@ -179,7 +179,7 @@ class FileService(DomainService):
                 )
             )
             self.db.flush()
-            return family
+            return new_family
         family = self.repository.get_family(family_id, manuscript_id, lock=True)
         if family is None:
             raise _not_found()

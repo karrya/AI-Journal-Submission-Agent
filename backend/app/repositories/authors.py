@@ -3,7 +3,7 @@
 import json
 from datetime import datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import ColumnElement, func, select
 from sqlalchemy.orm import Session
 
 from app.models import (
@@ -44,7 +44,7 @@ class AuthorRepository:
         permission: str | None,
         now_utc: datetime,
     ) -> tuple[list[Author], int]:
-        predicates = [Author.deleted_at.is_(None)]
+        predicates: list[ColumnElement[bool]] = [Author.deleted_at.is_(None)]
         if name:
             predicates.append(Author.display_name.contains(name))
         if orcid:
@@ -172,7 +172,7 @@ class InstitutionRepository:
         sort: str,
         order: str,
     ) -> tuple[list[Institution], int]:
-        predicates = [Institution.deleted_at.is_(None)]
+        predicates: list[ColumnElement[bool]] = [Institution.deleted_at.is_(None)]
         if name:
             predicates.append(Institution.normalized_name.contains(name))
         if country_code:
@@ -225,7 +225,7 @@ class AuthorInstitutionRepository:
                 AuthorInstitution.id == link_id,
                 *self._predicates(author_id),
             )
-        ).one_or_none()
+        ).tuples().one_or_none()
 
     def list_page(
         self, *, author_id: str, page: int, page_size: int, sort: str, order: str

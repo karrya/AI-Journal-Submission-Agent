@@ -118,7 +118,10 @@ def require_author_permission(
         permission=permission.value,
         now_utc=now,
     ):
-        return db.get(Author, author_id)
+        author = db.get(Author, author_id)
+        if author is None:
+            raise AppError(404, "RESOURCE_NOT_FOUND", "资源不存在")
+        return author
     if repository.any_current(user_id=user.id, author_id=author_id, now_utc=now):
         raise AppError(403, "PERMISSION_DENIED", "当前用户无权执行此操作")
     if repository.any_record(user_id=user.id, author_id=author_id):

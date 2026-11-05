@@ -2,7 +2,7 @@
 
 from datetime import UTC, datetime
 from typing import Any
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -262,7 +262,7 @@ class ManuscriptService(DomainService):
         if entries is None:
             return [
                 ManuscriptAuthorInput(
-                    author_id=owner_author_id, position=1, is_corresponding=True
+                    author_id=UUID(owner_author_id), position=1, is_corresponding=True
                 )
             ]
         if not entries or len(entries) > 200:

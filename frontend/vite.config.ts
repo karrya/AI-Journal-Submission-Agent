@@ -1,8 +1,7 @@
 import vue from '@vitejs/plugin-vue'
-import { defineConfig, type UserConfig } from 'vite'
-import type { InlineConfig } from 'vitest'
+import { defineConfig } from 'vitest/config'
 
-const config: UserConfig & { test: InlineConfig } = {
+const config = {
   plugins: [vue()],
   server: {
     host: '127.0.0.1',

@@ -282,6 +282,77 @@ def test_validity_filter_uses_inactive_subject_precedence(
     assert inactive.json()["total"] == 1
 
 
+def test_authorization_flush_maps_only_known_unique_conflicts(
+    db_session, admin, author, operator, monkeypatch
+):
+    from sqlalchemy.exc import IntegrityError
+
+    from app.core.errors import AppError
+    from app.schemas.authors import AuthorizationCreate
+    from app.services.authorizations import AuthorizationService
+
+    now = datetime.now(UTC)
+    payload = AuthorizationCreate(
+        author_id=author.id,
+        user_id=operator.id,
+        permissions=["author:profile:read"],
+        valid_from=now - timedelta(minutes=1),
+        valid_to=now + timedelta(hours=1),
+    )
+    service = AuthorizationService(db_session, admin, str(AuthorAuthorization.__name__))
+
+    original_flush = db_session.flush
+
+    def known_unique(*args, **kwargs):
+        if any(isinstance(item, AuthorAuthorization) for item in db_session.new):
+            raise IntegrityError(
+                "INSERT",
+                {},
+                Exception(
+                    1062,
+                    "Duplicate entry 'x' for key "
+                    "'author_emails.uq_author_emails_author_normalized'",
+                ),
+            )
+        return original_flush()
+
+    monkeypatch.setattr(db_session, "flush", known_unique)
+    with pytest.raises(AppError) as caught:
+        service.create(payload)
+    assert caught.value.status_code == 409
+    assert caught.value.code == "CONFLICT"
+
+
+def test_authorization_flush_does_not_map_foreign_key_failures_to_conflict(
+    db_session, admin, author, operator, monkeypatch
+):
+    from sqlalchemy.exc import IntegrityError
+
+    from app.schemas.authors import AuthorizationCreate
+    from app.services.authorizations import AuthorizationService
+
+    now = datetime.now(UTC)
+    payload = AuthorizationCreate(
+        author_id=author.id,
+        user_id=operator.id,
+        permissions=["author:profile:read"],
+        valid_from=now - timedelta(minutes=1),
+        valid_to=now + timedelta(hours=1),
+    )
+    service = AuthorizationService(db_session, admin, str(AuthorAuthorization.__name__))
+
+    original_flush = db_session.flush
+
+    def foreign_key_failure(*args, **kwargs):
+        if any(isinstance(item, AuthorAuthorization) for item in db_session.new):
+            raise IntegrityError("INSERT", {}, Exception(1452, "foreign key failure"))
+        return original_flush()
+
+    monkeypatch.setattr(db_session, "flush", foreign_key_failure)
+    with pytest.raises(IntegrityError):
+        service.create(payload)
+
+
 def test_authorization_not_found_is_flat_404(client, admin_context):
     response = client.get(
         f"/api/v1/author-authorizations/{AuthorAuthorization.__name__}"

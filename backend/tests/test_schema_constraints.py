@@ -436,9 +436,9 @@ def test_all_eighteen_tables_exist(db_engine):
 
 def test_migrated_columns_and_composite_foreign_keys_match_models(db_engine):
     inspector = inspect(db_engine)
-    for table_name, expected_columns in EXPECTED_NEW_COLUMNS.items():
+    for table_name, table in Base.metadata.tables.items():
         columns = inspector.get_columns(table_name)
-        assert {column["name"] for column in columns} == expected_columns
+        assert {column["name"] for column in columns} == set(table.columns.keys())
         for column in columns:
             if column["name"].endswith("_at"):
                 assert isinstance(column["type"], DATETIME)
@@ -454,6 +454,65 @@ def test_migrated_columns_and_composite_foreign_keys_match_models(db_engine):
             for foreign_key in inspector.get_foreign_keys(table_name)
         }
         assert expected.issubset(actual)
+
+
+def test_migrated_engine_collation_and_every_foreign_key_restrict_match_contract(
+    db_engine,
+):
+    inspector = inspect(db_engine)
+    for table_name in EXPECTED_TABLES:
+        options = inspector.get_table_options(table_name)
+        assert options["mysql_engine"] == "InnoDB"
+        assert options["mysql_default charset"] == "utf8mb4"
+        assert options["mysql_collate"].startswith("utf8mb4_")
+        foreign_keys = inspector.get_foreign_keys(table_name)
+        assert foreign_keys
+        assert all(
+            foreign_key["options"].get("ondelete") == "RESTRICT"
+            for foreign_key in foreign_keys
+        )
+    storage_path = next(
+        column
+        for column in inspector.get_columns("manuscript_files")
+        if column["name"] == "storage_path"
+    )
+    assert storage_path["type"].collation == "ascii_bin"
+
+
+def test_mig_01_empty_upgrade_head_is_cleanly_repeatable(db_engine):
+    """MIG-01: an empty upgrade and repeated head produce identical schema options."""
+    import os
+
+    from alembic import command
+    from alembic.config import Config
+    from conftest import BACKEND_DIR
+
+    previous_url = os.environ.get("ALEMBIC_DATABASE_URL")
+    os.environ["ALEMBIC_DATABASE_URL"] = os.environ["TEST_DATABASE_URL"]
+    config = Config(str(BACKEND_DIR / "alembic.ini"))
+    try:
+        command.downgrade(config, "base")
+        assert inspect(db_engine).get_table_names() == ["alembic_version"]
+        command.upgrade(config, "head")
+        first_options = {
+            name: inspect(db_engine).get_table_options(name) for name in EXPECTED_TABLES
+        }
+        command.upgrade(config, "head")
+        assert set(inspect(db_engine).get_table_names()) == EXPECTED_TABLES | {
+            "alembic_version"
+        }
+        assert {
+            name: inspect(db_engine).get_table_options(name) for name in EXPECTED_TABLES
+        } == first_options
+        with db_engine.connect() as connection:
+            assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0002"
+            assert connection.scalar(text("SELECT COUNT(*) FROM alembic_version")) == 1
+    finally:
+        command.upgrade(config, "head")
+        if previous_url is None:
+            os.environ.pop("ALEMBIC_DATABASE_URL", None)
+        else:
+            os.environ["ALEMBIC_DATABASE_URL"] = previous_url
 
 
 def test_current_version_must_belong_to_same_manuscript(

@@ -1,5 +1,9 @@
+import asyncio
+import json
 from uuid import UUID
 
+import pytest
+from fastapi import Request
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -54,6 +58,32 @@ def test_request_id_is_a_server_generated_uuid():
     request_id = response.headers["x-request-id"]
     assert UUID(request_id)
     assert request_id != "client-supplied"
+
+
+@pytest.mark.parametrize("invalid_value", [None, 123])
+def test_error_handlers_replace_invalid_runtime_request_ids(invalid_value):
+    from app.main import app_error_handler
+
+    request = Request({"type": "http", "method": "GET", "path": "/", "headers": []})
+    request.state.request_id = invalid_value
+    response = asyncio.run(
+        app_error_handler(request, AppError(409, "CONFLICT", "Conflict"))
+    )
+    body = json.loads(response.body)
+    assert isinstance(body["request_id"], str)
+    assert str(UUID(body["request_id"])) == body["request_id"]
+    assert body["request_id"] != invalid_value
+
+
+def test_middleware_error_replaces_invalid_runtime_request_id():
+    from app.api.v1.deps import _middleware_error
+
+    request = Request({"type": "http", "method": "GET", "path": "/", "headers": []})
+    request.state.request_id = 123
+    response = _middleware_error(request, 403, "PASSWORD_CHANGE_REQUIRED", "Change")
+    body = json.loads(response.body)
+    assert isinstance(body["request_id"], str)
+    assert str(UUID(body["request_id"])) == body["request_id"]
 
 
 def test_cors_allows_only_the_configured_local_origin():

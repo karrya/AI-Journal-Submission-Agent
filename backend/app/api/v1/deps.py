@@ -1,7 +1,7 @@
 import hmac
 from dataclasses import dataclass
 from typing import Annotated
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from fastapi import Depends, Header, Request
 from fastapi.responses import JSONResponse
@@ -114,14 +114,28 @@ def require_csrf(
     return principal
 
 
+def get_request_id(request: Request) -> str:
+    candidate = getattr(request.state, "request_id", None)
+    if isinstance(candidate, str):
+        try:
+            parsed = UUID(candidate)
+        except ValueError:
+            pass
+        else:
+            if str(parsed) == candidate:
+                return candidate
+    generated = str(uuid4())
+    request.state.request_id = generated
+    return generated
+
+
 def _middleware_error(request: Request, status: int, code: str, message: str):
-    request_id = getattr(request.state, "request_id", str(uuid4()))
     return JSONResponse(
         status_code=status,
         content={
             "code": code,
             "message": message,
-            "request_id": request_id,
+            "request_id": get_request_id(request),
             "details": None,
         },
     )

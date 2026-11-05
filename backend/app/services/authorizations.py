@@ -1,5 +1,6 @@
 """Administrator-only finite author authorization management."""
 
+from collections.abc import Sequence
 from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
@@ -114,8 +115,8 @@ class AuthorizationService(DomainService):
         *,
         action: str,
         authorization: AuthorAuthorization,
-        before: list[str] | None,
-        after: list[str],
+        before: Sequence[str] | None,
+        after: Sequence[str],
     ) -> None:
         self.audit.record(
             actor_user_id=self.user.id,
@@ -154,7 +155,7 @@ class AuthorizationService(DomainService):
                 created_by=self.user.id,
             )
         )
-        self.db.flush()
+        self._flush()
         self._audit(
             action="authorization.create",
             authorization=authorization,
@@ -231,7 +232,7 @@ class AuthorizationService(DomainService):
             setattr(authorization, key, value)
         authorization.reviewed_by = self.user.id
         authorization.reviewed_at = utc_now()
-        self.db.flush()
+        self._flush()
         after = sorted(set(authorization.permissions))
         self._audit(
             action="authorization.update",
@@ -250,7 +251,7 @@ class AuthorizationService(DomainService):
             authorization.revoked_at = utc_now()
         authorization.reviewed_by = self.user.id
         authorization.reviewed_at = utc_now()
-        self.db.flush()
+        self._flush()
         self._audit(
             action="authorization.revoke",
             authorization=authorization,

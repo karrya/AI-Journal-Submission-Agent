@@ -392,6 +392,17 @@ def test_audit_detail_returns_only_the_approved_schema(
     assert response.json()["created_at"].startswith("2026-11-01T12:00:00")
 
 
+def test_failed_audit_detail_returns_error_code_and_message(
+    client, auditor_context, audit_records
+):
+    response = client.get(f"/api/v1/audit-logs/{audit_records['second'].id}")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["result"] == "failure"
+    assert body["error_code"] == "UNAUTHORIZED"
+    assert body["error_message"] == "Login failed"
+
+
 def test_audit_rejects_invalid_utc_ranges_and_sorts(client, auditor_context):
     naive = client.get(
         "/api/v1/audit-logs", params={"created_from": "2026-11-01T00:00:00"}

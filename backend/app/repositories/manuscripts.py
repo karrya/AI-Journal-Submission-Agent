@@ -3,7 +3,7 @@
 import json
 from datetime import datetime
 
-from sqlalchemy import delete, func, or_, select
+from sqlalchemy import ColumnElement, delete, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.models import (
@@ -95,7 +95,7 @@ class ManuscriptRepository:
         user_id: str | None,
         now_utc: datetime | None,
     ) -> tuple[list[Manuscript], int]:
-        predicates = [Manuscript.deleted_at.is_(None)]
+        predicates: list[ColumnElement[bool]] = [Manuscript.deleted_at.is_(None)]
         if status is not None:
             predicates.append(Manuscript.status == status)
         if user_id is not None and now_utc is not None:

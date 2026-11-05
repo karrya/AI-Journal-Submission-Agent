@@ -1,6 +1,6 @@
 """Persistence queries for publishers, journal platforms, and journals."""
 
-from sqlalchemy import func, select
+from sqlalchemy import ColumnElement, func, select
 from sqlalchemy.orm import Session
 
 from app.models import Journal, JournalPlatform, Publisher
@@ -29,7 +29,7 @@ class PublisherRepository:
         sort: str,
         order: str,
     ) -> tuple[list[Publisher], int]:
-        predicates = [Publisher.deleted_at.is_(None)]
+        predicates: list[ColumnElement[bool]] = [Publisher.deleted_at.is_(None)]
         if name:
             predicates.append(Publisher.normalized_name.contains(name))
         total = self.db.scalar(select(func.count()).select_from(Publisher).where(*predicates))
@@ -76,7 +76,7 @@ class JournalPlatformRepository:
         sort: str,
         order: str,
     ) -> tuple[list[JournalPlatform], int]:
-        predicates = [JournalPlatform.deleted_at.is_(None)]
+        predicates: list[ColumnElement[bool]] = [JournalPlatform.deleted_at.is_(None)]
         if code:
             predicates.append(JournalPlatform.code == code)
         if name:
@@ -131,7 +131,7 @@ class JournalRepository:
         sort: str,
         order: str,
     ) -> tuple[list[Journal], int]:
-        predicates = [Journal.deleted_at.is_(None)]
+        predicates: list[ColumnElement[bool]] = [Journal.deleted_at.is_(None)]
         if name:
             predicates.append(Journal.name.contains(name))
         if publisher_id:

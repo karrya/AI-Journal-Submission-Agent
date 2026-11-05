@@ -219,7 +219,7 @@ class FileValidator:
                 else tuple(marker.encode("utf-16le") for marker in ("Workbook", "Book"))
             )
             carry = b""
-            found = set()
+            found: set[bytes] = set()
             while chunk := source.read(CHUNK_SIZE):
                 scanned = carry + chunk
                 found.update(marker for marker in markers if marker in scanned)

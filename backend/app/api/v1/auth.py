@@ -1,5 +1,6 @@
 from datetime import UTC, datetime
-from typing import Annotated
+from typing import Annotated, Literal, cast
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy.orm import Session
@@ -70,11 +71,11 @@ def _clear_session_cookie(
 
 def _user_response(service: AuthService, user: User) -> UserResponse:
     return UserResponse(
-        id=user.id,
+        id=UUID(user.id),
         username=user.username,
         display_name=user.display_name,
         roles=service.role_codes(user.id),
-        status=user.status,
+        status=cast(Literal["active", "disabled"], user.status),
         must_change_password=user.must_change_password,
         last_login_at=_utc(user.last_login_at),
     )
@@ -112,11 +113,14 @@ def login(
         ),
     )
     _set_session_cookie(response, request, settings, result.raw_token, max_age)
+    idle_expires_at = _utc(result.session.idle_expires_at)
+    absolute_expires_at = _utc(result.session.absolute_expires_at)
+    assert idle_expires_at is not None and absolute_expires_at is not None
     return LoginResponse(
         user=_user_response(service, result.user),
         csrf_token=result.csrf_token,
-        idle_expires_at=_utc(result.session.idle_expires_at),
-        absolute_expires_at=_utc(result.session.absolute_expires_at),
+        idle_expires_at=idle_expires_at,
+        absolute_expires_at=absolute_expires_at,
     )
 
 

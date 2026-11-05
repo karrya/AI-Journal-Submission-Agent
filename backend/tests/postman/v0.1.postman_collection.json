@@ -60,7 +60,7 @@
           ]
         },
         {
-          "name": "No session is unauthorized",
+          "name": "API-01 No session is unauthorized",
           "request": {
             "method": "GET",
             "header": [],
@@ -935,7 +935,7 @@
           ]
         },
         {
-          "name": "Ungranted author B profile is not found",
+          "name": "API-01 Ungranted author B profile is not found",
           "request": {
             "method": "GET",
             "header": [],
@@ -959,7 +959,7 @@
           ]
         },
         {
-          "name": "Cross-manuscript version ID is not found",
+          "name": "API-01 Cross-manuscript version ID is not found",
           "request": {
             "method": "GET",
             "header": [],
@@ -1025,7 +1025,7 @@
           ]
         },
         {
-          "name": "Expired grant is rejected",
+          "name": "API-01 Expired grant is rejected",
           "request": {
             "method": "GET",
             "header": [],

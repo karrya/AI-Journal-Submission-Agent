@@ -1,9 +1,11 @@
 """Transactional, authorization-aware author domain services."""
 
+import re
 import unicodedata
 from datetime import UTC, datetime
 from typing import Any
 
+from sqlalchemy import UniqueConstraint, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -18,6 +20,7 @@ from app.models import (
     UserRole,
     utc_now,
 )
+from app.models.base import Base
 from app.repositories.authors import (
     AuthorInstitutionRepository,
     AuthorRepository,
@@ -50,7 +53,6 @@ from app.services.permissions import (
     has_author_permission,
     require_author_permission,
 )
-from sqlalchemy import select
 
 
 def normalize_display_name(value: str) -> str:
@@ -73,6 +75,26 @@ def _not_found() -> AppError:
 
 def _validation(message: str) -> AppError:
     return AppError(422, "VALIDATION_ERROR", message)
+
+
+def _is_known_unique_violation(error: IntegrityError) -> bool:
+    original = error.orig
+    if original is None or not original.args or original.args[0] != 1062:
+        return False
+    match = re.search(r"for key '([^']+)'", str(original))
+    if match is None:
+        return False
+    key = match.group(1).rsplit(".", maxsplit=1)[-1]
+    if key == "PRIMARY":
+        return True
+    for table in Base.metadata.tables.values():
+        if any(
+            constraint.name == key
+            for constraint in table.constraints
+            if isinstance(constraint, UniqueConstraint)
+        ) or any(index.unique and index.name == key for index in table.indexes):
+            return True
+    return False
 
 
 class DomainService:
@@ -125,15 +147,19 @@ class DomainService:
     def _flush(self) -> None:
         try:
             self.db.flush()
-        except IntegrityError:
+        except IntegrityError as error:
             self.db.rollback()
+            if not _is_known_unique_violation(error):
+                raise
             raise AppError(409, "CONFLICT", "资源唯一性冲突") from None
 
     def _commit(self) -> None:
         try:
             self.db.commit()
-        except IntegrityError:
+        except IntegrityError as error:
             self.db.rollback()
+            if not _is_known_unique_violation(error):
+                raise
             raise AppError(409, "CONFLICT", "资源唯一性冲突") from None
         except Exception:
             self.db.rollback()

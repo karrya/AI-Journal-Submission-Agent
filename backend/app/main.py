@@ -18,7 +18,7 @@ from app.api.v1 import (
     manuscripts,
     readiness,
 )
-from app.api.v1.deps import first_password_gate
+from app.api.v1.deps import first_password_gate, get_request_id
 from app.core.config import get_settings
 from app.core.errors import AppError
 from app.services.auth import LoginRateLimiter
@@ -63,7 +63,7 @@ async def app_error_handler(request: Request, exc: AppError):
         content={
             "code": exc.code,
             "message": exc.message,
-            "request_id": request.state.request_id,
+            "request_id": get_request_id(request),
             "details": exc.details,
         },
     )
@@ -81,7 +81,7 @@ async def not_found(request: Request, exc):
         content={
             "code": "RESOURCE_NOT_FOUND",
             "message": "资源不存在",
-            "request_id": request.state.request_id,
+            "request_id": get_request_id(request),
             "details": None,
         },
     )
@@ -97,7 +97,7 @@ async def validation_error_handler(request: Request, exc: RequestValidationError
         content={
             "code": "VALIDATION_ERROR",
             "message": "请求参数校验失败",
-            "request_id": request.state.request_id,
+            "request_id": get_request_id(request),
             "details": details,
         },
     )
@@ -123,7 +123,7 @@ async def http_error_handler(request: Request, exc: StarletteHTTPException):
         content={
             "code": code,
             "message": str(exc.detail),
-            "request_id": request.state.request_id,
+            "request_id": get_request_id(request),
             "details": None,
         },
     )
@@ -137,11 +137,11 @@ async def unhandled_error_handler(request: Request, exc: Exception):
     )
     return JSONResponse(
         status_code=500,
-        headers={"X-Request-ID": request.state.request_id},
+        headers={"X-Request-ID": get_request_id(request)},
         content={
             "code": "INTERNAL_SERVER_ERROR",
             "message": "服务器内部错误",
-            "request_id": request.state.request_id,
+            "request_id": get_request_id(request),
             "details": None,
         },
     )

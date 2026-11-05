@@ -321,6 +321,7 @@ class JournalService(JournalResourceService):
             for requirement in normalized["requirements"]:
                 item = dict(requirement)
                 verified_at = _utc(item["verified_at"])
+                assert verified_at is not None
                 item["verified_at"] = verified_at.isoformat()
                 requirements.append(item)
             normalized["requirements"] = requirements

@@ -80,7 +80,7 @@ describe('ManuscriptDetailView', () => {
     })
   }
 
-  it('displays the current version and immutable snapshots without cached coauthor secrets', async () => {
+  it('defensively hides cached coauthor secrets and unexpected storage paths', async () => {
     const wrapper = mountDetail()
     await flushPromises()
 
@@ -92,6 +92,35 @@ describe('ManuscriptDetailView', () => {
     expect(wrapper.get('[data-test="snapshot-history"]').find('input').exists()).toBe(false)
     for (const secret of ['private@example.invalid', 'private-phone', 'private-address', 'private-orcid', 'private-coauthor-notes', '/private/do-not-render.pdf', 'storage_path']) {
       expect(wrapper.text()).not.toContain(secret)
+    }
+  })
+
+  it('WEB-01 keeps coauthor secrets out of the UI and manuscript Network payloads', async () => {
+    const safeFile: Record<string, unknown> = { ...file }
+    delete safeFile.storage_path
+    const responses: unknown[] = []
+    adapter.mockImplementation(async (config) => {
+      let data: unknown
+      if (config.url === '/manuscripts/m1') data = manuscript
+      else if (config.url === '/manuscripts/m1/versions') data = { items: versions, page: 1, page_size: 20, total: 2 }
+      else if (config.url === '/manuscripts/m1/versions/v2') data = versions[0]
+      else if (config.url === '/manuscripts/m1/versions/v2/files') data = { items: [safeFile], page: 1, page_size: 100, total: 1 }
+      else if (config.url === '/authors') data = { items: authorOptions, page: 1, page_size: 100, total: 2 }
+      else throw new Error(`Unexpected request: ${config.method} ${config.url}`)
+      if (config.url !== '/authors') responses.push(data)
+      return success(config, data)
+    })
+    const wrapper = mountDetail()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Working title')
+    expect(responses).toHaveLength(4)
+    for (const payload of responses) {
+      const serialized = JSON.stringify(payload)
+      for (const forbidden of ['email', 'phone_number', 'address_line1', 'orcid', 'notes', 'storage_path', 'stored_filename']) {
+        expect(serialized).not.toContain(forbidden)
+      }
+      expect(wrapper.text()).not.toContain('private-coauthor-notes')
     }
   })
 

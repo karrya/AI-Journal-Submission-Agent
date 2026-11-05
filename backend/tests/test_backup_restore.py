@@ -16,12 +16,15 @@ from scripts.backup import BackupFailed, create_backup
 from scripts.restore import (
     RestoreFailed,
     _recreate_excluded_tables,
+    _mysql_restore_arguments,
+    _run_mysql_restore,
+    _validate_dump,
     extract_verified_backup,
     restore_backup,
     validate_age_key_file,
     validate_restore_target,
 )
-from scripts.test_backup_restore import _temporary_proof_file
+from scripts.test_backup_restore import _remove_restore_directory, _temporary_proof_file
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 UNIT_PASSWORD = "unit-only-password"
@@ -105,6 +108,35 @@ def encrypt_archive(plain_archive: Path, encrypted: Path, recipient: str) -> Non
         )
 
 
+def make_sql_archive(tmp_path: Path, age_identity, dump: bytes) -> tuple[Path, Path]:
+    key_file, recipient = age_identity
+    manifest = {
+        "format_version": 1,
+        "sessions_excluded": True,
+        "source_database": "academic_submission_agent",
+        "files": [
+            {
+                "path": "database.sql",
+                "sha256": hashlib.sha256(dump).hexdigest(),
+                "size": len(dump),
+            }
+        ],
+    }
+    plain_path = tmp_path / "sql-proof.tar"
+    with tarfile.open(plain_path, mode="w:") as bundle:
+        for name, content in (
+            ("database.sql", dump),
+            ("manifest.json", json.dumps(manifest).encode("utf-8")),
+        ):
+            info = tarfile.TarInfo(name)
+            info.size = len(content)
+            bundle.addfile(info, io.BytesIO(content))
+    archive = tmp_path / "sql-proof.tar.age"
+    encrypt_archive(plain_path, archive, recipient)
+    plain_path.unlink()
+    return archive, key_file
+
+
 class FakeResult:
     def __init__(self, rows):
         self.rows = rows
@@ -173,6 +205,28 @@ def test_restore_refuses_development_target():
 def test_restore_rejects_wrong_database_targets(database_name):
     with pytest.raises(ValueError):
         validate_restore_target(database_name, "isolated-restore-test")
+
+
+@pytest.mark.parametrize("child_path", [False, True])
+def test_restore_binds_guard_to_relocated_live_storage(
+    tmp_path, age_identity, child_path
+):
+    live = tmp_path / "relocated-live-storage"
+    live.mkdir()
+    archive, key_file = make_sql_archive(tmp_path, age_identity, b"")
+    target = live / "child" if child_path else live
+
+    with pytest.raises(ValueError, match="outside live storage"):
+        restore_backup(
+            archive,
+            "mysql+pymysql://asa_app:unit-only-password@127.0.0.1/academic_submission_agent",
+            "mysql+pymysql://asa_test:target-unit-password@127.0.0.1/academic_submission_agent_restore_test",
+            target,
+            confirmation="RESTORE",
+            age_secret_key_file=key_file,
+            live_storage=live,
+            engine_factory=lambda url: pytest.fail("database must not be contacted"),
+        )
 
 
 def test_restore_rejects_live_storage_and_nonempty_targets(tmp_path):
@@ -315,6 +369,7 @@ def test_restore_requires_exact_confirmation_and_external_key(tmp_path):
             tmp_path / "restored",
             confirmation="restore",
             age_secret_key_file=tmp_path / "key",
+            live_storage=tmp_path / "live-storage",
         )
     with pytest.raises(ValueError):
         validate_age_key_file(PROJECT_ROOT / "not-an-external-age-key")
@@ -369,6 +424,98 @@ def test_extract_verified_backup_rejects_path_traversal(tmp_path, age_identity):
     plain_path.unlink()
 
 
+@pytest.mark.parametrize(
+    "statement",
+    [
+        "DROP TABLE `academic_submission_agent`.`authors`;",
+        "INSERT INTO `academic_submission_agent_test`.`authors` VALUES (1);",
+        "UPDATE academic_submission_agent.authors SET display_name='changed';",
+        "ALTER TABLE `academic_submission_agent` . `authors` ADD COLUMN x INT;",
+        "DROP/**/TABLE/**/`academic_submission_agent`/**/./**/`authors`;",
+        "/*!50000 DROP TABLE `academic_submission_agent`.`authors` */;",
+        "SET @x=1; DROP TABLE `academic_submission_agent`/* trick */./* trick */`authors`;",
+        "CREATE TABLE x AS SELECT * FROM academic_submission_agent.authors;",
+        'SET sql_mode=\'ANSI_QUOTES\'; DROP TABLE "academic_submission_agent" . "authors";',
+        "DROP TABLE 'academic_submission_agent'.'authors';",
+    ],
+)
+def test_hash_valid_cross_database_sql_never_reaches_mysql(
+    tmp_path, age_identity, statement
+):
+    archive, key_file = make_sql_archive(tmp_path, age_identity, statement.encode())
+    source = FakeDatabase("academic_submission_agent", {"authors": 1})
+    target = FakeDatabase("academic_submission_agent_restore_test")
+    engines = {source.name: FakeEngine(source), target.name: FakeEngine(target)}
+    executed = []
+
+    def mysql_runner(*args):
+        executed.append(args)
+
+    with pytest.raises(RestoreFailed):
+        restore_backup(
+            archive,
+            "mysql+pymysql://asa_app:unit-only-password@127.0.0.1/academic_submission_agent",
+            "mysql+pymysql://asa_test:target-unit-password@127.0.0.1/academic_submission_agent_restore_test",
+            tmp_path / "restored-storage",
+            confirmation="RESTORE",
+            age_secret_key_file=key_file,
+            live_storage=tmp_path / "live-storage",
+            engine_factory=lambda url: engines[make_url(url).database],
+            mysql_runner=mysql_runner,
+        )
+
+    assert executed == []
+    assert source.tables == {"authors": 1}
+    assert target.tables == {}
+    assert not (tmp_path / "restored-storage").exists()
+
+
+def test_mysql_runner_prepends_validated_target_for_one_database(tmp_path, monkeypatch):
+    capture = tmp_path / "mysql-input.sql"
+    monkeypatch.setenv("MYSQL_INPUT_CAPTURE", str(capture))
+    executable = tmp_path / "fake-mysql.py"
+    executable.write_text(
+        """#!/usr/bin/env python3
+import os
+import sys
+from pathlib import Path
+Path(os.environ['MYSQL_INPUT_CAPTURE']).write_bytes(sys.stdin.buffer.read())
+""",
+        encoding="utf-8",
+    )
+    executable.chmod(0o700)
+    command, environment = _mysql_restore_arguments(
+        "mysql+pymysql://asa_test:target-unit-password@127.0.0.1/academic_submission_agent_restore_test"
+    )
+    command[0] = str(executable)
+    dump = tmp_path / "database.sql"
+    dump.write_text("CREATE TABLE `authors` (`id` INT);\n", encoding="utf-8")
+
+    _run_mysql_restore(command, environment, dump)
+
+    assert capture.read_text(encoding="utf-8") == (
+        "USE `academic_submission_agent_restore_test`;\n"
+        "CREATE TABLE `authors` (`id` INT);\n"
+    )
+
+
+def test_dump_validator_accepts_unqualified_mysqldump_statements(tmp_path):
+    dump = tmp_path / "database.sql"
+    dump.write_text(
+        """/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+DROP TABLE IF EXISTS `authors`;
+CREATE TABLE `authors` (`id` INT, `note` VARCHAR(100));
+LOCK TABLES `authors` WRITE;
+/*!40000 ALTER TABLE `authors` DISABLE KEYS */;
+INSERT INTO `authors` VALUES (1,'literal academic_submission_agent.authors');
+/*!40000 ALTER TABLE `authors` ENABLE KEYS */;
+UNLOCK TABLES;
+""",
+        encoding="utf-8",
+    )
+    _validate_dump(dump)
+
+
 def test_restore_rejects_nonempty_database_before_reading_backup(tmp_path):
     source = FakeDatabase("academic_submission_agent", {"authors": 1})
     target = FakeDatabase("academic_submission_agent_restore_test", {"authors": 1})
@@ -385,11 +532,63 @@ def test_restore_rejects_nonempty_database_before_reading_backup(tmp_path):
             tmp_path / "restored-storage",
             confirmation="RESTORE",
             age_secret_key_file=tmp_path / "unused-key",
+            live_storage=tmp_path / "live-storage",
             engine_factory=lambda url: engines[make_url(url).database],
         )
 
     assert target.tables == {"authors": 1}
     assert not (tmp_path / "restored-storage").exists()
+
+
+def test_non_utf8_dump_cleans_decrypted_extraction(tmp_path, age_identity):
+    archive, key_file = make_sql_archive(tmp_path, age_identity, b"\xff\xfe\x80")
+    destination = tmp_path / "non-utf8-extraction"
+
+    with pytest.raises(RestoreFailed):
+        extract_verified_backup(archive, key_file, destination)
+    assert not destination.exists()
+
+
+def test_keyboard_interrupt_during_file_copy_cleans_and_propagates(
+    tmp_path, age_identity, monkeypatch
+):
+    monkeypatch.setenv("DUMP_CAPTURE", str(tmp_path / "dump-capture.json"))
+    key_file, arguments = backup_arguments(tmp_path, age_identity)
+    archive = create_backup(tmp_path / "backups", **arguments)
+    source = FakeDatabase(
+        "academic_submission_agent",
+        {"authors": 1, "auth_sessions": 0, "alembic_version": 1},
+    )
+    target = FakeDatabase("academic_submission_agent_restore_test")
+    engines = {source.name: FakeEngine(source), target.name: FakeEngine(target)}
+
+    def mysql_runner(*args):
+        target.tables.update({"authors": 1, "alembic_version": 1})
+
+    def migration_runner(url):
+        target.tables["auth_sessions"] = 0
+
+    def interrupted_copy(source_path, destination_path):
+        destination_path.write_bytes(b"partial plaintext")
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr("scripts.restore.shutil.copyfile", interrupted_copy)
+    restored = tmp_path / "restored-storage"
+    with pytest.raises(KeyboardInterrupt):
+        restore_backup(
+            archive,
+            "mysql+pymysql://asa_app:unit-only-password@127.0.0.1/academic_submission_agent",
+            "mysql+pymysql://asa_test:target-unit-password@127.0.0.1/academic_submission_agent_restore_test",
+            restored,
+            confirmation="RESTORE",
+            age_secret_key_file=key_file,
+            live_storage=tmp_path / "live-storage",
+            engine_factory=lambda url: engines[make_url(url).database],
+            mysql_runner=mysql_runner,
+            migration_runner=migration_runner,
+        )
+
+    assert not restored.exists()
 
 
 def test_alembic_recreation_creates_only_excluded_empty_session_table():
@@ -433,6 +632,20 @@ def test_temporary_proof_file_preserves_existing_storage_content(tmp_path):
     assert list(storage.iterdir()) == [existing]
 
 
+def test_restore_directory_cleanup_failure_blocks_success(tmp_path, monkeypatch):
+    restored = tmp_path / "decrypted-restore"
+    restored.mkdir()
+    remnant = restored / "plaintext.sql"
+    remnant.write_text("plaintext", encoding="utf-8")
+    monkeypatch.setattr(
+        "scripts.test_backup_restore.shutil.rmtree", lambda *args, **kwargs: None
+    )
+
+    with pytest.raises(RuntimeError, match="cleanup failed"):
+        _remove_restore_directory(restored)
+    assert remnant.exists()
+
+
 def test_restore_compares_database_files_hashes_and_source_snapshot(
     tmp_path, age_identity, monkeypatch
 ):
@@ -455,6 +668,7 @@ def test_restore_compares_database_files_hashes_and_source_snapshot(
 
     def mysql_runner(command, environment, dump_path):
         assert "--database=academic_submission_agent_restore_test" in command
+        assert "--one-database" in command
         assert environment["MYSQL_PWD"] == "target-unit-password"
         assert "target-unit-password" not in command
         assert dump_path.read_bytes().startswith(b"CREATE TABLE `authors`")
@@ -476,6 +690,7 @@ def test_restore_compares_database_files_hashes_and_source_snapshot(
         tmp_path / "restored-storage",
         confirmation="RESTORE",
         age_secret_key_file=key_file,
+        live_storage=tmp_path / "live-storage",
         engine_factory=engine_factory,
         mysql_runner=mysql_runner,
         migration_runner=migration_runner,
@@ -486,7 +701,7 @@ def test_restore_compares_database_files_hashes_and_source_snapshot(
     assert verification.compared_row_counts == 2
     assert verification.file_count == 1
     assert verification.verified_hash_count == 3
-    assert verification.source_unchanged is True
+    assert verification.source_table_counts_unchanged is True
     assert source.tables == {
         "authors": 1,
         "auth_sessions": 2,

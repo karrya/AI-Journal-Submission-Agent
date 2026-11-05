@@ -126,11 +126,20 @@ def _development_snapshot(database_url: str, storage: Path) -> tuple[dict, dict]
             raise RuntimeError("development database name is missing")
         row_counts = _database_snapshot(engine, database_name)
         checksums: dict[str, str] = {}
+        schema_hashes: dict[str, str] = {}
         with engine.connect() as connection:
             for table in row_counts:
                 row = connection.execute(text(f"CHECKSUM TABLE `{table}`")).one()
                 checksums[table] = str(row[1])
-        database = {"row_counts": row_counts, "table_checksums": checksums}
+                ddl = connection.execute(text(f"SHOW CREATE TABLE `{table}`")).one()[1]
+                schema_hashes[table] = hashlib.sha256(
+                    str(ddl).encode("utf-8")
+                ).hexdigest()
+        database = {
+            "row_counts": row_counts,
+            "table_checksums": checksums,
+            "schema_hashes": schema_hashes,
+        }
     finally:
         engine.dispose()
     return database, _storage_snapshot(storage)
@@ -179,6 +188,15 @@ def _target_url() -> str:
     )
 
 
+def _remove_restore_directory(path: Path) -> None:
+    try:
+        shutil.rmtree(path)
+    except OSError as exc:
+        raise RuntimeError("restore directory cleanup failed") from exc
+    if path.exists():
+        raise RuntimeError("restore directory cleanup failed; plaintext remains")
+
+
 def main() -> None:
     load_dotenv(PROJECT_ROOT / ".env", override=False)
     _require_application_stopped()
@@ -211,6 +229,7 @@ def main() -> None:
                     restore_parent / "storage",
                     confirmation="RESTORE",
                     age_secret_key_file=key_file,
+                    live_storage=storage,
                 )
             after = _development_snapshot(source_url, storage)
             if after != before:
@@ -225,22 +244,18 @@ def main() -> None:
             ]
             if unencrypted:
                 raise RuntimeError("unencrypted or partial backup artifacts remain")
-            print(
-                json.dumps(
-                    {
-                        "table_count_after_alembic": verification.table_count,
-                        "compared_source_tables": verification.compared_row_counts,
-                        "restored_file_count": verification.file_count,
-                        "verified_manifest_hashes": verification.verified_hash_count,
-                        "development_unchanged": after == before,
-                        "temporary_proof_file_cleaned": True,
-                        "isolated_restore_directory_removed": True,
-                    },
-                    sort_keys=True,
-                )
-            )
+            result = {
+                "table_count_after_alembic": verification.table_count,
+                "compared_source_tables": verification.compared_row_counts,
+                "restored_file_count": verification.file_count,
+                "verified_manifest_hashes": verification.verified_hash_count,
+                "development_unchanged": after == before,
+                "temporary_proof_file_cleaned": True,
+                "isolated_restore_directory_removed": True,
+            }
         finally:
-            shutil.rmtree(restore_parent, ignore_errors=True)
+            _remove_restore_directory(restore_parent)
+        print(json.dumps(result, sort_keys=True))
     except (BackupFailed, RestoreFailed, RuntimeError) as exc:
         raise SystemExit(f"BACKUP-01 failed: {exc}") from None
 

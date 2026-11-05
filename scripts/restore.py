@@ -37,7 +37,7 @@ class RestoreVerification:
     compared_row_counts: int
     file_count: int
     verified_hash_count: int
-    source_unchanged: bool
+    source_table_counts_unchanged: bool
     manifest: dict
 
 
@@ -149,14 +149,135 @@ def _read_manifest(
     return manifest
 
 
+def _quoted_token(dump: str, start: int, quote: str) -> tuple[str, int]:
+    content: list[str] = []
+    index = start + 1
+    while index < len(dump):
+        char = dump[index]
+        if char == "\\":
+            if index + 1 >= len(dump):
+                raise RestoreFailed("database dump has an unterminated escape")
+            if quote != "`":
+                content.append(dump[index + 1])
+            index += 2
+            continue
+        if char == quote:
+            if index + 1 < len(dump) and dump[index + 1] == quote:
+                content.append(quote)
+                index += 2
+                continue
+            return "".join(content), index + 1
+        content.append(char)
+        index += 1
+    raise RestoreFailed("database dump has an unterminated quoted value")
+
+
+def _mysql_tokens(dump: str) -> list[tuple[str, str]]:
+    """Tokenize executable MySQL SQL, ignoring comments and literal contents."""
+    tokens: list[tuple[str, str]] = []
+    index = 0
+    while index < len(dump):
+        char = dump[index]
+        if char.isspace():
+            index += 1
+            continue
+        if char == "#" or (
+            dump.startswith("--", index)
+            and index + 2 < len(dump)
+            and dump[index + 2].isspace()
+        ):
+            newline = dump.find("\n", index)
+            index = len(dump) if newline < 0 else newline + 1
+            continue
+        if dump.startswith("/*", index):
+            end = dump.find("*/", index + 2)
+            if end < 0:
+                raise RestoreFailed("database dump has an unterminated comment")
+            if dump.startswith("/*!", index):
+                executable = dump[index + 3 : end]
+                if len(executable) >= 5 and executable[:5].isdigit():
+                    executable = executable[5:]
+                tokens.extend(_mysql_tokens(executable))
+            index = end + 2
+            continue
+        if char in "'\"`":
+            content, index = _quoted_token(dump, index, char)
+            tokens.append(("ident" if char in '"`' else "string", content))
+            continue
+        if char.isdigit():
+            end = index + 1
+            while end < len(dump) and (dump[end].isalnum() or dump[end] in "xX_"):
+                end += 1
+            tokens.append(("number", dump[index:end]))
+            index = end
+            continue
+        if char.isalpha() or char in "_$" or ord(char) > 127:
+            end = index + 1
+            while end < len(dump) and (
+                dump[end].isalnum() or dump[end] in "_$" or ord(dump[end]) > 127
+            ):
+                end += 1
+            tokens.append(("ident", dump[index:end]))
+            index = end
+            continue
+        tokens.append(("punct", char))
+        index += 1
+    return tokens
+
+
 def _validate_dump(dump_path: Path) -> None:
     dump = dump_path.read_text(encoding="utf-8")
-    if re.search(r"^\s*USE\s+", dump, flags=re.IGNORECASE | re.MULTILINE) or re.search(
-        r"\b(?:CREATE|DROP|ALTER)\s+(?:SCHEMA|DATABASE)\b",
-        dump,
-        flags=re.IGNORECASE,
-    ):
-        raise RestoreFailed("database dump contains unsafe database selection or DDL")
+    tokens = _mysql_tokens(dump)
+    for index in range(len(tokens) - 2):
+        left, dot, right = tokens[index : index + 3]
+        if (
+            left[0] in {"ident", "string"}
+            and dot == ("punct", ".")
+            and right[0] in {"ident", "string"}
+            and not (
+                left[0] == "ident" and index > 0 and tokens[index - 1] == ("punct", "@")
+            )
+        ):
+            raise RestoreFailed("database dump contains a schema-qualified reference")
+
+    statements: list[list[tuple[str, str]]] = []
+    statement: list[tuple[str, str]] = []
+    for token in tokens:
+        if token == ("punct", ";"):
+            if statement:
+                statements.append(statement)
+                statement = []
+        else:
+            statement.append(token)
+    if statement:
+        statements.append(statement)
+
+    allowed_second_keywords = {
+        "SET": set(),
+        "DROP": {"TABLE"},
+        "CREATE": {"TABLE"},
+        "ALTER": {"TABLE"},
+        "INSERT": {"INTO"},
+        "LOCK": {"TABLES"},
+        "UNLOCK": {"TABLES"},
+    }
+    for statement in statements:
+        if statement[0][0] != "ident":
+            raise RestoreFailed("database dump contains an unsupported statement")
+        keyword = statement[0][1].upper()
+        if keyword not in allowed_second_keywords:
+            raise RestoreFailed("database dump contains an unsupported statement")
+        if keyword == "SET":
+            if any(
+                kind == "string" and "NO_BACKSLASH_ESCAPES" in value.upper()
+                for kind, value in statement
+            ):
+                raise RestoreFailed("database dump changes SQL string escaping")
+            continue
+        if len(statement) < 2 or statement[1][0] != "ident":
+            raise RestoreFailed("database dump contains an unsupported statement")
+        if statement[1][1].upper() not in allowed_second_keywords[keyword]:
+            raise RestoreFailed("database dump contains an unsupported statement")
 
 
 def extract_verified_backup(
@@ -212,11 +333,13 @@ def extract_verified_backup(
                         shutil.copyfileobj(source, output)
             _validate_dump(target / "database.sql")
         return manifest
-    except RestoreFailed:
-        shutil.rmtree(target, ignore_errors=True)
-        raise
-    except (OSError, tarfile.TarError) as exc:
-        shutil.rmtree(target, ignore_errors=True)
+    except BaseException as exc:
+        if target.exists():
+            shutil.rmtree(target)
+        if isinstance(exc, RestoreFailed):
+            raise
+        if isinstance(exc, (KeyboardInterrupt, SystemExit, GeneratorExit)):
+            raise
         raise RestoreFailed("encrypted backup could not be verified") from exc
 
 
@@ -253,16 +376,34 @@ def _database_snapshot(engine: Engine, expected_database: str) -> dict[str, int]
 def _run_mysql_restore(
     command: Sequence[str], environment: dict[str, str], dump_path: Path
 ) -> None:
+    database_arguments = [
+        argument for argument in command if argument.startswith("--database=")
+    ]
+    if len(database_arguments) != 1:
+        raise RestoreFailed("isolated database import configuration is invalid")
+    database = database_arguments[0].removeprefix("--database=")
+    if not DATABASE_NAME.fullmatch(database):
+        raise RestoreFailed("isolated database import configuration is invalid")
     with dump_path.open("rb") as dump:
-        result = subprocess.run(
+        process = subprocess.Popen(
             command,
-            stdin=dump,
+            stdin=subprocess.PIPE,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             env=environment,
-            check=False,
         )
-    if result.returncode != 0:
+        try:
+            assert process.stdin is not None
+            with process.stdin as stdin:
+                stdin.write(f"USE `{database}`;\n".encode("ascii"))
+                shutil.copyfileobj(dump, stdin)
+            return_code = process.wait()
+        except BaseException:
+            if process.poll() is None:
+                process.kill()
+                process.wait()
+            raise
+    if return_code != 0:
         raise RestoreFailed("isolated database import failed")
 
 
@@ -310,6 +451,7 @@ def _mysql_restore_arguments(database_url: str) -> tuple[list[str], dict[str, st
     environment["MYSQL_PWD"] = url.password or ""
     command = [
         "mysql",
+        "--one-database",
         f"--host={url.host or '127.0.0.1'}",
         f"--port={url.port or 3306}",
         f"--user={url.username}",
@@ -327,7 +469,8 @@ def _clear_restore_directory(target: Path, existed: bool) -> None:
                 else:
                     child.unlink()
     else:
-        shutil.rmtree(target, ignore_errors=True)
+        if target.exists():
+            shutil.rmtree(target)
 
 
 def restore_backup(
@@ -338,13 +481,14 @@ def restore_backup(
     *,
     confirmation: str,
     age_secret_key_file: str | Path,
+    live_storage: str | Path,
     engine_factory: Callable[[str], Engine] = _create_engine,
     mysql_runner: Callable[
         [Sequence[str], dict[str, str], Path], None
     ] = _run_mysql_restore,
     migration_runner: Callable[[str], None] = _run_alembic,
 ) -> RestoreVerification:
-    """Restore and compare tables, rows, files, hashes, and source immutability."""
+    """Restore and compare tables, rows, files, hashes, and source count stability."""
     if confirmation != "RESTORE":
         raise ValueError("restore requires explicit --confirm RESTORE")
     source_url = make_url(source_database_url)
@@ -360,7 +504,9 @@ def restore_backup(
         raise ValueError("valid source and target MySQL URLs are required")
     if source_url.database == target_url.database:
         raise ValueError("restore target must differ from the development database")
-    target = validate_restore_target(target_url.database, target_directory)
+    target = validate_restore_target(
+        target_url.database, target_directory, live_storage=Path(live_storage)
+    )
     target_existed = target.exists()
     source_engine: Engine | None = None
     target_engine: Engine | None = None
@@ -411,7 +557,9 @@ def restore_backup(
 
         source_after = _database_snapshot(source_engine, source_url.database)
         if source_after != source_before:
-            raise RestoreFailed("development database changed during restore")
+            raise RestoreFailed(
+                "development table names or row counts changed during restore"
+            )
         target_after = _database_snapshot(target_engine, target_url.database)
         if not set(source_before).issubset(target_after):
             raise RestoreFailed("post-migration source tables are missing")
@@ -450,14 +598,15 @@ def restore_backup(
             compared_row_counts=compared,
             file_count=len(actual_files),
             verified_hash_count=len(manifest["files"]),
-            source_unchanged=True,
+            source_table_counts_unchanged=True,
             manifest=manifest,
         )
-    except RestoreFailed:
+    except BaseException as exc:
         _clear_restore_directory(target, target_existed)
-        raise
-    except Exception as exc:
-        _clear_restore_directory(target, target_existed)
+        if isinstance(exc, RestoreFailed):
+            raise
+        if isinstance(exc, (KeyboardInterrupt, SystemExit, GeneratorExit)):
+            raise
         raise RestoreFailed(
             "isolated restore failed; development data was not targeted"
         ) from exc
@@ -506,6 +655,7 @@ def main() -> None:
             args.target_directory,
             confirmation=args.confirm,
             age_secret_key_file=key_file,
+            live_storage=Path(os.environ.get("STORAGE_ROOT", PROJECT_ROOT / "storage")),
         )
     except (ValueError, RestoreFailed) as exc:
         raise SystemExit(str(exc)) from None
@@ -516,7 +666,7 @@ def main() -> None:
                 "compared_row_counts": verification.compared_row_counts,
                 "file_count": verification.file_count,
                 "verified_hash_count": verification.verified_hash_count,
-                "source_unchanged": verification.source_unchanged,
+                "source_table_counts_unchanged": verification.source_table_counts_unchanged,
             },
             sort_keys=True,
         )

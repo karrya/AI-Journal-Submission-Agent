@@ -46,8 +46,11 @@ partial artifact and unencrypted temporary files.
 
 Provision an **empty** database named `academic_submission_agent_restore_test` and
 an account that can import and migrate only that database. Supply its URL through
-`RESTORE_DATABASE_URL` in the protected environment. The restore target directory
-must be new or empty and outside live `storage/`.
+`RESTORE_DATABASE_URL` in the protected environment. Use a dedicated account with
+privileges on that database alone whenever possible. The restore target directory
+must be new or empty and outside the actual configured `STORAGE_ROOT`; standalone
+restore reads that root from the protected environment and rejects both the root
+and every subdirectory.
 
 ```bash
 .venv/bin/python scripts/restore.py \
@@ -59,11 +62,19 @@ must be new or empty and outside live `storage/`.
 
 The command rejects the development database, malformed or non-`_test` names,
 non-empty targets, live-storage paths, unsafe archive members, and hash mismatches.
-It compares the dumped tables before migration, runs `alembic upgrade head` and
-`alembic check`, compares all source row counts except excluded sessions, verifies
-every manifest hash, and compares restored storage file names, counts, and hashes.
-Sessions must remain empty. The source database is snapshotted again and must be
-unchanged.
+A MySQL-aware tokenizer accepts only expected mysqldump statement forms and rejects
+every schema-qualified reference, including quoted, comment-split, and executable
+comment variants. The import uses `mysql --one-database` and prepends only the
+validated isolated target `USE` statement after archive validation.
+
+The command compares dumped tables before migration, runs `alembic upgrade head`
+and `alembic check`, compares all source row counts except excluded sessions,
+verifies every manifest hash, and compares restored storage file names, counts,
+and hashes. Sessions must remain empty. Standalone restore checks source table
+names and row counts for stability; it does not claim content/schema immutability.
+The real proof below additionally compares table checksums, schema DDL hashes, and
+storage hashes before and after. Every decryption, restore, interruption, and
+cleanup failure prevents success output and removes decrypted temporary data.
 
 ## Repeatable BACKUP-01 proof
 

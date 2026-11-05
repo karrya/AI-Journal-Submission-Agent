@@ -8,7 +8,7 @@ from alembic import command
 from alembic.config import Config
 from dotenv import load_dotenv
 from sqlalchemy import inspect, select, text
-from sqlalchemy.engine import make_url
+from sqlalchemy.engine import Connection, make_url
 from sqlalchemy.orm import Session
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
@@ -38,6 +38,34 @@ def validate_test_storage_root(root: Path) -> Path:
     if resolved == live or live in resolved.parents:
         raise RuntimeError("tests cannot use the live storage directory")
     return root
+
+
+def clear_test_data(connection: Connection) -> None:
+    table_names = set(inspect(connection).get_table_names())
+    if "manuscripts" in table_names:
+        connection.execute(text("UPDATE manuscripts SET current_version_id = NULL"))
+    for table in (
+        "operation_logs",
+        "manuscript_files",
+        "file_families",
+        "manuscript_authors",
+        "manuscript_versions",
+        "manuscripts",
+        "journals",
+        "journal_platforms",
+        "publishers",
+        "author_authorizations",
+        "author_institutions",
+        "author_emails",
+        "auth_sessions",
+        "user_roles",
+        "authors",
+        "institutions",
+        "roles",
+        "users",
+    ):
+        if table in table_names:
+            connection.execute(text(f"DELETE FROM `{table}`"))
 
 
 @pytest.fixture(scope="session")
@@ -70,6 +98,8 @@ def db_engine():
             else:
                 os.environ["ALEMBIC_DATABASE_URL"] = previous_url
 
+        with engine.begin() as connection:
+            clear_test_data(connection)
         yield engine
     finally:
         engine.dispose()
@@ -97,33 +127,7 @@ def db_session(db_engine, test_storage_root):
         session.rollback()
         session.close()
         with db_engine.begin() as connection:
-            table_names = set(inspect(connection).get_table_names())
-            if "manuscripts" in table_names:
-                connection.execute(
-                    text("UPDATE manuscripts SET current_version_id = NULL")
-                )
-            for table in (
-                "operation_logs",
-                "manuscript_files",
-                "file_families",
-                "manuscript_authors",
-                "manuscript_versions",
-                "manuscripts",
-                "journals",
-                "journal_platforms",
-                "publishers",
-                "author_authorizations",
-                "author_institutions",
-                "author_emails",
-                "auth_sessions",
-                "user_roles",
-                "authors",
-                "institutions",
-                "roles",
-                "users",
-            ):
-                if table in table_names:
-                    connection.execute(text(f"DELETE FROM `{table}`"))
+            clear_test_data(connection)
 
 
 @pytest.fixture

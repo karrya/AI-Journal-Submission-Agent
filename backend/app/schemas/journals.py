@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import AfterValidator, Field, model_validator
+from pydantic import AfterValidator, Field, field_validator, model_validator
 
 from app.schemas.common import (
     InputModel,
@@ -92,10 +92,17 @@ JournalPlatformPage = Page[JournalPlatformResponse]
 
 class JournalRequirement(InputModel):
     key: str = Field(min_length=1)
-    value: str = Field(min_length=1)
+    value: str | int | float | bool = Field(allow_inf_nan=False)
     scope: str = Field(min_length=1)
     source_url: SecureUrl = Field(max_length=1024)
     verified_at: datetime
+
+    @field_validator("value")
+    @classmethod
+    def require_nonempty_string(cls, value):
+        if isinstance(value, str) and not value:
+            raise ValueError("Requirement value must not be empty")
+        return value
 
 
 class JournalCreate(InputModel):

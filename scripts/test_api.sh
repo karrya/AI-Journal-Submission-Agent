@@ -55,15 +55,37 @@ trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-mkdir -p "$WORK_DIR/storage"
 export ENVIRONMENT=test
 export DATABASE_URL="$TEST_DATABASE_URL"
 export ALEMBIC_DATABASE_URL="$TEST_DATABASE_URL"
-export STORAGE_ROOT="$WORK_DIR/storage"
+export STORAGE_ROOT="${TEST_STORAGE_ROOT:-$WORK_DIR/storage}"
 export SESSION_COOKIE_SECURE=false
 export ALLOWED_ORIGINS='["http://localhost:5173"]'
 export CSRF_SECRET_KEY="$("$PYTHON" -c 'import secrets; print(secrets.token_urlsafe(48))')"
 export PYTHONPATH="$ROOT_DIR/backend"
+
+"$PYTHON" - "$TEST_DATABASE_URL" "$STORAGE_ROOT" "$ROOT_DIR/storage" <<'PY'
+import os
+import sys
+
+from sqlalchemy.engine import make_url
+
+from app.core.test_guards import validate_test_environment
+
+url = make_url(sys.argv[1])
+try:
+    validate_test_environment(
+        url.database,
+        sys.argv[2],
+        sys.argv[3],
+        environment=os.environ.get("ENVIRONMENT"),
+        database_host=url.host,
+    )
+except RuntimeError as error:
+    raise SystemExit(str(error)) from None
+PY
+
+mkdir -p "$STORAGE_ROOT"
 
 new_password() {
     printf 'Aa!%s' "$("$PYTHON" -c 'import secrets; print(secrets.token_hex(16))')"

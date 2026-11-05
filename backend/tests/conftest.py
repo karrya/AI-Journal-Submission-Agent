@@ -11,6 +11,8 @@ from sqlalchemy import inspect, select, text
 from sqlalchemy.engine import Connection, make_url
 from sqlalchemy.orm import Session
 
+from app.core.test_guards import validate_test_environment
+
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 PROJECT_ROOT = BACKEND_DIR.parent
 TEST_DATABASE = "academic_submission_agent_test"
@@ -29,14 +31,17 @@ def validate_test_database_url(url: str) -> str:
             "TEST_DATABASE_URL must target the fixed academic_submission_agent_test "
             "database ending in _test"
         )
+    validate_test_environment(
+        parsed.database,
+        LIVE_STORAGE_ROOT.parent / "test-storage-validation",
+        LIVE_STORAGE_ROOT,
+        database_host=parsed.host,
+    )
     return url
 
 
 def validate_test_storage_root(root: Path) -> Path:
-    resolved = root.resolve()
-    live = LIVE_STORAGE_ROOT.resolve()
-    if resolved == live or live in resolved.parents:
-        raise RuntimeError("tests cannot use the live storage directory")
+    validate_test_environment(TEST_DATABASE, root, LIVE_STORAGE_ROOT)
     return root
 
 
@@ -69,13 +74,24 @@ def clear_test_data(connection: Connection) -> None:
 
 
 @pytest.fixture(scope="session")
-def db_engine():
+def db_engine(tmp_path_factory: pytest.TempPathFactory):
     if os.environ.get("ENVIRONMENT") != "test":
         raise RuntimeError("MySQL integration tests require ENVIRONMENT=test")
     url = os.environ.get("TEST_DATABASE_URL")
     if not url:
         raise RuntimeError("TEST_DATABASE_URL is required for MySQL integration tests")
-    validate_test_database_url(url)
+    parsed = make_url(validate_test_database_url(url))
+    session_storage_root = validate_test_storage_root(
+        tmp_path_factory.mktemp("session-storage")
+    )
+    os.environ["STORAGE_ROOT"] = str(session_storage_root)
+    validate_test_environment(
+        parsed.database,
+        session_storage_root,
+        LIVE_STORAGE_ROOT,
+        environment=os.environ.get("ENVIRONMENT"),
+        database_host=parsed.host,
+    )
 
     from app.core.database import create_mysql_engine
 

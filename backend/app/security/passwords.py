@@ -7,13 +7,18 @@ _password_hasher = PasswordHasher()
 
 _COMMON_WEAK_PASSWORDS = frozenset(
     {
+        "111111",
+        "123456",
+        "admin123",
         "admin12345678",
         "adminadmin12",
         "changeme123!",
         "letmeinletmein",
         "p@ssw0rd123!",
+        "password",
         "password123!",
         "password1234",
+        "qwerty",
         "qwertyqwerty",
         "welcome123!",
     }
@@ -43,8 +48,8 @@ def password_needs_rehash(password_hash: str) -> bool:
 
 
 def validate_new_password(username: str, password: str) -> None:
-    if not 12 <= len(password) <= 128:
-        raise ValueError("密码长度必须为 12–128 个字符")
+    if not 6 <= len(password) <= 128:
+        raise ValueError("密码长度必须为 6–128 个字符")
     normalized = normalize_username(password)
     if normalized == normalize_username(username):
         raise ValueError("新密码不得与用户名相同")

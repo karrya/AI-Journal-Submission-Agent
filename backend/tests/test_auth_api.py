@@ -327,8 +327,40 @@ def test_password_fields_preserve_significant_whitespace():
 
 
 @pytest.mark.parametrize(
+    ("new_password", "expected_valid"),
+    [("a" * 5, False), ("a" * 6, True), ("a" * 128, True), ("a" * 129, False)],
+)
+def test_new_password_length_boundaries(new_password, expected_valid):
+    from app.schemas.auth import ChangePasswordRequest
+    from app.security.passwords import validate_new_password
+
+    if expected_valid:
+        request = ChangePasswordRequest(
+            current_password="current-password", new_password=new_password
+        )
+        assert request.new_password == new_password
+        validate_new_password("initial-admin", new_password)
+    else:
+        with pytest.raises(ValueError):
+            ChangePasswordRequest(
+                current_password="current-password", new_password=new_password
+            )
+        with pytest.raises(ValueError):
+            validate_new_password("initial-admin", new_password)
+
+
+@pytest.mark.parametrize(
     "new_password",
-    ["short", "initial-admin", "Password123!"],
+    [
+        "short",
+        "initial-admin",
+        "Password123!",
+        "123456",
+        "qwerty",
+        "password",
+        "admin123",
+        "111111",
+    ],
 )
 def test_password_change_rejects_weak_or_invalid_new_passwords(
     client, db_session, login_initial_admin, new_password

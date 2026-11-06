@@ -112,7 +112,7 @@ cd "$PROJECT_ROOT"
 .venv/bin/python scripts/create_admin.py
 ```
 
-在隐藏提示中输入唯一的管理员用户名和 12–128 字符的初始密码。系统没有默认密码。该命令创建固定角色目录和一个 `system_admin`，设置 `must_change_password=true`，并在任何用户已存在时拒绝初始化。
+在隐藏提示中输入唯一的管理员用户名和 6–128 字符的初始密码。系统没有默认密码。该命令创建固定角色目录和一个 `system_admin`，设置 `must_change_password=true`，并在任何用户已存在时拒绝初始化。
 
 启动应用，在前端登录并完成强制修改密码表单。修改密码会撤销现有会话；使用新密码重新登录。在完成此步骤前，业务 API 返回 `403 PASSWORD_CHANGE_REQUIRED`；仅会话身份、CSRF、退出登录和修改密码路由保持可用。
 

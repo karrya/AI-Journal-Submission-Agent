@@ -110,6 +110,34 @@ describe('ChangePasswordView', () => {
     expect(wrapper.text()).not.toContain('raw stack')
   })
 
+  it('accepts a six-character new password', async () => {
+    adapter.mockImplementation(async (config) => success(config))
+    const { wrapper } = await mountChangePassword()
+    await wrapper.get('[data-test="new-password"]').setValue('abcdef')
+    await wrapper.get('[data-test="confirm-password"]').setValue('abcdef')
+
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(adapter).toHaveBeenCalledTimes(1)
+    expect(JSON.parse(String(adapter.mock.calls[0][0].data))).toEqual({
+      current_password: 'old-password',
+      new_password: 'abcdef',
+    })
+  })
+
+  it('does not submit a five-character new password', async () => {
+    const { wrapper } = await mountChangePassword()
+    await wrapper.get('[data-test="new-password"]').setValue('abcde')
+    await wrapper.get('[data-test="confirm-password"]').setValue('abcde')
+
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(adapter).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('新密码长度须为 6 至 128 个字符')
+  })
+
   it('does not submit mismatched password confirmation', async () => {
     const { wrapper } = await mountChangePassword()
     await wrapper.get('[data-test="confirm-password"]').setValue('different-password')

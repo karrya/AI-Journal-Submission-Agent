@@ -25,8 +25,8 @@ async function submit(): Promise<void> {
       errorMessage.value = '请填写所有密码字段。'
       return
     }
-    if (form.new_password.length < 12 || form.new_password.length > 128) {
-      errorMessage.value = '新密码长度须为 12 至 128 个字符。'
+    if (form.new_password.length < 6 || form.new_password.length > 128) {
+      errorMessage.value = '新密码长度须为 6 至 128 个字符。'
       return
     }
     if (form.new_password !== form.confirm_password) {

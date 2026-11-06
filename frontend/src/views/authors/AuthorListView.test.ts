@@ -42,6 +42,9 @@ describe('AuthorListView', () => {
     const wrapper = mountList()
     await flushPromises()
     expect(wrapper.text()).toContain('Listed Author')
+    const links = wrapper.findAll('a')
+    expect(links.find((link) => link.text() === '查看')?.classes()).toContain('action-button--view')
+    expect(links.find((link) => link.text() === '授权')?.classes()).toContain('action-button--permission')
     expect(adapter.mock.calls[0][0].params).toMatchObject({
       page: 1, page_size: 20, sort: 'display_name', order: 'asc',
     })

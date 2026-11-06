@@ -2,6 +2,7 @@
 import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { getSafeRequestId } from '../../api/client'
+import AuthShell from '../../components/AuthShell.vue'
 import { useAuthStore } from '../../stores/auth'
 
 const auth = useAuthStore()
@@ -44,10 +45,11 @@ async function submit(): Promise<void> {
 </script>
 
 <template>
-  <section class="auth-card" aria-labelledby="change-password-title">
-    <p class="auth-eyebrow">首次密码设置</p>
-    <h1 id="change-password-title">修改密码</h1>
-    <p class="auth-intro">请先设置新密码，再使用本系统。</p>
+  <AuthShell>
+    <section class="auth-card" aria-labelledby="change-password-title">
+      <p class="auth-eyebrow">首次密码设置</p>
+      <h1 id="change-password-title">修改密码</h1>
+      <p class="auth-intro">请先设置新密码，再使用本系统。</p>
     <el-alert
       v-if="errorMessage"
       class="auth-alert"
@@ -101,5 +103,6 @@ async function submit(): Promise<void> {
         修改密码
       </el-button>
     </el-form>
-  </section>
+    </section>
+  </AuthShell>
 </template>

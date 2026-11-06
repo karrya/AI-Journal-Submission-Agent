@@ -477,21 +477,21 @@ onMounted(() => void loadPublishers())
         <label>搜索名称<input v-model="publisherQuery.name" @change="publisherQuery.page = 1; loadPublishers()"></label>
         <label>排序<select v-model="publisherQuery.sort" data-test="publisher-sort" @change="publisherSortChanged"><option value="name">名称</option><option value="created_at">创建时间</option><option value="updated_at">更新时间</option></select></label>
         <label>顺序<select v-model="publisherQuery.order" @change="publisherSortChanged"><option value="asc">升序</option><option value="desc">降序</option></select></label>
-        <button v-if="isAdmin" type="button" data-test="add-publisher" @click="openPublisherForm()">添加出版商</button>
+        <button v-if="isAdmin" class="action-button action-button--create" type="button" data-test="add-publisher" @click="openPublisherForm()">添加出版商</button>
       </div>
       <form v-if="showPublisherForm" data-test="publisher-form" class="stacked-form" novalidate @submit.prevent="savePublisher">
         <h2>{{ editingPublisherId ? '编辑出版商' : '添加出版商' }}</h2>
         <label>名称<input v-model="publisherForm.name" data-test="publisher-name" required maxlength="255"></label>
         <label>网站<input v-model="publisherForm.website_url" type="url"></label>
         <label>备注<textarea v-model="publisherForm.notes" rows="3"></textarea></label>
-        <button type="submit" :disabled="busy">保存出版商</button><button type="button" @click="showPublisherForm = false">取消</button>
+        <button class="action-button action-button--create" type="submit" :disabled="busy">保存出版商</button><button class="action-button action-button--neutral" type="button" @click="showPublisherForm = false">取消</button>
       </form>
       <p v-if="publisherLoading">正在加载出版商…</p><p v-else-if="!errorMessage && publishers.length === 0">未找到出版商。</p>
       <table v-else>
         <thead><tr><th>名称</th><th>网站</th><th v-if="isAdmin">操作</th></tr></thead>
-        <tbody><tr v-for="publisher in publishers" :key="publisher.id"><td>{{ publisher.name }}</td><td><template v-if="publisher.website_url"><a v-if="safeResourceUrl(publisher.website_url)" :href="safeResourceUrl(publisher.website_url) ?? undefined" target="_blank" rel="noopener noreferrer">网站</a><span v-else>{{ publisher.website_url }}</span></template><span v-else>—</span></td><td v-if="isAdmin"><button type="button" :data-test="`edit-publisher-${publisher.id}`" @click="openPublisherForm(publisher)">编辑</button><button type="button" :data-test="`delete-publisher-${publisher.id}`" @click="requestDelete('publisher', publisher.id)">删除</button></td></tr></tbody>
+        <tbody><tr v-for="publisher in publishers" :key="publisher.id"><td>{{ publisher.name }}</td><td><template v-if="publisher.website_url"><a v-if="safeResourceUrl(publisher.website_url)" class="action-button action-button--compact action-button--view" :href="safeResourceUrl(publisher.website_url) ?? undefined" target="_blank" rel="noopener noreferrer">网站</a><span v-else>{{ publisher.website_url }}</span></template><span v-else>—</span></td><td v-if="isAdmin"><button class="action-button action-button--compact action-button--edit" type="button" :data-test="`edit-publisher-${publisher.id}`" @click="openPublisherForm(publisher)">编辑</button><button class="action-button action-button--compact action-button--danger" type="button" :data-test="`delete-publisher-${publisher.id}`" @click="requestDelete('publisher', publisher.id)">删除</button></td></tr></tbody>
       </table>
-      <nav class="pagination" aria-label="出版商分页"><button type="button" :disabled="publisherQuery.page === 1 || publisherLoading" @click="publisherPage(publisherQuery.page - 1)">上一页</button><span>第 {{ publisherQuery.page }} 页 · 共 {{ publisherTotal }} 条</span><button type="button" data-test="next-publishers" :disabled="publisherQuery.page * publisherQuery.page_size >= publisherTotal || publisherLoading" @click="publisherPage(publisherQuery.page + 1)">下一页</button></nav>
+      <nav class="pagination" aria-label="出版商分页"><button class="action-button action-button--compact action-button--neutral" type="button" :disabled="publisherQuery.page === 1 || publisherLoading" @click="publisherPage(publisherQuery.page - 1)">上一页</button><span>第 {{ publisherQuery.page }} 页 · 共 {{ publisherTotal }} 条</span><button class="action-button action-button--compact action-button--neutral" type="button" data-test="next-publishers" :disabled="publisherQuery.page * publisherQuery.page_size >= publisherTotal || publisherLoading" @click="publisherPage(publisherQuery.page + 1)">下一页</button></nav>
     </section>
 
     <section v-else-if="activeTab === 'platforms'" aria-label="平台管理">
@@ -499,7 +499,7 @@ onMounted(() => void loadPublishers())
         <label>搜索名称<input v-model="platformQuery.name" @change="platformQuery.page = 1; loadPlatforms()"></label>
         <label>排序<select v-model="platformQuery.sort" data-test="platform-sort" @change="platformSortChanged"><option value="code">代码</option><option value="name">名称</option><option value="created_at">创建时间</option><option value="updated_at">更新时间</option></select></label>
         <label>顺序<select v-model="platformQuery.order" @change="platformSortChanged"><option value="asc">升序</option><option value="desc">降序</option></select></label>
-        <button v-if="isAdmin" type="button" data-test="add-platform" @click="openPlatformForm()">添加平台</button>
+        <button v-if="isAdmin" class="action-button action-button--create" type="button" data-test="add-platform" @click="openPlatformForm()">添加平台</button>
       </div>
       <form v-if="showPlatformForm" data-test="platform-form" class="stacked-form" novalidate @submit.prevent="savePlatform">
         <h2>{{ editingPlatformId ? '编辑平台' : '添加平台' }}</h2>
@@ -507,14 +507,14 @@ onMounted(() => void loadPublishers())
         <label>名称<input v-model="platformForm.name" data-test="platform-name" required maxlength="255"></label>
         <label>描述<textarea v-model="platformForm.description" rows="3"></textarea></label>
         <label>状态<select v-model="platformForm.status"><option value="active">启用</option><option value="needs_review">待审核</option><option value="disabled">已停用</option></select></label>
-        <button type="submit" :disabled="busy">保存平台</button><button type="button" @click="showPlatformForm = false">取消</button>
+        <button class="action-button action-button--create" type="submit" :disabled="busy">保存平台</button><button class="action-button action-button--neutral" type="button" @click="showPlatformForm = false">取消</button>
       </form>
       <p v-if="platformLoading">正在加载平台…</p><p v-else-if="!errorMessage && platforms.length === 0">未找到平台。</p>
       <table v-else>
         <thead><tr><th>代码</th><th>名称</th><th>状态</th><th v-if="isAdmin">操作</th></tr></thead>
-        <tbody><tr v-for="platform in platforms" :key="platform.id"><td>{{ platform.code }}</td><td>{{ platform.name }}</td><td>{{ displayText(PLATFORM_STATUS_LABELS, platform.status) }}</td><td v-if="isAdmin"><button type="button" :data-test="`edit-platform-${platform.id}`" @click="openPlatformForm(platform)">编辑</button><button type="button" :data-test="`delete-platform-${platform.id}`" @click="requestDelete('platform', platform.id)">删除</button></td></tr></tbody>
+        <tbody><tr v-for="platform in platforms" :key="platform.id"><td>{{ platform.code }}</td><td>{{ platform.name }}</td><td>{{ displayText(PLATFORM_STATUS_LABELS, platform.status) }}</td><td v-if="isAdmin"><button class="action-button action-button--compact action-button--edit" type="button" :data-test="`edit-platform-${platform.id}`" @click="openPlatformForm(platform)">编辑</button><button class="action-button action-button--compact action-button--danger" type="button" :data-test="`delete-platform-${platform.id}`" @click="requestDelete('platform', platform.id)">删除</button></td></tr></tbody>
       </table>
-      <nav class="pagination" aria-label="平台分页"><button type="button" :disabled="platformQuery.page === 1 || platformLoading" @click="platformPage(platformQuery.page - 1)">上一页</button><span>第 {{ platformQuery.page }} 页 · 共 {{ platformTotal }} 条</span><button type="button" data-test="next-platforms" :disabled="platformQuery.page * platformQuery.page_size >= platformTotal || platformLoading" @click="platformPage(platformQuery.page + 1)">下一页</button></nav>
+      <nav class="pagination" aria-label="平台分页"><button class="action-button action-button--compact action-button--neutral" type="button" :disabled="platformQuery.page === 1 || platformLoading" @click="platformPage(platformQuery.page - 1)">上一页</button><span>第 {{ platformQuery.page }} 页 · 共 {{ platformTotal }} 条</span><button class="action-button action-button--compact action-button--neutral" type="button" data-test="next-platforms" :disabled="platformQuery.page * platformQuery.page_size >= platformTotal || platformLoading" @click="platformPage(platformQuery.page + 1)">下一页</button></nav>
     </section>
 
     <section v-else aria-label="期刊管理">
@@ -522,7 +522,7 @@ onMounted(() => void loadPublishers())
         <label>搜索名称<input v-model="journalQuery.name" @change="journalQuery.page = 1; loadJournals()"></label>
         <label>排序<select v-model="journalQuery.sort" data-test="journal-sort" @change="journalSortChanged"><option value="name">名称</option><option value="created_at">创建时间</option><option value="updated_at">更新时间</option></select></label>
         <label>顺序<select v-model="journalQuery.order" @change="journalSortChanged"><option value="asc">升序</option><option value="desc">降序</option></select></label>
-        <button v-if="isAdmin" type="button" data-test="add-journal" @click="openJournalForm()">添加期刊</button>
+        <button v-if="isAdmin" class="action-button action-button--create" type="button" data-test="add-journal" @click="openJournalForm()">添加期刊</button>
       </div>
       <form v-if="showJournalForm" data-test="journal-form" class="stacked-form" novalidate @submit.prevent="saveJournal">
         <h2>{{ editingJournalId ? '编辑期刊' : '添加期刊' }}</h2>
@@ -551,31 +551,31 @@ onMounted(() => void loadPublishers())
               <label>HTTPS 来源网址<input v-model="requirement.source_url" data-test="requirement-source" type="url" required></label>
               <label>核验时间<input v-model="requirement.verified_at" data-test="requirement-verified" type="datetime-local" required></label>
             </div>
-            <button type="button" @click="journalForm.requirements.splice(index, 1)">移除要求</button>
+            <button class="action-button action-button--danger" type="button" @click="journalForm.requirements.splice(index, 1)">移除要求</button>
           </div>
-          <button type="button" data-test="add-requirement" @click="addRequirement">添加要求</button>
+          <button class="action-button action-button--create" type="button" data-test="add-requirement" @click="addRequirement">添加要求</button>
         </fieldset>
         <label>整体要求来源网址<input v-model="journalForm.requirements_source_url" type="url"></label>
         <label>整体要求核验时间<input v-model="journalForm.requirements_verified_at" type="datetime-local"></label>
         <label>备注<textarea v-model="journalForm.notes" rows="3"></textarea></label>
-        <button type="submit" :disabled="busy">保存期刊</button><button type="button" @click="showJournalForm = false">取消</button>
+        <button class="action-button action-button--create" type="submit" :disabled="busy">保存期刊</button><button class="action-button action-button--neutral" type="button" @click="showJournalForm = false">取消</button>
       </form>
       <p v-if="journalLoading">正在加载期刊…</p><p v-else-if="!errorMessage && journals.length === 0">未找到期刊。</p>
       <table v-else>
         <thead><tr><th>名称</th><th>ISSN</th><th>eISSN</th><th>出版商 ID</th><th>平台 ID</th><th>状态</th><th>要求</th><th v-if="isAdmin">操作</th></tr></thead>
         <tbody><tr v-for="journal in journals" :key="journal.id">
           <td>{{ journal.name }}</td><td>{{ formatIssn(journal.issn) }}</td><td>{{ formatIssn(journal.eissn) }}</td><td>{{ journal.publisher_id }}</td><td>{{ journal.platform_id ?? '—' }}</td><td>{{ displayText(PLATFORM_STATUS_LABELS, journal.status) }}</td>
-          <td><details><summary>{{ journal.requirements.length }} 项要求</summary><ul><li v-for="(requirement, index) in journal.requirements" :key="`${requirement.key}-${index}`">{{ requirement.key }}: {{ formatRequirementValue(requirement.value) }}（{{ requirement.scope }}） · <template v-if="safeResourceUrl(requirement.source_url)"><a :href="safeResourceUrl(requirement.source_url) ?? undefined" target="_blank" rel="noopener noreferrer">来源</a></template><span v-else>{{ requirement.source_url }}</span> · 核验于 {{ requirement.verified_at }}</li></ul></details></td>
-          <td v-if="isAdmin"><button type="button" :data-test="`edit-journal-${journal.id}`" @click="openJournalForm(journal)">编辑</button><button type="button" :data-test="`delete-journal-${journal.id}`" @click="requestDelete('journal', journal.id)">删除</button></td>
+          <td><details><summary>{{ journal.requirements.length }} 项要求</summary><ul><li v-for="(requirement, index) in journal.requirements" :key="`${requirement.key}-${index}`">{{ requirement.key }}: {{ formatRequirementValue(requirement.value) }}（{{ requirement.scope }}） · <template v-if="safeResourceUrl(requirement.source_url)"><a class="action-button action-button--compact action-button--view" :href="safeResourceUrl(requirement.source_url) ?? undefined" target="_blank" rel="noopener noreferrer">来源</a></template><span v-else>{{ requirement.source_url }}</span> · 核验于 {{ requirement.verified_at }}</li></ul></details></td>
+          <td v-if="isAdmin"><button class="action-button action-button--compact action-button--edit" type="button" :data-test="`edit-journal-${journal.id}`" @click="openJournalForm(journal)">编辑</button><button class="action-button action-button--compact action-button--danger" type="button" :data-test="`delete-journal-${journal.id}`" @click="requestDelete('journal', journal.id)">删除</button></td>
         </tr></tbody>
       </table>
-      <nav class="pagination" aria-label="期刊分页"><button type="button" :disabled="journalQuery.page === 1 || journalLoading" @click="journalPage(journalQuery.page - 1)">上一页</button><span>第 {{ journalQuery.page }} 页 · 共 {{ journalTotal }} 条</span><button type="button" data-test="next-journals" :disabled="journalQuery.page * journalQuery.page_size >= journalTotal || journalLoading" @click="journalPage(journalQuery.page + 1)">下一页</button></nav>
+      <nav class="pagination" aria-label="期刊分页"><button class="action-button action-button--compact action-button--neutral" type="button" :disabled="journalQuery.page === 1 || journalLoading" @click="journalPage(journalQuery.page - 1)">上一页</button><span>第 {{ journalQuery.page }} 页 · 共 {{ journalTotal }} 条</span><button class="action-button action-button--compact action-button--neutral" type="button" data-test="next-journals" :disabled="journalQuery.page * journalQuery.page_size >= journalTotal || journalLoading" @click="journalPage(journalQuery.page + 1)">下一页</button></nav>
     </section>
 
     <section v-if="deleteTarget" class="confirmation-panel" aria-label="确认软删除">
       <h2>确认软删除</h2><p>该{{ displayText(RESOURCE_KIND_LABELS, deleteTarget.kind) }}将从在用列表中移除，历史记录仍会保留。</p>
       <label class="confirmation-control"><input v-model="deleteConfirmed" data-test="delete-confirm" type="checkbox"> 我确认本次软删除。</label>
-      <button type="button" :data-test="`confirm-delete-${deleteTarget.kind}-${deleteTarget.id}`" :disabled="busy" @click="confirmDelete">确认删除</button><button type="button" @click="deleteTarget = null">取消</button>
+      <button class="action-button action-button--danger" type="button" :data-test="`confirm-delete-${deleteTarget.kind}-${deleteTarget.id}`" :disabled="busy" @click="confirmDelete">确认删除</button><button class="action-button action-button--neutral" type="button" @click="deleteTarget = null">取消</button>
     </section>
   </section>
 </template>

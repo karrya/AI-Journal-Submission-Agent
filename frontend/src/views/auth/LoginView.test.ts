@@ -52,6 +52,15 @@ describe('LoginView', () => {
     return { router, wrapper }
   }
 
+  it('shows the product brand alongside the login form', async () => {
+    const { wrapper } = await mountLogin()
+
+    const logo = wrapper.get('[data-test="app-logo"]')
+    expect(logo.attributes('aria-label')).toBe('学术投稿助手标志')
+    expect(wrapper.find('[data-test="username"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="password"]').exists()).toBe(true)
+  })
+
   it('prevents double submission and uses backend login fields', async () => {
     let complete!: (response: AxiosResponse) => void
     adapter.mockImplementation(() => new Promise<AxiosResponse>((resolve) => { complete = resolve }))

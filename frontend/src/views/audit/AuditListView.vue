@@ -147,7 +147,7 @@ onMounted(() => void load())
           <select v-model="filters.order"><option value="desc">最新优先</option><option value="asc">最早优先</option></select>
         </label>
       </div>
-      <button type="button" data-test="apply-audit-filters" @click="applyFilters">应用筛选</button>
+      <button class="action-button action-button--neutral" type="button" data-test="apply-audit-filters" @click="applyFilters">应用筛选</button>
     </form>
 
     <p v-if="errorMessage" class="form-error" role="alert">{{ errorMessage }}</p>
@@ -159,7 +159,7 @@ onMounted(() => void load())
         <td><time :datetime="log.created_at">{{ log.created_at }}</time></td>
         <td>{{ log.actor_user_id ?? displayText(AUDIT_ACTOR_LABELS, log.actor_type) }}</td><td>{{ displayText(AUDIT_CATEGORY_LABELS, log.category) }}</td><td>{{ log.action }}</td>
         <td>{{ log.target_type ? displayText(AUDIT_TARGET_LABELS, log.target_type) : '—' }}<br>{{ log.target_id ?? '—' }}</td><td>{{ displayText(AUDIT_RESULT_LABELS, log.result) }}</td><td>{{ log.request_id }}</td>
-        <td><button type="button" :data-test="`view-audit-${log.id}`" :disabled="detailLoading" @click="showDetail(log.id)">查看详情</button></td>
+        <td><button class="action-button action-button--compact action-button--view" type="button" :data-test="`view-audit-${log.id}`" :disabled="detailLoading" @click="showDetail(log.id)">查看详情</button></td>
       </tr></tbody>
     </table>
 
@@ -179,9 +179,9 @@ onMounted(() => void load())
     </section>
 
     <nav class="pagination" aria-label="审计日志分页">
-      <button type="button" :disabled="filters.page === 1 || loading" @click="changePage(filters.page - 1)">上一页</button>
+      <button class="action-button action-button--compact action-button--neutral" type="button" :disabled="filters.page === 1 || loading" @click="changePage(filters.page - 1)">上一页</button>
       <span>第 {{ filters.page }} 页 · 共 {{ total }} 条</span>
-      <button type="button" data-test="next-audit" :disabled="filters.page * filters.page_size >= total || loading" @click="changePage(filters.page + 1)">下一页</button>
+      <button class="action-button action-button--compact action-button--neutral" type="button" data-test="next-audit" :disabled="filters.page * filters.page_size >= total || loading" @click="changePage(filters.page + 1)">下一页</button>
     </nav>
   </section>
 </template>

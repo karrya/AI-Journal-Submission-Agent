@@ -283,7 +283,7 @@ onMounted(() => void loadAuthors())
         <label>搜索姓名<input v-model="authorQuery.name" data-test="author-name-filter" @change="authorQuery.page = 1; loadAuthors()"></label>
         <label>排序<select v-model="authorQuery.sort" data-test="author-sort" @change="authorSortChanged"><option value="display_name">显示姓名</option><option value="created_at">创建时间</option><option value="updated_at">更新时间</option></select></label>
         <label>顺序<select v-model="authorQuery.order" @change="authorSortChanged"><option value="asc">升序</option><option value="desc">降序</option></select></label>
-        <button v-if="isAdmin" type="button" data-test="add-author" @click="showAuthorForm = true">添加作者</button>
+        <button v-if="isAdmin" class="action-button action-button--create" type="button" data-test="add-author" @click="showAuthorForm = true">添加作者</button>
       </div>
       <p v-if="authorError" class="form-error" role="alert">{{ authorError }}</p>
       <AuthorForm v-if="showAuthorForm" data-test="author-create-form" :submitting="authorBusy" @submit="saveAuthor" @cancel="showAuthorForm = false" />
@@ -294,22 +294,22 @@ onMounted(() => void loadAuthors())
         <tbody><tr v-for="author in authors" :key="author.id">
           <td>{{ author.display_name }}</td><td>{{ author.orcid ?? '—' }}</td><td>{{ displayText(AUTHOR_STATUS_LABELS, author.status) }}</td>
           <td class="table-actions">
-            <RouterLink :to="`/authors/${author.id}`">查看</RouterLink>
-            <RouterLink :to="`/authors/${author.id}/authorizations`">授权</RouterLink>
-            <button v-if="isAdmin" type="button" :data-test="`delete-author-${author.id}`" @click="requestAuthorDelete(author.id)">删除</button>
+            <RouterLink class="action-button action-button--compact action-button--view" :to="`/authors/${author.id}`">查看</RouterLink>
+            <RouterLink class="action-button action-button--compact action-button--permission" :to="`/authors/${author.id}/authorizations`">授权</RouterLink>
+            <button v-if="isAdmin" class="action-button action-button--compact action-button--danger" type="button" :data-test="`delete-author-${author.id}`" @click="requestAuthorDelete(author.id)">删除</button>
           </td>
         </tr></tbody>
       </table>
       <section v-if="deletingAuthorId" class="confirmation-panel" aria-label="确认删除作者">
         <p>确定软删除该作者吗？历史记录将保留，但该资料会从在用列表中移除。</p>
         <label class="confirmation-control"><input v-model="authorDeleteConfirmed" data-test="author-delete-confirm" type="checkbox"> 我确认软删除该作者。</label>
-        <button type="button" :data-test="`confirm-delete-author-${deletingAuthorId}`" @click="confirmAuthorDelete">确认删除</button>
-        <button type="button" @click="deletingAuthorId = null">取消</button>
+        <button class="action-button action-button--danger" type="button" :data-test="`confirm-delete-author-${deletingAuthorId}`" @click="confirmAuthorDelete">确认删除</button>
+        <button class="action-button action-button--neutral" type="button" @click="deletingAuthorId = null">取消</button>
       </section>
       <nav class="pagination" aria-label="作者分页">
-        <button type="button" :disabled="authorQuery.page === 1 || authorLoading" @click="authorPage(authorQuery.page - 1)">上一页</button>
+        <button class="action-button action-button--compact action-button--neutral" type="button" :disabled="authorQuery.page === 1 || authorLoading" @click="authorPage(authorQuery.page - 1)">上一页</button>
         <span>第 {{ authorQuery.page }} 页 · 共 {{ authorTotal }} 条</span>
-        <button type="button" data-test="next-authors" :disabled="authorQuery.page * authorQuery.page_size >= authorTotal || authorLoading" @click="authorPage(authorQuery.page + 1)">下一页</button>
+        <button class="action-button action-button--compact action-button--neutral" type="button" data-test="next-authors" :disabled="authorQuery.page * authorQuery.page_size >= authorTotal || authorLoading" @click="authorPage(authorQuery.page + 1)">下一页</button>
       </nav>
     </section>
 
@@ -318,7 +318,7 @@ onMounted(() => void loadAuthors())
         <label>搜索名称<input v-model="institutionQuery.name" @change="institutionQuery.page = 1; loadInstitutions()"></label>
         <label>排序<select v-model="institutionQuery.sort" @change="institutionSortChanged"><option value="name">名称</option><option value="created_at">创建时间</option><option value="updated_at">更新时间</option></select></label>
         <label>顺序<select v-model="institutionQuery.order" @change="institutionSortChanged"><option value="asc">升序</option><option value="desc">降序</option></select></label>
-        <button v-if="isAdmin" type="button" data-test="add-institution" @click="openInstitutionForm()">添加单位</button>
+        <button v-if="isAdmin" class="action-button action-button--create" type="button" data-test="add-institution" @click="openInstitutionForm()">添加单位</button>
       </div>
       <p v-if="institutionError" class="form-error" role="alert">{{ institutionError }}</p>
       <form v-if="showInstitutionForm" data-test="institution-form" class="stacked-form" novalidate @submit.prevent="saveInstitution">
@@ -330,8 +330,8 @@ onMounted(() => void loadAuthors())
           <label>国家代码<input v-model="institutionForm.country_code" maxlength="2" placeholder="CN"></label>
           <label>城市<input v-model="institutionForm.city" maxlength="128"></label>
         </div>
-        <button type="submit" :disabled="institutionBusy">保存单位</button>
-        <button type="button" @click="showInstitutionForm = false">取消</button>
+        <button class="action-button action-button--create" type="submit" :disabled="institutionBusy">保存单位</button>
+        <button class="action-button action-button--neutral" type="button" @click="showInstitutionForm = false">取消</button>
       </form>
       <p v-if="institutionLoading">正在加载单位…</p>
       <p v-else-if="!institutionError && institutions.length === 0">未找到单位。</p>
@@ -339,20 +339,20 @@ onMounted(() => void loadAuthors())
         <thead><tr><th>名称</th><th>类型</th><th>城市</th><th>国家</th><th>网站</th><th v-if="isAdmin">操作</th></tr></thead>
         <tbody><tr v-for="institution in institutions" :key="institution.id">
           <td>{{ institution.name }}</td><td>{{ institution.institution_type ?? '—' }}</td><td>{{ institution.city ?? '—' }}</td><td>{{ institution.country_code ?? '—' }}</td>
-          <td><template v-if="institution.website_url"><a v-if="safeResourceUrl(institution.website_url)" :href="safeResourceUrl(institution.website_url) ?? undefined" rel="noopener noreferrer" target="_blank">网站</a><span v-else>{{ institution.website_url }}</span></template><span v-else>—</span></td>
-          <td v-if="isAdmin"><button type="button" :data-test="`edit-institution-${institution.id}`" @click="openInstitutionForm(institution)">编辑</button><button type="button" :data-test="`delete-institution-${institution.id}`" @click="requestInstitutionDelete(institution.id)">删除</button></td>
+          <td><template v-if="institution.website_url"><a v-if="safeResourceUrl(institution.website_url)" class="action-button action-button--compact action-button--view" :href="safeResourceUrl(institution.website_url) ?? undefined" rel="noopener noreferrer" target="_blank">网站</a><span v-else>{{ institution.website_url }}</span></template><span v-else>—</span></td>
+          <td v-if="isAdmin"><button class="action-button action-button--compact action-button--edit" type="button" :data-test="`edit-institution-${institution.id}`" @click="openInstitutionForm(institution)">编辑</button><button class="action-button action-button--compact action-button--danger" type="button" :data-test="`delete-institution-${institution.id}`" @click="requestInstitutionDelete(institution.id)">删除</button></td>
         </tr></tbody>
       </table>
       <section v-if="deletingInstitutionId" class="confirmation-panel" aria-label="确认删除单位">
         <p>确定软删除该单位吗？现有作者关联需另行管理。</p>
         <label class="confirmation-control"><input v-model="institutionDeleteConfirmed" data-test="institution-delete-confirm" type="checkbox"> 我确认软删除该单位。</label>
-        <button type="button" :data-test="`confirm-delete-institution-${deletingInstitutionId}`" @click="confirmInstitutionDelete">确认删除</button>
-        <button type="button" @click="deletingInstitutionId = null">取消</button>
+        <button class="action-button action-button--danger" type="button" :data-test="`confirm-delete-institution-${deletingInstitutionId}`" @click="confirmInstitutionDelete">确认删除</button>
+        <button class="action-button action-button--neutral" type="button" @click="deletingInstitutionId = null">取消</button>
       </section>
       <nav class="pagination" aria-label="单位分页">
-        <button type="button" :disabled="institutionQuery.page === 1 || institutionLoading" @click="institutionPage(institutionQuery.page - 1)">上一页</button>
+        <button class="action-button action-button--compact action-button--neutral" type="button" :disabled="institutionQuery.page === 1 || institutionLoading" @click="institutionPage(institutionQuery.page - 1)">上一页</button>
         <span>第 {{ institutionQuery.page }} 页 · 共 {{ institutionTotal }} 条</span>
-        <button type="button" :disabled="institutionQuery.page * institutionQuery.page_size >= institutionTotal || institutionLoading" @click="institutionPage(institutionQuery.page + 1)">下一页</button>
+        <button class="action-button action-button--compact action-button--neutral" type="button" :disabled="institutionQuery.page * institutionQuery.page_size >= institutionTotal || institutionLoading" @click="institutionPage(institutionQuery.page + 1)">下一页</button>
       </nav>
     </section>
   </section>

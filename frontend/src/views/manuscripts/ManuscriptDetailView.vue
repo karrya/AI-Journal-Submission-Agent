@@ -309,7 +309,7 @@ watch(() => props.manuscriptId, () => {
 
 <template>
   <section class="management-page" aria-labelledby="manuscript-detail-title">
-    <RouterLink to="/manuscripts">返回稿件列表</RouterLink>
+    <RouterLink class="action-button action-button--neutral" to="/manuscripts">返回稿件列表</RouterLink>
     <p v-if="loading">正在加载稿件工作区…</p>
     <p v-if="errorMessage" class="form-error" role="alert">{{ errorMessage }}</p>
 
@@ -338,7 +338,7 @@ watch(() => props.manuscriptId, () => {
           <label>数据可用性声明<textarea v-model="metadata.data_availability_statement" rows="3"></textarea></label>
           <label>备注<textarea v-model="metadata.notes" rows="3"></textarea></label>
           <p v-if="metadataError" class="form-error" role="alert">{{ metadataError }}</p>
-          <button type="submit" :disabled="metadataBusy">保存工作元数据</button>
+          <button class="action-button action-button--create" type="submit" :disabled="metadataBusy">保存工作元数据</button>
         </form>
         <dl v-else class="detail-grid">
           <div><dt>标题</dt><dd>{{ manuscript.title }}</dd></div>
@@ -376,7 +376,7 @@ watch(() => props.manuscriptId, () => {
         <form data-test="version-form" class="stacked-form" @submit.prevent="saveVersion">
           <label>版本标签<input v-model="versionLabel" data-test="version-label" maxlength="100"></label>
           <label>变更说明<textarea v-model="versionNote" rows="3"></textarea></label>
-          <button type="submit" :disabled="versionBusy">创建新稿件版本</button>
+          <button class="action-button action-button--create" type="submit" :disabled="versionBusy">创建新稿件版本</button>
         </form>
         <p v-if="versionError" class="form-error" role="alert">{{ versionError }}</p>
       </section>
@@ -427,7 +427,7 @@ watch(() => props.manuscriptId, () => {
             <td>{{ file.display_name }}</td><td>{{ displayText(FILE_TYPE_LABELS, file.file_type) }}</td><td>{{ file.file_version }}</td>
             <td>{{ file.original_filename }}</td><td>{{ file.size_bytes }} 字节</td>
             <td>{{ displayText(FILE_INTEGRITY_LABELS, file.integrity_status) }}</td><td>{{ displayText(FILE_SCAN_LABELS, file.scan_status) }}</td>
-            <td><button type="button" :data-test="`download-${file.id}`" :disabled="downloadingId !== null" @click="download(file)">下载</button></td>
+            <td><button class="action-button action-button--compact action-button--download" type="button" :data-test="`download-${file.id}`" :disabled="downloadingId !== null" @click="download(file)">下载</button></td>
           </tr></tbody>
         </table>
       </section>

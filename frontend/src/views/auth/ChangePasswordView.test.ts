@@ -64,6 +64,15 @@ describe('ChangePasswordView', () => {
     return { router, wrapper }
   }
 
+  it('shows the product brand alongside the password form', async () => {
+    const { wrapper } = await mountChangePassword()
+
+    const logo = wrapper.get('[data-test="app-logo"]')
+    expect(logo.attributes('aria-label')).toBe('学术投稿助手标志')
+    expect(wrapper.find('[data-test="current-password"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="new-password"]').exists()).toBe(true)
+  })
+
   it('prevents double submission, sends backend fields, and returns to login', async () => {
     let complete!: (response: AxiosResponse) => void
     adapter.mockImplementation(() => new Promise<AxiosResponse>((resolve) => { complete = resolve }))

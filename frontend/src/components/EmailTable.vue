@@ -135,8 +135,8 @@ function remove(emailId: string): void {
           <td>{{ email.email }}</td><td>{{ displayText(EMAIL_PURPOSE_LABELS, email.purpose) }}</td><td>{{ email.is_primary ? '是' : '否' }}</td>
           <td>{{ displayText(EMAIL_VERIFICATION_LABELS, email.verification_status) }}</td><td>{{ displayText(EMAIL_AUTHORIZATION_LABELS, email.authorization_status) }}</td>
           <td v-if="canManage">
-            <button type="button" :data-test="`edit-email-${email.id}`" @click="startEdit(email)">编辑</button>
-            <button type="button" :data-test="`delete-email-${email.id}`" @click="startDelete(email.id)">解绑</button>
+            <button class="action-button action-button--compact action-button--edit" type="button" :data-test="`edit-email-${email.id}`" @click="startEdit(email)">编辑</button>
+            <button class="action-button action-button--compact action-button--danger" type="button" :data-test="`delete-email-${email.id}`" @click="startDelete(email.id)">解绑</button>
           </td>
         </tr>
       </tbody>
@@ -148,15 +148,15 @@ function remove(emailId: string): void {
       <label>用途<select v-model="editForm.purpose"><option value="communication">通讯</option><option value="registration">注册</option><option value="backup">备用</option></select></label>
       <label><input v-model="editForm.is_primary" type="checkbox"> 主邮箱</label>
       <label class="confirmation-control"><input v-model="editForm.confirm" data-test="edit-email-confirm" type="checkbox"> 我确认此邮箱地址及绑定变更。</label>
-      <button type="submit">保存邮箱</button>
-      <button type="button" @click="editingId = null">取消</button>
+      <button class="action-button action-button--create" type="submit">保存邮箱</button>
+      <button class="action-button action-button--neutral" type="button" @click="editingId = null">取消</button>
     </form>
 
     <section v-if="canManage && deletingId" class="confirmation-panel" aria-label="确认邮箱解绑">
       <p>解绑会将此邮箱从作者资料中移除，需单独确认。</p>
       <label class="confirmation-control"><input v-model="deleteConfirmed" data-test="delete-email-confirm" type="checkbox"> 我确认解绑此邮箱。</label>
-      <button type="button" :data-test="`confirm-delete-${deletingId}`" @click="remove(deletingId)">确认解绑</button>
-      <button type="button" @click="deletingId = null">取消</button>
+      <button class="action-button action-button--danger" type="button" :data-test="`confirm-delete-${deletingId}`" @click="remove(deletingId)">确认解绑</button>
+      <button class="action-button action-button--neutral" type="button" @click="deletingId = null">取消</button>
     </section>
 
     <form v-if="canManage" data-test="create-email-form" class="stacked-form" novalidate @submit.prevent="create">
@@ -165,7 +165,7 @@ function remove(emailId: string): void {
       <label>用途<select v-model="createForm.purpose"><option value="communication">通讯</option><option value="registration">注册</option><option value="backup">备用</option></select></label>
       <label><input v-model="createForm.is_primary" type="checkbox"> 主邮箱</label>
       <label class="confirmation-control"><input v-model="createForm.confirm" data-test="create-email-confirm" type="checkbox"> 我确认可将此邮箱绑定到该作者。</label>
-      <button type="submit" :disabled="busy">添加邮箱</button>
+      <button class="action-button action-button--create" type="submit" :disabled="busy">添加邮箱</button>
     </form>
   </div>
 </template>

@@ -143,7 +143,7 @@ async function submit(): Promise<void> {
     <span v-if="progress !== null">{{ progress }}%</span>
     <p v-if="successMessage" role="status">{{ successMessage }}</p>
     <p v-if="error" class="form-error" role="alert">{{ error }}</p>
-    <button v-if="conflict" type="button" data-test="refresh-version" @click="emit('refresh')">刷新稿件及当前版本</button>
-    <button type="submit" :disabled="uploading">上传文件</button>
+    <button v-if="conflict" class="action-button action-button--neutral" type="button" data-test="refresh-version" @click="emit('refresh')">刷新稿件及当前版本</button>
+    <button class="action-button action-button--create" type="submit" :disabled="uploading">上传文件</button>
   </form>
 </template>

@@ -46,6 +46,9 @@ describe('ManuscriptListView', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('Visible manuscript')
+    const workspaceLink = wrapper.findAll('a').find((link) => link.text() === '打开工作区')
+    expect(workspaceLink?.classes()).toContain('action-button--view')
+    expect(wrapper.get('[data-test="apply-filters"]').classes()).toContain('action-button--neutral')
     expect(wrapper.text()).not.toContain('private-coauthor-notes')
     expect(wrapper.text()).not.toContain('private-owner-orcid')
     expect(adapter.mock.calls[0][0].params).toMatchObject({ sort: 'created_at', order: 'desc' })

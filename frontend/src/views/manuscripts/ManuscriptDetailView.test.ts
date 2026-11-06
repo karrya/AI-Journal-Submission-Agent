@@ -105,6 +105,8 @@ describe('ManuscriptDetailView', () => {
     expect(wrapper.text()).toContain('Snapshot two title')
     expect(wrapper.text()).toContain('Immutable original title')
     expect(wrapper.get('[data-test="current-files"]').text()).toContain('paper.pdf')
+    expect(wrapper.findAll('a').find((link) => link.text() === '返回稿件列表')?.classes()).toContain('action-button--neutral')
+    expect(wrapper.get('[data-test="download-f1"]').classes()).toContain('action-button--download')
     expect(wrapper.get('[data-test="snapshot-history"]').find('input').exists()).toBe(false)
     for (const secret of ['private@example.invalid', 'private-phone', 'private-address', 'private-orcid', 'private-coauthor-notes', '/private/do-not-render.pdf', 'storage_path']) {
       expect(wrapper.text()).not.toContain(secret)

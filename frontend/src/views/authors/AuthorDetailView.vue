@@ -354,7 +354,7 @@ watch([() => props.authorId, effectivePermissions], () => void load(), { immedia
 
 <template>
   <section class="management-page" aria-labelledby="author-detail-title">
-    <RouterLink to="/authors">返回作者列表</RouterLink>
+    <RouterLink class="action-button action-button--neutral" to="/authors">返回作者列表</RouterLink>
     <h1 id="author-detail-title">作者详情</h1>
     <p v-if="loading">正在加载作者…</p>
     <p v-if="errorMessage" class="form-error" role="alert">{{ errorMessage }}</p>
@@ -370,7 +370,7 @@ watch([() => props.authorId, effectivePermissions], () => void load(), { immedia
         <div v-if="author.phone_number != null"><dt>电话号码</dt><dd>{{ author.phone_number }}</dd></div>
         <div v-if="author.notes != null"><dt>备注</dt><dd>{{ author.notes }}</dd></div>
       </dl>
-      <button v-if="canManage && !showAuthorForm" type="button" data-test="edit-author" @click="showAuthorForm = true">编辑作者</button>
+      <button v-if="canManage && !showAuthorForm" class="action-button action-button--edit" type="button" data-test="edit-author" @click="showAuthorForm = true">编辑作者</button>
       <p v-if="authorMutationError" class="form-error" role="alert">{{ authorMutationError }}</p>
       <AuthorForm
         v-if="canManage && showAuthorForm"
@@ -408,18 +408,18 @@ watch([() => props.authorId, effectivePermissions], () => void load(), { immedia
         <tbody><tr v-for="link in institutions" :key="link.id">
           <td>{{ link.institution_name }}</td><td>{{ link.department ?? '—' }}</td><td>{{ link.position_title ?? '—' }}</td><td>{{ link.is_current ? '是' : '否' }}</td>
           <td v-if="canManage">
-            <button type="button" :data-test="`edit-affiliation-${link.id}`" @click="openAffiliationForm(link)">编辑</button>
-            <button type="button" :data-test="`delete-affiliation-${link.id}`" @click="startAffiliationDelete(link.id)">移除</button>
+            <button class="action-button action-button--compact action-button--edit" type="button" :data-test="`edit-affiliation-${link.id}`" @click="openAffiliationForm(link)">编辑</button>
+            <button class="action-button action-button--compact action-button--danger" type="button" :data-test="`delete-affiliation-${link.id}`" @click="startAffiliationDelete(link.id)">移除</button>
           </td>
         </tr></tbody>
       </table>
-      <button v-if="canManage && !showAffiliationForm" type="button" data-test="add-affiliation" @click="openAffiliationForm()">添加单位关联</button>
+      <button v-if="canManage && !showAffiliationForm" class="action-button action-button--create" type="button" data-test="add-affiliation" @click="openAffiliationForm()">添加单位关联</button>
       <p v-if="affiliationError" class="form-error" role="alert">{{ affiliationError }}</p>
       <section v-if="canManage && deletingLinkId" class="confirmation-panel" aria-label="确认移除单位关联">
         <p>确定从该作者移除单位关联吗？此操作需单独确认。</p>
         <label class="confirmation-control"><input v-model="affiliationDeleteConfirmed" data-test="affiliation-delete-confirm" type="checkbox"> 我确认移除该单位关联。</label>
-        <button type="button" :data-test="`confirm-delete-affiliation-${deletingLinkId}`" :disabled="affiliationBusy" @click="confirmAffiliationDelete">确认移除</button>
-        <button type="button" @click="deletingLinkId = null">取消</button>
+        <button class="action-button action-button--danger" type="button" :data-test="`confirm-delete-affiliation-${deletingLinkId}`" :disabled="affiliationBusy" @click="confirmAffiliationDelete">确认移除</button>
+        <button class="action-button action-button--neutral" type="button" @click="deletingLinkId = null">取消</button>
       </section>
       <InstitutionLinkForm
         v-if="canManage && showAffiliationForm"

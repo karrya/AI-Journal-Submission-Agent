@@ -224,7 +224,7 @@ watch(() => props.authorId, () => {
       <label>用户 ID<input v-model="query.user_id" @change="query.page = 1; load()"></label>
       <label>排序<select v-model="query.sort" @change="sortChanged"><option value="created_at">创建时间</option><option value="updated_at">更新时间</option><option value="valid_from">开始时间</option><option value="valid_to">结束时间</option></select></label>
       <label>顺序<select v-model="query.order" @change="sortChanged"><option value="desc">降序</option><option value="asc">升序</option></select></label>
-      <button v-if="isAdmin" type="button" data-test="add-authorization" @click="openForm()">添加授权</button>
+      <button v-if="isAdmin" class="action-button action-button--permission" type="button" data-test="add-authorization" @click="openForm()">添加授权</button>
     </div>
     <p v-if="errorMessage" class="form-error" role="alert">{{ errorMessage }}</p>
 
@@ -242,8 +242,8 @@ watch(() => props.authorId, () => {
       </fieldset>
       <label>授权依据<input v-model="form.evidence_ref" maxlength="1024"></label>
       <label>备注<textarea v-model="form.notes" rows="3"></textarea></label>
-      <button type="submit" :disabled="saving">保存授权</button>
-      <button type="button" @click="showForm = false">取消</button>
+      <button class="action-button action-button--permission" type="submit" :disabled="saving">保存授权</button>
+      <button class="action-button action-button--neutral" type="button" @click="showForm = false">取消</button>
     </form>
 
     <section v-if="revokingId" class="confirmation-panel" aria-label="确认撤销授权">
@@ -251,8 +251,8 @@ watch(() => props.authorId, () => {
       <p>撤销与编辑相互独立，并将在授权对象的下次请求时生效。</p>
       <label>原因<textarea v-model="revokeReason" data-test="revoke-reason" rows="3" maxlength="2000"></textarea></label>
       <label class="confirmation-control"><input v-model="revokeConfirmed" data-test="revoke-confirm" type="checkbox"> 我确认撤销此授权。</label>
-      <button type="button" :data-test="`confirm-revoke-${revokingId}`" :disabled="saving" @click="confirmRevoke">确认撤销</button>
-      <button type="button" @click="revokingId = null">取消</button>
+      <button class="action-button action-button--danger" type="button" :data-test="`confirm-revoke-${revokingId}`" :disabled="saving" @click="confirmRevoke">确认撤销</button>
+      <button class="action-button action-button--neutral" type="button" @click="revokingId = null">取消</button>
     </section>
 
     <p v-if="loading">正在加载授权…</p>
@@ -262,13 +262,13 @@ watch(() => props.authorId, () => {
       <tbody><tr v-for="authorization in items" :key="authorization.id">
         <td>{{ authorization.author_id }}</td><td>{{ authorization.user_id }}</td><td>{{ authorization.permissions.map((code) => displayText(PERMISSION_LABELS, code)).join('、') }}</td>
         <td>{{ authorization.valid_from }}</td><td>{{ authorization.valid_to }}</td><td>{{ displayText(AUTHORIZATION_STATUS_LABELS, authorization.validity_status) }}</td>
-        <td v-if="isAdmin"><button type="button" :data-test="`edit-authorization-${authorization.id}`" @click="openForm(authorization)">编辑</button><button v-if="!authorization.revoked_at" type="button" :data-test="`revoke-authorization-${authorization.id}`" @click="startRevoke(authorization.id)">撤销</button></td>
+        <td v-if="isAdmin"><button class="action-button action-button--compact action-button--edit" type="button" :data-test="`edit-authorization-${authorization.id}`" @click="openForm(authorization)">编辑</button><button v-if="!authorization.revoked_at" class="action-button action-button--compact action-button--danger" type="button" :data-test="`revoke-authorization-${authorization.id}`" @click="startRevoke(authorization.id)">撤销</button></td>
       </tr></tbody>
     </table>
     <nav class="pagination" aria-label="授权分页">
-      <button type="button" :disabled="query.page === 1 || loading" @click="changePage(query.page - 1)">上一页</button>
+      <button class="action-button action-button--compact action-button--neutral" type="button" :disabled="query.page === 1 || loading" @click="changePage(query.page - 1)">上一页</button>
       <span>第 {{ query.page }} 页 · 共 {{ total }} 条</span>
-      <button type="button" data-test="next-authorizations" :disabled="query.page * query.page_size >= total || loading" @click="changePage(query.page + 1)">下一页</button>
+      <button class="action-button action-button--compact action-button--neutral" type="button" data-test="next-authorizations" :disabled="query.page * query.page_size >= total || loading" @click="changePage(query.page + 1)">下一页</button>
     </nav>
   </section>
 </template>

@@ -45,6 +45,7 @@ describe('AuthorizationView', () => {
     ))
     const wrapper = mountView()
     await flushPromises()
+    expect(wrapper.get('[data-test="add-authorization"]').classes()).toContain('action-button--permission')
     await wrapper.get('[data-test="add-authorization"]').trigger('click')
     const options = wrapper.findAll('[data-test="permission-option"]')
     expect(options).toHaveLength(9)

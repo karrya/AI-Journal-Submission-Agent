@@ -102,6 +102,6 @@ function submit(): void {
       <label><input v-model="form.is_current" type="checkbox"> 当前单位</label>
     </div>
     <label class="confirmation-control"><input v-model="form.confirm" data-test="affiliation-confirm" type="checkbox"> 我确认本次作者单位关联变更。</label>
-    <div class="form-actions"><button type="submit" :disabled="submitting">保存单位关联</button><button type="button" @click="emit('cancel')">取消</button></div>
+    <div class="form-actions"><button class="action-button action-button--create" type="submit" :disabled="submitting">保存单位关联</button><button class="action-button action-button--neutral" type="button" @click="emit('cancel')">取消</button></div>
   </form>
 </template>

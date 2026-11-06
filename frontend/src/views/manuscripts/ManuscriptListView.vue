@@ -189,8 +189,8 @@ onMounted(() => void load())
           <option value="asc">升序</option>
         </select>
       </label>
-      <button type="button" data-test="apply-filters" @click="applyFilters">应用筛选</button>
-      <button v-if="canCreate" type="button" data-test="add-manuscript" @click="openCreate">新建稿件</button>
+      <button class="action-button action-button--neutral" type="button" data-test="apply-filters" @click="applyFilters">应用筛选</button>
+      <button v-if="canCreate" class="action-button action-button--create" type="button" data-test="add-manuscript" @click="openCreate">新建稿件</button>
     </div>
 
     <p v-if="errorMessage" class="form-error" role="alert">{{ errorMessage }}</p>
@@ -228,7 +228,7 @@ onMounted(() => void load())
         @submit="saveCreate"
       />
       <p v-if="createError" class="form-error" role="alert">{{ createError }}</p>
-      <button type="button" :disabled="creating" @click="showCreate = false">取消</button>
+      <button class="action-button action-button--compact action-button--neutral" type="button" :disabled="creating" @click="showCreate = false">取消</button>
     </section>
 
     <p v-if="loading">正在加载稿件…</p>
@@ -241,13 +241,13 @@ onMounted(() => void load())
         <td>{{ ownerName(manuscript) }}</td>
         <td>{{ displayText(MANUSCRIPT_STATUS_LABELS, manuscript.status) }}</td>
         <td><time :datetime="manuscript.updated_at">{{ manuscript.updated_at }}</time></td>
-        <td><RouterLink :to="`/manuscripts/${manuscript.id}`">打开工作区</RouterLink></td>
+        <td><RouterLink class="action-button action-button--compact action-button--view" :to="`/manuscripts/${manuscript.id}`">打开工作区</RouterLink></td>
       </tr></tbody>
     </table>
     <nav class="pagination" aria-label="稿件分页">
-      <button type="button" :disabled="query.page === 1 || loading" @click="changePage(query.page - 1)">上一页</button>
+      <button class="action-button action-button--compact action-button--neutral" type="button" :disabled="query.page === 1 || loading" @click="changePage(query.page - 1)">上一页</button>
       <span>第 {{ query.page }} 页 · 共 {{ total }} 条</span>
-      <button type="button" data-test="next-manuscripts" :disabled="query.page * query.page_size >= total || loading" @click="changePage(query.page + 1)">下一页</button>
+      <button class="action-button action-button--compact action-button--neutral" type="button" data-test="next-manuscripts" :disabled="query.page * query.page_size >= total || loading" @click="changePage(query.page + 1)">下一页</button>
     </nav>
   </section>
 </template>

@@ -3,6 +3,7 @@ import axios from 'axios'
 import { reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getSafeRequestId } from '../../api/client'
+import AuthShell from '../../components/AuthShell.vue'
 import { useAuthStore } from '../../stores/auth'
 
 const auth = useAuthStore()
@@ -52,10 +53,11 @@ async function submit(): Promise<void> {
 </script>
 
 <template>
-  <section class="auth-card" aria-labelledby="login-title">
-    <p class="auth-eyebrow">学术投稿助手</p>
-    <h1 id="login-title">登录</h1>
-    <p class="auth-intro">使用管理员账号继续。</p>
+  <AuthShell>
+    <section class="auth-card" aria-labelledby="login-title">
+      <p class="auth-eyebrow">欢迎回来</p>
+      <h1 id="login-title">登录工作区</h1>
+      <p class="auth-intro">登录您的账号，继续管理研究与投稿。</p>
     <el-alert
       v-if="errorMessage"
       class="auth-alert"
@@ -97,5 +99,6 @@ async function submit(): Promise<void> {
         登录
       </el-button>
     </el-form>
-  </section>
+    </section>
+  </AuthShell>
 </template>

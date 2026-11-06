@@ -30,6 +30,8 @@ describe('App navigation', () => {
     useAuthStore().setSession(user, 'csrf')
     const wrapper = mount(App, { global })
 
+    const logo = wrapper.get('[data-test="app-logo"]')
+    expect(logo.attributes('aria-label')).toBe('学术投稿助手标志')
     expect(wrapper.text()).toContain('稿件')
     expect(wrapper.text()).not.toContain('审计日志')
   })

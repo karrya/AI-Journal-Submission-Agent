@@ -54,6 +54,7 @@ describe('AuditListView', () => {
     })
     const wrapper = mount(AuditListView)
     await flushPromises()
+    expect(wrapper.get('[data-test="view-audit-l1"]').classes()).toContain('action-button--view')
     await wrapper.get('[data-test="view-audit-l1"]').trigger('click')
     await flushPromises()
 

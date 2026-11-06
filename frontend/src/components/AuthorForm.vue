@@ -142,8 +142,8 @@ function submit(): void {
       我确认该作者身份及以上变更准确无误。
     </label>
     <div class="form-actions">
-      <button type="submit" :disabled="submitting">{{ submitting ? '保存中…' : '保存作者' }}</button>
-      <button type="button" :disabled="submitting" @click="emit('cancel')">取消</button>
+      <button class="action-button action-button--create" type="submit" :disabled="submitting">{{ submitting ? '保存中…' : '保存作者' }}</button>
+      <button class="action-button action-button--neutral" type="button" :disabled="submitting" @click="emit('cancel')">取消</button>
     </div>
   </form>
 </template>

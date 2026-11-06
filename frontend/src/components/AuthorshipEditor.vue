@@ -103,7 +103,7 @@ function submit(): void {
           </option>
         </select>
       </label>
-      <button type="button" data-test="add-author" :disabled="!selectedAuthorId" @click="addAuthor">添加作者</button>
+      <button class="action-button action-button--create" type="button" data-test="add-author" :disabled="!selectedAuthorId" @click="addAuthor">添加作者</button>
     </div>
 
     <ol class="authorship-list">
@@ -120,9 +120,9 @@ function submit(): void {
           >
           通讯作者
         </label>
-        <button type="button" :data-test="`move-up-${author.author_id}`" :disabled="index === 0" @click="move(index, -1)">上移</button>
-        <button type="button" :data-test="`move-down-${author.author_id}`" :disabled="index === rows.length - 1" @click="move(index, 1)">下移</button>
-        <button v-if="author.author_id !== ownerAuthorId" type="button" :data-test="`remove-${author.author_id}`" @click="remove(index)">移除</button>
+        <button class="action-button action-button--compact action-button--neutral" type="button" :data-test="`move-up-${author.author_id}`" :disabled="index === 0" @click="move(index, -1)">上移</button>
+        <button class="action-button action-button--compact action-button--neutral" type="button" :data-test="`move-down-${author.author_id}`" :disabled="index === rows.length - 1" @click="move(index, 1)">下移</button>
+        <button v-if="author.author_id !== ownerAuthorId" class="action-button action-button--compact action-button--danger" type="button" :data-test="`remove-${author.author_id}`" @click="remove(index)">移除</button>
       </li>
     </ol>
 
@@ -131,6 +131,6 @@ function submit(): void {
       我确认此作者名单、排列顺序及通讯作者选择。
     </label>
     <p v-if="error" class="form-error" role="alert">{{ error }}</p>
-    <button type="submit" :disabled="submitting">保存作者名单</button>
+    <button class="action-button action-button--create" type="submit" :disabled="submitting">保存作者名单</button>
   </form>
 </template>

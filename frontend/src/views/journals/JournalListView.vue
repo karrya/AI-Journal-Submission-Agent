@@ -530,7 +530,7 @@ onMounted(() => void loadPublishers())
           <label>出版商<select v-model="journalForm.publisher_id" data-test="journal-publisher" required><option value="" disabled>请选择出版商</option><option v-for="option in publisherOptions" :key="option.id" :value="option.id">{{ option.name ?? option.id }}</option></select></label>
           <label>平台<select v-model="journalForm.platform_id" data-test="journal-platform"><option value="">无平台</option><option v-for="option in platformOptions" :key="option.id" :value="option.id">{{ option.name ?? option.id }}<template v-if="option.code"> ({{ option.code }})</template></option></select></label>
           <label>名称<input v-model="journalForm.name" data-test="journal-name" required maxlength="500"></label>
-          <label>状态<input v-model="journalForm.status" required maxlength="32"></label>
+          <label>状态<select v-model="journalForm.status" data-test="journal-status" required><option v-for="(label, value) in PLATFORM_STATUS_LABELS" :key="value" :value="value">{{ label }}</option></select></label>
           <label>ISSN<input v-model="journalForm.issn" placeholder="0378-5955"></label>
           <label>eISSN<input v-model="journalForm.eissn"></label>
           <label>网站<input v-model="journalForm.website_url" type="url"></label>

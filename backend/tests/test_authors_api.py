@@ -348,6 +348,41 @@ def test_email_update_confirmation_status_rules_and_cross_author_isolation(
     assert cross_author.status_code == 404
 
 
+def test_email_create_accepts_institutional_purpose(client, admin_context, author):
+    response = client.post(
+        f"/api/v1/authors/{author.id}/emails",
+        json={
+            "email": address("institutional"),
+            "purpose": "institutional",
+            "confirm_email_binding": True,
+        },
+    )
+    assert response.status_code == 201
+    assert response.json()["purpose"] == "institutional"
+
+
+def test_email_update_accepts_institutional_purpose(
+    client, admin_context, author, db_session
+):
+    email = AuthorEmail(
+        author_id=author.id,
+        email=address("old"),
+        normalized_email=address("old"),
+        purpose="communication",
+    )
+    db_session.add(email)
+    db_session.commit()
+
+    response = client.patch(
+        f"/api/v1/authors/{author.id}/emails/{email.id}",
+        json={"purpose": "institutional"},
+    )
+    assert response.status_code == 200
+    assert response.json()["purpose"] == "institutional"
+    db_session.expire_all()
+    assert db_session.get(AuthorEmail, email.id).purpose == "institutional"
+
+
 def test_email_delete_requires_body_confirmation_and_soft_deletes(
     client, admin_context, author, db_session
 ):

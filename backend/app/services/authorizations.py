@@ -3,6 +3,7 @@
 from collections.abc import Sequence
 from datetime import UTC, datetime
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
@@ -10,6 +11,7 @@ from app.models import Author, AuthorAuthorization, User, utc_now
 from app.repositories.authorizations import AuthorizationRepository
 from app.schemas.authors import (
     AuthorizationCreate,
+    AuthorizationOptionsResponse,
     AuthorizationPage,
     AuthorizationResponse,
     AuthorizationUpdate,
@@ -35,6 +37,22 @@ class AuthorizationService(DomainService):
     def __init__(self, db: Session, user: User, request_id: str):
         super().__init__(db, user, request_id)
         self.repository = AuthorizationRepository(db)
+
+    def options(self) -> AuthorizationOptionsResponse:
+        self._require_admin()
+        authors = self.db.scalars(
+            select(Author)
+            .where(Author.deleted_at.is_(None), Author.status == "active")
+            .order_by(Author.display_name, Author.id)
+        ).all()
+        users = self.db.scalars(
+            select(User)
+            .where(User.deleted_at.is_(None), User.status == "active")
+            .order_by(User.display_name, User.username, User.id)
+        ).all()
+        return AuthorizationOptionsResponse.model_validate(
+            {"authors": authors, "users": users}
+        )
 
     @staticmethod
     def _validate_interval(*, valid_from: datetime, valid_to: datetime, now: datetime):

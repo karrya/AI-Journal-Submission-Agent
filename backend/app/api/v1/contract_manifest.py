@@ -38,6 +38,7 @@ CONTRACTS: tuple[RouteContract, ...] = (
         "AuthorInstitutionResponse",
     ),
     RouteContract("DELETE", "/authors/{author_id}/institutions/{link_id}", "None"),
+    RouteContract("GET", "/author-authorizations/options", "AuthorizationOptionsResponse"),
     RouteContract("GET", "/author-authorizations", "AuthorizationPage"),
     RouteContract("POST", "/author-authorizations", "AuthorizationResponse"),
     RouteContract(

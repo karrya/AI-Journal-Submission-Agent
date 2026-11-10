@@ -43,6 +43,25 @@ def manuscript_payload(owner, *, authors=None, **overrides):
     return payload
 
 
+EXTENDED_METADATA = {
+    "funding_number": "FUND-2026-001",
+    "funding_name": "National Research Foundation",
+    "publication_statement": "Publication statement",
+    "acknowledgements": "Acknowledgements",
+    "author_contributions": "Author contributions",
+    "clinical_trial_number": "NCT20260001",
+}
+
+UPDATED_EXTENDED_METADATA = {
+    "funding_number": "FUND-2026-002",
+    "funding_name": "Updated Research Foundation",
+    "publication_statement": "Updated publication statement",
+    "acknowledgements": "Updated acknowledgements",
+    "author_contributions": "Updated author contributions",
+    "clinical_trial_number": "NCT20260002",
+}
+
+
 def author_input(author, position, *, corresponding=False):
     return {
         "author_id": str(author.id),
@@ -186,6 +205,25 @@ def test_create_builds_initial_version_and_minimal_authors(
         assert forbidden not in serialized
     assert all("notes" not in author for author in version.metadata_snapshot["authors"])
     assert db_session.scalar(select(func.count()).select_from(ManuscriptAuthor)) == 2
+
+
+def test_extended_metadata_is_stored_in_response_and_initial_snapshot(
+    client, db_session, operator_context, owner_permissions, owner
+):
+    response = client.post(
+        "/api/v1/manuscripts",
+        json=manuscript_payload(owner, language="zh", **EXTENDED_METADATA),
+    )
+    assert response.status_code == 201
+    body = response.json()
+    assert body["language"] == "zh"
+    for field, value in EXTENDED_METADATA.items():
+        assert body[field] == value
+
+    version = db_session.get(ManuscriptVersion, body["current_version_id"])
+    assert version.metadata_snapshot["language"] == "zh"
+    for field, value in EXTENDED_METADATA.items():
+        assert version.metadata_snapshot[field] == value
 
 
 def test_create_defaults_to_owner_as_first_corresponding_author(
@@ -404,6 +442,40 @@ def test_patch_changes_working_metadata_without_rewriting_history(
     )
     assert log.before_summary["title"] == "A study"
     assert log.after_summary == {"title": "Changed title", "keywords": ["updated"]}
+
+
+def test_extended_metadata_updates_working_copy_and_only_new_snapshot(
+    client, db_session, manuscript
+):
+    old_version_id = manuscript.current_version_id
+    response = client.patch(
+        f"/api/v1/manuscripts/{manuscript.id}",
+        json={"language": "zh", **UPDATED_EXTENDED_METADATA},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["language"] == "zh"
+    for field, value in UPDATED_EXTENDED_METADATA.items():
+        assert body[field] == value
+
+    db_session.expire_all()
+    old_version = db_session.get(ManuscriptVersion, old_version_id)
+    assert old_version.metadata_snapshot["language"] == "en"
+    assert old_version.metadata_snapshot["title"] == "A study"
+    assert all(old_version.metadata_snapshot.get(field) is None for field in EXTENDED_METADATA)
+    working = db_session.get(Manuscript, manuscript.id)
+    for field, value in UPDATED_EXTENDED_METADATA.items():
+        assert getattr(working, field) == value
+
+    created = client.post(
+        f"/api/v1/manuscripts/{manuscript.id}/versions",
+        json={"label": "Extended metadata"},
+    )
+    assert created.status_code == 201
+    snapshot = created.json()["metadata_snapshot"]
+    assert snapshot["language"] == "zh"
+    for field, value in UPDATED_EXTENDED_METADATA.items():
+        assert snapshot[field] == value
 
 
 def test_soft_delete_requires_update_but_not_read(

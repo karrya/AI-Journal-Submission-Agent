@@ -62,6 +62,12 @@ EXPECTED_NEW_COLUMNS = {
         "subject_field",
         "language",
         "funding_statement",
+        "funding_number",
+        "funding_name",
+        "publication_statement",
+        "acknowledgements",
+        "author_contributions",
+        "clinical_trial_number",
         "conflict_of_interest_statement",
         "ethics_statement",
         "data_availability_statement",
@@ -505,7 +511,7 @@ def test_mig_01_empty_upgrade_head_is_cleanly_repeatable(db_engine):
             name: inspect(db_engine).get_table_options(name) for name in EXPECTED_TABLES
         } == first_options
         with db_engine.connect() as connection:
-            assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0002"
+            assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0003"
             assert connection.scalar(text("SELECT COUNT(*) FROM alembic_version")) == 1
     finally:
         command.upgrade(config, "head")

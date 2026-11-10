@@ -46,6 +46,7 @@ EXPECTED_ROUTES = {
         "AuthorInstitutionResponse",
     ),
     ("DELETE", "/authors/{author_id}/institutions/{link_id}", "None"),
+    ("GET", "/author-authorizations/options", "AuthorizationOptionsResponse"),
     ("GET", "/author-authorizations", "AuthorizationPage"),
     ("POST", "/author-authorizations", "AuthorizationResponse"),
     ("GET", "/author-authorizations/{authorization_id}", "AuthorizationResponse"),

@@ -27,13 +27,13 @@ const emit = defineEmits<{
 
 const createForm = reactive({
   email: '',
-  purpose: 'communication' as 'communication' | 'registration' | 'backup',
+  purpose: 'communication' as 'communication' | 'registration' | 'backup' | 'institutional',
   is_primary: false,
   confirm: false,
 })
 const editForm = reactive({
   email: '',
-  purpose: 'communication' as 'communication' | 'registration' | 'backup',
+  purpose: 'communication' as 'communication' | 'registration' | 'backup' | 'institutional',
   is_primary: false,
   confirm: false,
 })
@@ -145,7 +145,7 @@ function remove(emailId: string): void {
     <form v-if="canManage && editingId" data-test="edit-email-form" class="stacked-form" novalidate @submit.prevent="update">
       <h3>修改邮箱绑定</h3>
       <label>邮箱地址<input v-model="editForm.email" data-test="edit-email-address" type="email" required></label>
-      <label>用途<select v-model="editForm.purpose"><option value="communication">通讯</option><option value="registration">注册</option><option value="backup">备用</option></select></label>
+      <label>用途<select v-model="editForm.purpose"><option value="communication">通讯</option><option value="registration">注册</option><option value="backup">备用</option><option value="institutional">机构邮箱</option></select></label>
       <label><input v-model="editForm.is_primary" type="checkbox"> 主邮箱</label>
       <label class="confirmation-control"><input v-model="editForm.confirm" data-test="edit-email-confirm" type="checkbox"> 我确认此邮箱地址及绑定变更。</label>
       <button class="action-button action-button--create" type="submit">保存邮箱</button>
@@ -162,7 +162,7 @@ function remove(emailId: string): void {
     <form v-if="canManage" data-test="create-email-form" class="stacked-form" novalidate @submit.prevent="create">
       <h3>添加邮箱</h3>
       <label>邮箱地址<input v-model="createForm.email" data-test="new-email" type="email" required></label>
-      <label>用途<select v-model="createForm.purpose"><option value="communication">通讯</option><option value="registration">注册</option><option value="backup">备用</option></select></label>
+      <label>用途<select v-model="createForm.purpose"><option value="communication">通讯</option><option value="registration">注册</option><option value="backup">备用</option><option value="institutional">机构邮箱</option></select></label>
       <label><input v-model="createForm.is_primary" type="checkbox"> 主邮箱</label>
       <label class="confirmation-control"><input v-model="createForm.confirm" data-test="create-email-confirm" type="checkbox"> 我确认可将此邮箱绑定到该作者。</label>
       <button class="action-button action-button--create" type="submit" :disabled="busy">添加邮箱</button>

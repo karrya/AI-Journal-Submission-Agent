@@ -6,6 +6,7 @@ import {
   createInstitution,
   deleteAuthor,
   deleteInstitution,
+  getInstitution,
   listAuthors,
   listInstitutions,
   updateInstitution,
@@ -15,6 +16,7 @@ import {
   type AuthorUpdate,
   type InstitutionCreate,
   type InstitutionListQuery,
+  type InstitutionResponse,
   type InstitutionSummaryResponse,
   type InstitutionUpdate,
   type SortOrder,
@@ -66,6 +68,34 @@ const institutionForm = reactive({
   website_url: '',
   country_code: '',
   city: '',
+  region: '',
+  postal_code: '',
+})
+const commonCountries = [
+  { code: 'CN', name: '中国' },
+  { code: 'US', name: '美国' },
+  { code: 'GB', name: '英国' },
+  { code: 'JP', name: '日本' },
+  { code: 'KR', name: '韩国' },
+  { code: 'SG', name: '新加坡' },
+  { code: 'CA', name: '加拿大' },
+  { code: 'AU', name: '澳大利亚' },
+  { code: 'DE', name: '德国' },
+  { code: 'FR', name: '法国' },
+  { code: 'IT', name: '意大利' },
+  { code: 'ES', name: '西班牙' },
+  { code: 'NL', name: '荷兰' },
+  { code: 'CH', name: '瑞士' },
+  { code: 'SE', name: '瑞典' },
+  { code: 'IN', name: '印度' },
+]
+const institutionCountryOptions = computed(() => {
+  const options = [...commonCountries]
+  const currentCode = institutionForm.country_code
+  if (currentCode && !options.some((option) => option.code === currentCode)) {
+    options.push({ code: currentCode, name: '其他' })
+  }
+  return options
 })
 const deletingInstitutionId = ref<string | null>(null)
 const institutionDeleteConfirmed = ref(false)
@@ -187,17 +217,35 @@ function selectTab(tab: 'authors' | 'institutions'): void {
   if (tab === 'institutions') void loadInstitutions()
 }
 
-function openInstitutionForm(institution?: InstitutionSummaryResponse): void {
+async function openInstitutionForm(institution?: InstitutionSummaryResponse): Promise<void> {
+  if (institutionBusy.value) return
+  institutionError.value = ''
+  showInstitutionForm.value = false
+  editingInstitutionId.value = null
+  let detailedInstitution: InstitutionResponse | undefined
+  if (institution) {
+    institutionBusy.value = true
+    try {
+      detailedInstitution = await getInstitution(institution.id)
+    } catch (error) {
+      institutionError.value = safeError(error, '无法加载单位详情。')
+      return
+    } finally {
+      institutionBusy.value = false
+    }
+  }
+  const values = detailedInstitution ?? institution
   editingInstitutionId.value = institution?.id ?? null
   Object.assign(institutionForm, {
-    name: institution?.name ?? '',
-    institution_type: institution?.institution_type ?? '',
-    website_url: institution?.website_url ?? '',
-    country_code: institution?.country_code ?? '',
-    city: institution?.city ?? '',
+    name: values?.name ?? '',
+    institution_type: values?.institution_type ?? '',
+    website_url: values?.website_url ?? '',
+    country_code: values?.country_code ?? '',
+    city: values?.city ?? '',
+    region: detailedInstitution?.region ?? '',
+    postal_code: detailedInstitution?.postal_code ?? '',
   })
   showInstitutionForm.value = true
-  institutionError.value = ''
 }
 
 function nullable(value: string): string | null {
@@ -222,6 +270,8 @@ async function saveInstitution(): Promise<void> {
     website_url: websiteUrl,
     country_code: nullable(institutionForm.country_code)?.toUpperCase() ?? null,
     city: nullable(institutionForm.city),
+    region: nullable(institutionForm.region),
+    postal_code: nullable(institutionForm.postal_code),
   }
   institutionBusy.value = true
   try {
@@ -327,8 +377,10 @@ onMounted(() => void loadAuthors())
           <label>名称<input v-model="institutionForm.name" data-test="institution-name" required maxlength="255"></label>
           <label>类型<input v-model="institutionForm.institution_type" maxlength="32"></label>
           <label>网站<input v-model="institutionForm.website_url" data-test="institution-website" type="url"></label>
-          <label>国家代码<input v-model="institutionForm.country_code" maxlength="2" placeholder="CN"></label>
+          <label>国家代码<select v-model="institutionForm.country_code" data-test="institution-country"><option value="">未设置</option><option v-for="option in institutionCountryOptions" :key="option.code" :value="option.code">{{ option.name }}（{{ option.code }}）</option></select></label>
+          <label>省<input v-model="institutionForm.region" data-test="institution-region" maxlength="128"></label>
           <label>城市<input v-model="institutionForm.city" maxlength="128"></label>
+          <label>邮编<input v-model="institutionForm.postal_code" data-test="institution-postal-code" maxlength="32"></label>
         </div>
         <button class="action-button action-button--create" type="submit" :disabled="institutionBusy">保存单位</button>
         <button class="action-button action-button--neutral" type="button" @click="showInstitutionForm = false">取消</button>

@@ -105,6 +105,12 @@ describe('AuthorListView', () => {
       if (config.url === '/institutions' && config.method === 'get') {
         return success(config, { ...emptyPage, items: [institution], total: 1 })
       }
+      if (config.url === '/institutions/i1' && config.method === 'get') {
+        return success(config, {
+          ...institution, address_line1: null, address_line2: null, region: null, postal_code: null,
+          created_at: '2026-11-01T00:00:00Z', updated_at: '2026-11-01T00:00:00Z',
+        })
+      }
       if (['post', 'patch', 'delete'].includes(config.method ?? '')) return success(config, institution)
       throw new Error(`Unexpected request: ${config.method} ${config.url}`)
     })
@@ -126,6 +132,7 @@ describe('AuthorListView', () => {
     })
 
     await wrapper.get('[data-test="edit-institution-i1"]').trigger('click')
+    await flushPromises()
     await wrapper.get('[data-test="institution-name"]').setValue('Updated Institution')
     await wrapper.get('[data-test="institution-form"]').trigger('submit')
     await flushPromises()
@@ -140,6 +147,153 @@ describe('AuthorListView', () => {
     expect(adapter.mock.calls.some(([config]) => config.method === 'delete' && config.url === '/institutions/i1')).toBe(true)
   })
 
+  it('submits the selected country code from Chinese options', async () => {
+    adapter.mockImplementation(async (config) => {
+      if (config.url === '/authors') return success(config, emptyPage)
+      if (config.url === '/institutions' && config.method === 'get') return success(config, emptyPage)
+      if (config.method === 'post') return success(config, {})
+      throw new Error(`Unexpected request: ${config.method} ${config.url}`)
+    })
+    const wrapper = mountList()
+    await flushPromises()
+    await wrapper.get('[data-test="institutions-tab"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-test="add-institution"]').trigger('click')
+
+    const countrySelect = wrapper.get('[data-test="institution-country"]')
+    expect(countrySelect.element.tagName).toBe('SELECT')
+    expect(countrySelect.get('option[value=""]').text()).toBe('未设置')
+    expect(countrySelect.get('option[value="CN"]').text()).toBe('中国（CN）')
+    expect(countrySelect.get('option[value="US"]').text()).toBe('美国（US）')
+    await wrapper.get('[data-test="institution-name"]').setValue('New Institution')
+    await countrySelect.setValue('US')
+    await wrapper.get('[data-test="institution-form"]').trigger('submit')
+    await flushPromises()
+    const createCall = adapter.mock.calls.find(([config]) => config.method === 'post')
+    expect(JSON.parse(String(createCall?.[0].data))).toMatchObject({ country_code: 'US' })
+  })
+
+  it('preserves an uncommon existing country code when editing', async () => {
+    const institution = {
+      id: 'i1', name: 'Brazilian Institution', institution_type: 'university',
+      website_url: null, country_code: 'BR', city: 'São Paulo',
+    }
+    adapter.mockImplementation(async (config) => {
+      if (config.url === '/authors') return success(config, emptyPage)
+      if (config.url === '/institutions' && config.method === 'get') {
+        return success(config, { ...emptyPage, items: [institution], total: 1 })
+      }
+      if (config.url === '/institutions/i1' && config.method === 'get') {
+        return success(config, {
+          ...institution, address_line1: null, address_line2: null, region: null, postal_code: null,
+          created_at: '2026-11-01T00:00:00Z', updated_at: '2026-11-01T00:00:00Z',
+        })
+      }
+      if (config.method === 'patch') return success(config, institution)
+      throw new Error(`Unexpected request: ${config.method} ${config.url}`)
+    })
+    const wrapper = mountList()
+    await flushPromises()
+    await wrapper.get('[data-test="institutions-tab"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-test="edit-institution-i1"]').trigger('click')
+    await flushPromises()
+
+    const countrySelect = wrapper.get('[data-test="institution-country"]')
+    expect((countrySelect.element as HTMLSelectElement).value).toBe('BR')
+    expect(countrySelect.get('option[value="BR"]').text()).toBe('其他（BR）')
+    await wrapper.get('[data-test="institution-form"]').trigger('submit')
+    await flushPromises()
+    const updateCall = adapter.mock.calls.find(([config]) => config.method === 'patch')
+    expect(JSON.parse(String(updateCall?.[0].data))).toMatchObject({ country_code: 'BR' })
+  })
+
+  it('submits region and postal code when creating an institution', async () => {
+    adapter.mockImplementation(async (config) => {
+      if (config.url === '/authors') return success(config, emptyPage)
+      if (config.url === '/institutions' && config.method === 'get') return success(config, emptyPage)
+      if (config.method === 'post') return success(config, {})
+      throw new Error(`Unexpected request: ${config.method} ${config.url}`)
+    })
+    const wrapper = mountList()
+    await flushPromises()
+    await wrapper.get('[data-test="institutions-tab"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-test="add-institution"]').trigger('click')
+    await wrapper.get('[data-test="institution-name"]').setValue('New Institution')
+    await wrapper.get('[data-test="institution-region"]').setValue('Zhejiang')
+    await wrapper.get('[data-test="institution-postal-code"]').setValue('310000')
+    await wrapper.get('[data-test="institution-form"]').trigger('submit')
+    await flushPromises()
+
+    const createCall = adapter.mock.calls.find(([config]) => config.method === 'post')
+    expect(JSON.parse(String(createCall?.[0].data))).toMatchObject({
+      region: 'Zhejiang', postal_code: '310000',
+    })
+  })
+
+  it('loads and updates region and postal code through institution details', async () => {
+    const summary = {
+      id: 'i1', name: 'Detailed Institution', institution_type: 'university',
+      website_url: null, country_code: 'CN', city: 'Hangzhou',
+    }
+    const detail = {
+      ...summary, address_line1: null, address_line2: null,
+      region: 'Zhejiang', postal_code: '310000',
+      created_at: '2026-11-01T00:00:00Z', updated_at: '2026-11-01T00:00:00Z',
+    }
+    adapter.mockImplementation(async (config) => {
+      if (config.url === '/authors') return success(config, emptyPage)
+      if (config.url === '/institutions' && config.method === 'get') {
+        return success(config, { ...emptyPage, items: [summary], total: 1 })
+      }
+      if (config.url === '/institutions/i1' && config.method === 'get') return success(config, detail)
+      if (config.method === 'patch') return success(config, detail)
+      throw new Error(`Unexpected request: ${config.method} ${config.url}`)
+    })
+    const wrapper = mountList()
+    await flushPromises()
+    await wrapper.get('[data-test="institutions-tab"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-test="edit-institution-i1"]').trigger('click')
+    await flushPromises()
+
+    expect((wrapper.get('[data-test="institution-region"]').element as HTMLInputElement).value).toBe('Zhejiang')
+    expect((wrapper.get('[data-test="institution-postal-code"]').element as HTMLInputElement).value).toBe('310000')
+    await wrapper.get('[data-test="institution-region"]').setValue('New Region')
+    await wrapper.get('[data-test="institution-postal-code"]').setValue('100000')
+    await wrapper.get('[data-test="institution-form"]').trigger('submit')
+    await flushPromises()
+    const updateCall = adapter.mock.calls.find(([config]) => config.method === 'patch')
+    expect(JSON.parse(String(updateCall?.[0].data))).toMatchObject({
+      region: 'New Region', postal_code: '100000',
+    })
+  })
+
+  it('does not open institution editing when details cannot load', async () => {
+    const summary = {
+      id: 'i1', name: 'Detailed Institution', institution_type: 'university',
+      website_url: null, country_code: 'CN', city: 'Hangzhou',
+    }
+    adapter.mockImplementation(async (config) => {
+      if (config.url === '/authors') return success(config, emptyPage)
+      if (config.url === '/institutions' && config.method === 'get') {
+        return success(config, { ...emptyPage, items: [summary], total: 1 })
+      }
+      if (config.url === '/institutions/i1' && config.method === 'get') throw new Error('offline')
+      throw new Error(`Unexpected request: ${config.method} ${config.url}`)
+    })
+    const wrapper = mountList()
+    await flushPromises()
+    await wrapper.get('[data-test="institutions-tab"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-test="edit-institution-i1"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="institution-form"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('无法加载单位详情')
+  })
+
   it('renders unsafe institution URLs as text and rejects them on submit', async () => {
     const institution = {
       id: 'i1', name: 'Unsafe Institution', institution_type: null,
@@ -148,6 +302,12 @@ describe('AuthorListView', () => {
     adapter.mockImplementation(async (config) => {
       if (config.url === '/authors') return success(config, emptyPage)
       if (config.url === '/institutions' && config.method === 'get') return success(config, { ...emptyPage, items: [institution], total: 1 })
+      if (config.url === '/institutions/i1' && config.method === 'get') {
+        return success(config, {
+          ...institution, address_line1: null, address_line2: null, region: null, postal_code: null,
+          created_at: '2026-11-01T00:00:00Z', updated_at: '2026-11-01T00:00:00Z',
+        })
+      }
       if (config.method === 'patch') return success(config, institution)
       throw new Error(`Unexpected request: ${config.method} ${config.url}`)
     })
@@ -159,6 +319,7 @@ describe('AuthorListView', () => {
     expect(wrapper.find('a[href^="javascript:"]').exists()).toBe(false)
     expect(wrapper.text()).toContain('javascript:alert(1)')
     await wrapper.get('[data-test="edit-institution-i1"]').trigger('click')
+    await flushPromises()
     await wrapper.get('[data-test="institution-form"]').trigger('submit')
     await flushPromises()
     expect(adapter.mock.calls.some(([config]) => config.method === 'patch')).toBe(false)

@@ -18,9 +18,17 @@ const operator: User = {
 }
 const owner = { author_id: 'a1', display_name: 'Owner One', position: 1, is_corresponding: true }
 const coauthor = { author_id: 'b1', display_name: 'Coauthor B', position: 2, is_corresponding: false }
+const extendedMetadata = {
+  funding_number: 'FUND-2026-001',
+  funding_name: 'National Research Foundation',
+  publication_statement: 'Publication statement',
+  acknowledgements: 'Acknowledgements',
+  author_contributions: 'Author contributions',
+  clinical_trial_number: 'NCT20260001',
+}
 const snapshot = {
   owner_author_id: 'a1', title: 'Snapshot two title', abstract: 'Snapshot abstract', keywords: ['ai'],
-  article_type: 'research', language: 'en', authors: [owner, coauthor],
+  article_type: 'research', language: 'zh', ...extendedMetadata, authors: [owner, coauthor],
 }
 const versions = [
   {
@@ -140,6 +148,48 @@ describe('ManuscriptDetailView', () => {
       }
       expect(wrapper.text()).not.toContain('private-coauthor-notes')
     }
+  })
+
+  it('renders localized language and extended metadata in immutable snapshots', async () => {
+    const wrapper = mountDetail()
+    await flushPromises()
+
+    const history = wrapper.get('[data-test="snapshot-history"]').text()
+    expect(history).toContain('中文')
+    for (const value of Object.values(extendedMetadata)) expect(history).toContain(value)
+  })
+
+  it('updates language and extended metadata through the working form', async () => {
+    adapter.mockImplementation(async (config) => {
+      if (config.method === 'patch') {
+        return success(config, { ...manuscript, language: 'zh', ...extendedMetadata })
+      }
+      if (config.url === '/manuscripts/m1') return success(config, manuscript)
+      if (config.url === '/manuscripts/m1/versions') return success(config, { items: versions, page: 1, page_size: 20, total: 2 })
+      if (config.url === '/manuscripts/m1/versions/v2') return success(config, versions[0])
+      if (config.url === '/manuscripts/m1/versions/v2/files') return success(config, { items: [file], page: 1, page_size: 100, total: 1 })
+      if (config.url === '/authors') return success(config, { items: authorOptions, page: 1, page_size: 100, total: 2 })
+      throw new Error(`Unexpected request: ${config.method} ${config.url}`)
+    })
+    const wrapper = mountDetail()
+    await flushPromises()
+    const languageSelect = wrapper.get('[data-test="metadata-language"]')
+    expect(languageSelect.element.tagName).toBe('SELECT')
+    expect(languageSelect.findAll('option').map((option) => [option.attributes('value'), option.text()])).toEqual([
+      ['en', '英语'],
+      ['zh', '中文'],
+    ])
+    await languageSelect.setValue('zh')
+    for (const [field, value] of Object.entries(extendedMetadata)) {
+      await wrapper.get(`[data-test="metadata-${field.replace(/_/g, '-')}"]`).setValue(value)
+    }
+    await wrapper.get('[data-test="metadata-form"]').trigger('submit')
+    await flushPromises()
+
+    const patch = adapter.mock.calls.find(([config]) => config.method === 'patch')
+    expect(JSON.parse(String(patch?.[0].data))).toMatchObject({
+      language: 'zh', ...extendedMetadata,
+    })
   })
 
   it('updates working metadata without rewriting an immutable snapshot', async () => {

@@ -30,6 +30,11 @@ export const MANUSCRIPT_STATUS_LABELS: Readonly<Record<string, string>> = {
   archived: '已归档',
 }
 
+export const MANUSCRIPT_LANGUAGE_LABELS: Readonly<Record<string, string>> = {
+  en: '英语',
+  zh: '中文',
+}
+
 export const AUTHORIZATION_STATUS_LABELS: Readonly<Record<string, string>> = {
   not_yet_active: '尚未生效',
   active: '生效中',
@@ -42,6 +47,7 @@ export const EMAIL_PURPOSE_LABELS: Readonly<Record<string, string>> = {
   communication: '通讯',
   registration: '注册',
   backup: '备用',
+  institutional: '机构邮箱',
 }
 
 export const EMAIL_VERIFICATION_LABELS: Readonly<Record<string, string>> = {

@@ -93,14 +93,14 @@ export interface AuthorResponse {
 
 export interface EmailCreate {
   email: string
-  purpose?: 'communication' | 'registration' | 'backup'
+  purpose?: 'communication' | 'registration' | 'backup' | 'institutional'
   is_primary?: boolean
   confirm_email_binding: true
 }
 
 export interface EmailUpdate {
   email?: string
-  purpose?: 'communication' | 'registration' | 'backup'
+  purpose?: 'communication' | 'registration' | 'backup' | 'institutional'
   is_primary?: boolean
   confirm_email_binding?: true
   verification_status?: 'unverified' | 'verified'
@@ -112,7 +112,7 @@ export interface EmailResponse {
   author_id: string
   email: string
   normalized_email: string
-  purpose: 'communication' | 'registration' | 'backup'
+  purpose: 'communication' | 'registration' | 'backup' | 'institutional'
   is_primary: boolean
   verification_status: 'unverified' | 'verified'
   authorization_status: 'unconfirmed' | 'authorized' | 'revoked'
@@ -249,6 +249,11 @@ export interface AuthorizationResponse {
   validity_status: AuthorizationValidityStatus
 }
 
+export interface AuthorizationOptions {
+  authors: Array<{ id: string; display_name: string }>
+  users: Array<{ id: string; username: string; display_name: string }>
+}
+
 export interface AuthorizationListQuery {
   page?: number
   page_size?: number
@@ -373,6 +378,11 @@ export async function listAllInstitutions(): Promise<InstitutionSummaryResponse[
   return result.items
 }
 
+export async function getInstitution(institutionId: string): Promise<InstitutionResponse> {
+  const response = await api.get<InstitutionResponse>(`/institutions/${institutionId}`)
+  return response.data
+}
+
 export async function createInstitution(
   payload: InstitutionCreate,
 ): Promise<InstitutionResponse> {
@@ -400,6 +410,11 @@ export async function createAuthorInstitution(
     `/authors/${authorId}/institutions`,
     payload,
   )
+  return response.data
+}
+
+export async function getAuthorizationOptions(): Promise<AuthorizationOptions> {
+  const response = await api.get<AuthorizationOptions>('/author-authorizations/options')
   return response.data
 }
 

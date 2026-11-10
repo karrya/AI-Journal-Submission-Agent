@@ -154,6 +154,39 @@ describe('JournalListView', () => {
     expect(JSON.parse(String(updateCall?.[0].data))).toMatchObject({ name: 'Updated Platform' })
   })
 
+  it('shows Chinese journal status options and submits the selected English value', async () => {
+    adapter.mockImplementation(async (config) => {
+      if (config.url === '/publishers') return success(config, page([publisher]))
+      if (config.url === '/journal-platforms') return success(config, page([platform]))
+      if (config.url === '/journals' && config.method === 'get') return success(config, page([journal]))
+      if (config.method === 'post') return success(config, journal)
+      throw new Error(`Unexpected request: ${config.method} ${config.url}`)
+    })
+    const wrapper = mount(JournalListView)
+    await flushPromises()
+    await wrapper.get('[data-test="journals-tab"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-test="add-journal"]').trigger('click')
+    await flushPromises()
+
+    const statusSelect = wrapper.get('[data-test="journal-status"]')
+    expect(statusSelect.element.tagName).toBe('SELECT')
+    expect(statusSelect.findAll('option').map((option) => [option.attributes('value'), option.text()])).toEqual([
+      ['active', '启用'],
+      ['needs_review', '待审核'],
+      ['disabled', '已停用'],
+    ])
+    expect((statusSelect.element as HTMLSelectElement).value).toBe('active')
+
+    await wrapper.get('[data-test="journal-name"]').setValue('New Journal')
+    await wrapper.get('[data-test="journal-publisher"]').setValue('p1')
+    await statusSelect.setValue('needs_review')
+    await wrapper.get('[data-test="journal-form"]').trigger('submit')
+    await flushPromises()
+    const createCall = adapter.mock.calls.find(([config]) => config.method === 'post')
+    expect(JSON.parse(String(createCall?.[0].data))).toMatchObject({ status: 'needs_review' })
+  })
+
   it('requires every journal requirement field and an HTTPS source', async () => {
     adapter.mockImplementation(async (config) => {
       if (config.url === '/publishers') return success(config, page([publisher]))

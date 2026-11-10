@@ -34,6 +34,12 @@ class ManuscriptCreate(InputModel):
     subject_field: str | None = Field(default=None, max_length=255)
     language: str = Field(min_length=1, max_length=32)
     funding_statement: str | None = None
+    funding_number: str | None = Field(default=None, max_length=255)
+    funding_name: str | None = Field(default=None, max_length=255)
+    publication_statement: str | None = None
+    acknowledgements: str | None = None
+    author_contributions: str | None = None
+    clinical_trial_number: str | None = Field(default=None, max_length=255)
     conflict_of_interest_statement: str | None = None
     ethics_statement: str | None = None
     data_availability_statement: str | None = None
@@ -49,6 +55,12 @@ class ManuscriptUpdate(InputModel):
     subject_field: str | None = Field(default=None, max_length=255)
     language: str | None = Field(default=None, min_length=1, max_length=32)
     funding_statement: str | None = None
+    funding_number: str | None = Field(default=None, max_length=255)
+    funding_name: str | None = Field(default=None, max_length=255)
+    publication_statement: str | None = None
+    acknowledgements: str | None = None
+    author_contributions: str | None = None
+    clinical_trial_number: str | None = Field(default=None, max_length=255)
     conflict_of_interest_statement: str | None = None
     ethics_statement: str | None = None
     data_availability_statement: str | None = None
@@ -71,6 +83,12 @@ class ManuscriptResponse(OutputModel):
     subject_field: str | None = Field(default=None, max_length=255)
     language: str = Field(max_length=32)
     funding_statement: str | None = None
+    funding_number: str | None = Field(default=None, max_length=255)
+    funding_name: str | None = Field(default=None, max_length=255)
+    publication_statement: str | None = None
+    acknowledgements: str | None = None
+    author_contributions: str | None = None
+    clinical_trial_number: str | None = Field(default=None, max_length=255)
     conflict_of_interest_statement: str | None = None
     ethics_statement: str | None = None
     data_availability_statement: str | None = None
@@ -99,6 +117,12 @@ class ManuscriptSnapshot(OutputModel):
     subject_field: str | None = Field(default=None, max_length=255)
     language: str = Field(max_length=32)
     funding_statement: str | None = None
+    funding_number: str | None = Field(default=None, max_length=255)
+    funding_name: str | None = Field(default=None, max_length=255)
+    publication_statement: str | None = None
+    acknowledgements: str | None = None
+    author_contributions: str | None = None
+    clinical_trial_number: str | None = Field(default=None, max_length=255)
     conflict_of_interest_statement: str | None = None
     ethics_statement: str | None = None
     data_availability_statement: str | None = None

@@ -27,6 +27,36 @@ def create_authorization(client, author, user, **overrides):
     )
 
 
+def test_authorization_options_are_admin_only(client, operator_context):
+    response = client.get("/api/v1/author-authorizations/options")
+    assert response.status_code == 403
+    assert response.json()["code"] == "PERMISSION_DENIED"
+
+
+def test_authorization_options_include_only_active_subjects_and_minimum_fields(
+    client, admin_context, author, operator, user_factory, db_session
+):
+    from app.models import Author
+
+    user_factory("disabled-user", roles=("submission_operator",), status="disabled")
+    db_session.add(Author(display_name="Inactive Author", alternate_names=[], status="inactive"))
+    db_session.commit()
+
+    response = client.get("/api/v1/author-authorizations/options")
+    assert response.status_code == 200
+    body = response.json()
+    assert {item["display_name"] for item in body["authors"]} == {
+        "Permission Test Author"
+    }
+    assert {item["username"] for item in body["users"]} == {"admin", "operator"}
+    assert all(set(item) == {"id", "display_name"} for item in body["authors"])
+    assert all(
+        set(item) == {"id", "username", "display_name"} for item in body["users"]
+    )
+    assert "password_hash" not in response.text
+    assert "last_login_at" not in response.text
+
+
 def test_admin_can_create_filter_read_update_and_revoke_authorization(
     client, admin_context, admin, author, operator, db_session
 ):

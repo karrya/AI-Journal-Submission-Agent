@@ -120,14 +120,14 @@ AuthorPage = Page[AuthorResponse]
 
 class EmailCreate(InputModel):
     email: EmailStr = Field(max_length=254)
-    purpose: Literal["communication", "registration", "backup"] = "communication"
+    purpose: Literal["communication", "registration", "backup", "institutional"] = "communication"
     is_primary: bool = False
     confirm_email_binding: Literal[True]
 
 
 class EmailUpdate(InputModel):
     email: EmailStr | None = Field(default=None, max_length=254)
-    purpose: Literal["communication", "registration", "backup"] | None = None
+    purpose: Literal["communication", "registration", "backup", "institutional"] | None = None
     is_primary: bool | None = None
     confirm_email_binding: Literal[True] | None = None
     verification_status: Literal["unverified", "verified"] | None = None
@@ -146,7 +146,7 @@ class EmailResponse(OutputModel):
     author_id: UUID
     email: EmailStr = Field(max_length=254)
     normalized_email: EmailStr = Field(max_length=254)
-    purpose: Literal["communication", "registration", "backup"]
+    purpose: Literal["communication", "registration", "backup", "institutional"]
     is_primary: bool
     verification_status: Literal["unverified", "verified"]
     authorization_status: Literal["unconfirmed", "authorized", "revoked"]
@@ -271,6 +271,22 @@ class AuthorInstitutionLinkResponse(OutputModel):
 
 AuthorInstitutionResponse = AuthorInstitutionLinkResponse
 AuthorInstitutionPage = Page[AuthorInstitutionLinkResponse]
+
+
+class AuthorizationAuthorOption(OutputModel):
+    id: UUID
+    display_name: str
+
+
+class AuthorizationUserOption(OutputModel):
+    id: UUID
+    username: str
+    display_name: str
+
+
+class AuthorizationOptionsResponse(OutputModel):
+    authors: list[AuthorizationAuthorOption]
+    users: list[AuthorizationUserOption]
 
 
 class AuthorizationCreate(InputModel):

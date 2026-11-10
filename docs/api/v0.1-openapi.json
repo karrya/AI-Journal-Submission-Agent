@@ -2758,6 +2758,27 @@
         }
       }
     },
+    "/api/v1/author-authorizations/options": {
+      "get": {
+        "tags": [
+          "authorizations"
+        ],
+        "summary": "Authorization Options",
+        "operationId": "authorization_options_api_v1_author_authorizations_options_get",
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthorizationOptionsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/author-authorizations": {
       "get": {
         "tags": [
@@ -5695,6 +5716,26 @@
         ],
         "title": "作者更新请求"
       },
+      "AuthorizationAuthorOption": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "资源 ID"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "显示名称"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "display_name"
+        ],
+        "title": "授权作者选项"
+      },
       "AuthorizationCreate": {
         "properties": {
           "author_id": {
@@ -5771,6 +5812,31 @@
           "valid_to"
         ],
         "title": "授权创建请求"
+      },
+      "AuthorizationOptionsResponse": {
+        "properties": {
+          "authors": {
+            "items": {
+              "$ref": "#/components/schemas/AuthorizationAuthorOption"
+            },
+            "type": "array",
+            "title": "作者列表"
+          },
+          "users": {
+            "items": {
+              "$ref": "#/components/schemas/AuthorizationUserOption"
+            },
+            "type": "array",
+            "title": "用户列表"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "authors",
+          "users"
+        ],
+        "title": "授权选项响应"
       },
       "AuthorizationResponse": {
         "properties": {
@@ -6018,6 +6084,31 @@
         "type": "object",
         "title": "授权更新请求"
       },
+      "AuthorizationUserOption": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "资源 ID"
+          },
+          "username": {
+            "type": "string",
+            "title": "用户名"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "显示名称"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "username",
+          "display_name"
+        ],
+        "title": "授权用户选项"
+      },
       "Body_upload_file_api_v1_manuscripts__manuscript_id__versions__version_id__files_post": {
         "properties": {
           "file": {
@@ -6173,7 +6264,8 @@
             "enum": [
               "communication",
               "registration",
-              "backup"
+              "backup",
+              "institutional"
             ],
             "title": "用途",
             "default": "communication"
@@ -6226,7 +6318,8 @@
             "enum": [
               "communication",
               "registration",
-              "backup"
+              "backup",
+              "institutional"
             ],
             "title": "用途"
           },
@@ -6300,7 +6393,8 @@
                 "enum": [
                   "communication",
                   "registration",
-                  "backup"
+                  "backup",
+                  "institutional"
                 ]
               },
               {
@@ -7879,6 +7973,75 @@
             ],
             "title": "资助声明"
           },
+          "funding_number": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "基金编号"
+          },
+          "funding_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "基金名称"
+          },
+          "publication_statement": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "出版声明"
+          },
+          "acknowledgements": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "致谢"
+          },
+          "author_contributions": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "作者贡献"
+          },
+          "clinical_trial_number": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "临床实验编号（医学）"
+          },
           "conflict_of_interest_statement": {
             "anyOf": [
               {
@@ -8018,6 +8181,75 @@
               }
             ],
             "title": "资助声明"
+          },
+          "funding_number": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "基金编号"
+          },
+          "funding_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "基金名称"
+          },
+          "publication_statement": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "出版声明"
+          },
+          "acknowledgements": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "致谢"
+          },
+          "author_contributions": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "作者贡献"
+          },
+          "clinical_trial_number": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "临床实验编号（医学）"
           },
           "conflict_of_interest_statement": {
             "anyOf": [
@@ -8181,6 +8413,75 @@
             ],
             "title": "资助声明"
           },
+          "funding_number": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "基金编号"
+          },
+          "funding_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "基金名称"
+          },
+          "publication_statement": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "出版声明"
+          },
+          "acknowledgements": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "致谢"
+          },
+          "author_contributions": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "作者贡献"
+          },
+          "clinical_trial_number": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "临床实验编号（医学）"
+          },
           "conflict_of_interest_statement": {
             "anyOf": [
               {
@@ -8339,6 +8640,75 @@
               }
             ],
             "title": "资助声明"
+          },
+          "funding_number": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "基金编号"
+          },
+          "funding_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "基金名称"
+          },
+          "publication_statement": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "出版声明"
+          },
+          "acknowledgements": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "致谢"
+          },
+          "author_contributions": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "作者贡献"
+          },
+          "clinical_trial_number": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "临床实验编号（医学）"
           },
           "conflict_of_interest_statement": {
             "anyOf": [

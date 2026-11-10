@@ -44,7 +44,9 @@ const ownerAuthorId = ref('')
 const createAuthors = ref<ManuscriptAuthor[]>([])
 const metadata = reactive({
   title: '', abstract: '', keywords: '', article_type: '', subject_field: '', language: 'en',
-  funding_statement: '', conflict_of_interest_statement: '', ethics_statement: '',
+  funding_statement: '', funding_number: '', funding_name: '', publication_statement: '',
+  acknowledgements: '', author_contributions: '', clinical_trial_number: '',
+  conflict_of_interest_statement: '', ethics_statement: '',
   data_availability_statement: '', notes: '',
 })
 
@@ -135,6 +137,12 @@ async function saveCreate(authorship: ManuscriptAuthorsUpdate): Promise<void> {
       subject_field: nullable(metadata.subject_field),
       language: metadata.language.trim(),
       funding_statement: nullable(metadata.funding_statement),
+      funding_number: nullable(metadata.funding_number),
+      funding_name: nullable(metadata.funding_name),
+      publication_statement: nullable(metadata.publication_statement),
+      acknowledgements: nullable(metadata.acknowledgements),
+      author_contributions: nullable(metadata.author_contributions),
+      clinical_trial_number: nullable(metadata.clinical_trial_number),
       conflict_of_interest_statement: nullable(metadata.conflict_of_interest_statement),
       ethics_statement: nullable(metadata.ethics_statement),
       data_availability_statement: nullable(metadata.data_availability_statement),
@@ -146,7 +154,9 @@ async function saveCreate(authorship: ManuscriptAuthorsUpdate): Promise<void> {
     createAuthors.value = []
     Object.assign(metadata, {
       title: '', abstract: '', keywords: '', article_type: '', subject_field: '', language: 'en',
-      funding_statement: '', conflict_of_interest_statement: '', ethics_statement: '',
+      funding_statement: '', funding_number: '', funding_name: '', publication_statement: '',
+      acknowledgements: '', author_contributions: '', clinical_trial_number: '',
+      conflict_of_interest_statement: '', ethics_statement: '',
       data_availability_statement: '', notes: '',
     })
     await load()
@@ -207,12 +217,18 @@ onMounted(() => void load())
         <div class="form-grid">
           <label>标题<input v-model="metadata.title" data-test="title" maxlength="1000" required></label>
           <label>文章类型<input v-model="metadata.article_type" data-test="article-type" maxlength="100" required></label>
-          <label>语言<input v-model="metadata.language" data-test="language" maxlength="32" required></label>
+          <label>语言<select v-model="metadata.language" data-test="language" required><option value="en">英语</option><option value="zh">中文</option></select></label>
           <label>学科领域<input v-model="metadata.subject_field" maxlength="255"></label>
           <label>关键词（以逗号分隔）<input v-model="metadata.keywords" data-test="keywords"></label>
+          <label>基金编号<input v-model="metadata.funding_number" data-test="funding-number" maxlength="255"></label>
+          <label>基金名称<input v-model="metadata.funding_name" data-test="funding-name" maxlength="255"></label>
+          <label>临床实验编号（医学）<input v-model="metadata.clinical_trial_number" data-test="clinical-trial-number" maxlength="255"></label>
         </div>
         <label>摘要<textarea v-model="metadata.abstract" data-test="abstract" rows="6" required></textarea></label>
         <label>基金声明<textarea v-model="metadata.funding_statement" rows="3"></textarea></label>
+        <label>出版声明<textarea v-model="metadata.publication_statement" data-test="publication-statement" rows="3"></textarea></label>
+        <label>致谢<textarea v-model="metadata.acknowledgements" data-test="acknowledgements" rows="3"></textarea></label>
+        <label>作者贡献<textarea v-model="metadata.author_contributions" data-test="author-contributions" rows="3"></textarea></label>
         <label>利益冲突声明<textarea v-model="metadata.conflict_of_interest_statement" rows="3"></textarea></label>
         <label>伦理声明<textarea v-model="metadata.ethics_statement" rows="3"></textarea></label>
         <label>数据可用性声明<textarea v-model="metadata.data_availability_statement" rows="3"></textarea></label>

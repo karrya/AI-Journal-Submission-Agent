@@ -50,6 +50,12 @@ class Manuscript(UUIDPrimaryKeyMixin, CreatedUpdatedByMixin, SoftDeleteMixin, Ba
     subject_field: Mapped[str | None] = mapped_column(VARCHAR(255), nullable=True)
     language: Mapped[str] = mapped_column(VARCHAR(32), nullable=False)
     funding_statement: Mapped[str | None] = mapped_column(TEXT, nullable=True)
+    funding_number: Mapped[str | None] = mapped_column(VARCHAR(255), nullable=True)
+    funding_name: Mapped[str | None] = mapped_column(VARCHAR(255), nullable=True)
+    publication_statement: Mapped[str | None] = mapped_column(TEXT, nullable=True)
+    acknowledgements: Mapped[str | None] = mapped_column(TEXT, nullable=True)
+    author_contributions: Mapped[str | None] = mapped_column(TEXT, nullable=True)
+    clinical_trial_number: Mapped[str | None] = mapped_column(VARCHAR(255), nullable=True)
     conflict_of_interest_statement: Mapped[str | None] = mapped_column(
         TEXT, nullable=True
     )

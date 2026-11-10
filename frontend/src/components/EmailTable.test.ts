@@ -52,6 +52,23 @@ describe('EmailTable', () => {
     })
   })
 
+  it('supports institutional purpose when editing an email', async () => {
+    const wrapper = mount(EmailTable, { props: { emails: [email], canManage: true } })
+    await wrapper.get('[data-test="edit-email-e1"]').trigger('click')
+    const purposeSelect = wrapper.get('[data-test="edit-email-form"] select')
+    const institutionalOption = purposeSelect.find('option[value="institutional"]')
+    expect(institutionalOption.exists()).toBe(true)
+    expect(institutionalOption.text()).toBe('机构邮箱')
+
+    await purposeSelect.setValue('institutional')
+    await wrapper.get('[data-test="edit-email-confirm"]').setValue(true)
+    await wrapper.get('[data-test="edit-email-form"]').trigger('submit')
+    expect(wrapper.emitted('update')?.[0]?.[0]).toMatchObject({
+      emailId: 'e1',
+      payload: { purpose: 'institutional', confirm_email_binding: true },
+    })
+  })
+
   it('uses a separate explicit confirmation before unbinding', async () => {
     const wrapper = mount(EmailTable, { props: { emails: [email], canManage: true } })
     await wrapper.get('[data-test="delete-email-e1"]').trigger('click')

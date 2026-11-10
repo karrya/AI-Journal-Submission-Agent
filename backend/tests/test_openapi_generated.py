@@ -66,6 +66,34 @@ def test_failed_audit_error_fields_are_in_the_openapi_schema():
     }
 
 
+def test_institutional_email_purpose_is_in_openapi_contract():
+    schemas = app.openapi()["components"]["schemas"]
+    for schema_name in ("EmailCreate", "EmailUpdate", "EmailResponse"):
+        purpose = schemas[schema_name]["properties"]["purpose"]
+        if "anyOf" in purpose:
+            purpose = purpose["anyOf"][0]
+        assert "institutional" in purpose["enum"]
+
+
+def test_extended_manuscript_metadata_is_in_openapi_contract():
+    schemas = app.openapi()["components"]["schemas"]
+    expected_fields = {
+        "funding_number",
+        "funding_name",
+        "publication_statement",
+        "acknowledgements",
+        "author_contributions",
+        "clinical_trial_number",
+    }
+    for schema_name in (
+        "ManuscriptCreate",
+        "ManuscriptUpdate",
+        "ManuscriptResponse",
+        "ManuscriptSnapshot",
+    ):
+        assert expected_fields <= set(schemas[schema_name]["properties"])
+
+
 def test_file_upload_multipart_field_matches_approved_contract():
     document = app.openapi()
     operation = document["paths"][

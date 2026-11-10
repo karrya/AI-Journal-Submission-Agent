@@ -62,6 +62,14 @@ describe('ManuscriptListView', () => {
   })
 
   it('creates a manuscript with selected owner, metadata, and minimal confirmed authorship', async () => {
+    const extendedMetadata = {
+      funding_number: 'FUND-2026-001',
+      funding_name: 'National Research Foundation',
+      publication_statement: 'Publication statement',
+      acknowledgements: 'Acknowledgements',
+      author_contributions: 'Author contributions',
+      clinical_trial_number: 'NCT20260001',
+    }
     adapter.mockImplementation(async (config) => {
       if (config.url === '/authors') return success(config, { ...emptyPage, items: [owner], total: 1 })
       if (config.method === 'post') return success(config, manuscript, 201)
@@ -76,7 +84,16 @@ describe('ManuscriptListView', () => {
     await wrapper.get('[data-test="abstract"]').setValue('A complete abstract')
     await wrapper.get('[data-test="keywords"]').setValue('ai, methods')
     await wrapper.get('[data-test="article-type"]').setValue('research')
-    await wrapper.get('[data-test="language"]').setValue('en')
+    const languageSelect = wrapper.get('[data-test="language"]')
+    expect(languageSelect.element.tagName).toBe('SELECT')
+    expect(languageSelect.findAll('option').map((option) => [option.attributes('value'), option.text()])).toEqual([
+      ['en', '英语'],
+      ['zh', '中文'],
+    ])
+    await languageSelect.setValue('zh')
+    for (const [field, value] of Object.entries(extendedMetadata)) {
+      await wrapper.get(`[data-test="${field.replace(/_/g, '-')}"]`).setValue(value)
+    }
     await wrapper.get('[data-test="authorship-confirm"]').setValue(true)
     await wrapper.get('[data-test="create-authorship-form"]').trigger('submit')
     await flushPromises()
@@ -86,7 +103,8 @@ describe('ManuscriptListView', () => {
     const payload = JSON.parse(String(createCall?.[0].data))
     expect(payload).toMatchObject({
       owner_author_id: 'a1', title: 'New manuscript', abstract: 'A complete abstract',
-      keywords: ['ai', 'methods'], article_type: 'research', language: 'en',
+      keywords: ['ai', 'methods'], article_type: 'research', language: 'zh',
+      ...extendedMetadata,
     })
     expect(payload.authors).toEqual([{ author_id: 'a1', position: 1, is_corresponding: true }])
     expect(JSON.stringify(payload)).not.toContain('display_name')

@@ -2,11 +2,13 @@
 import { computed, reactive, ref, watch } from 'vue'
 import {
   createAuthorization,
+  getAuthorizationOptions,
   listAuthorizations,
   revokeAuthorization,
   updateAuthorization,
   PERMISSION_CODES,
   type AuthorizationListQuery,
+  type AuthorizationOptions,
   type AuthorizationResponse,
   type PermissionCode,
   type SortOrder,
@@ -46,6 +48,23 @@ const form = reactive({
   notes: '',
 })
 const revokingId = ref<string | null>(null)
+const authorOptions = ref<AuthorizationOptions['authors']>([])
+const userOptions = ref<AuthorizationOptions['users']>([])
+const optionsLoading = ref(false)
+const optionsLoaded = ref(false)
+const authorOptionMissing = computed(() => Boolean(
+  editingId.value
+  && optionsLoaded.value
+  && form.author_id
+  && !authorOptions.value.some((author) => author.id === form.author_id),
+))
+const userOptionMissing = computed(() => Boolean(
+  editingId.value
+  && optionsLoaded.value
+  && form.user_id
+  && !userOptions.value.some((user) => user.id === form.user_id),
+))
+let optionsSequence = 0
 const revokeReason = ref('')
 const revokeConfirmed = ref(false)
 let loadSequence = 0
@@ -95,6 +114,25 @@ function toInputDate(value: string): string {
   return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16)
 }
 
+async function loadOptions(): Promise<void> {
+  if (!isAdmin.value || optionsLoaded.value || optionsLoading.value) return
+  const sequence = ++optionsSequence
+  optionsLoading.value = true
+  try {
+    const options = await getAuthorizationOptions()
+    if (sequence !== optionsSequence) return
+    authorOptions.value = options.authors
+    userOptions.value = options.users
+    optionsLoaded.value = true
+  } catch (error) {
+    if (sequence === optionsSequence) {
+      errorMessage.value = safeError(error, '无法加载授权选项。')
+    }
+  } finally {
+    if (sequence === optionsSequence) optionsLoading.value = false
+  }
+}
+
 function openForm(authorization?: AuthorizationResponse): void {
   editingId.value = authorization?.id ?? null
   Object.assign(form, {
@@ -109,6 +147,7 @@ function openForm(authorization?: AuthorizationResponse): void {
   showForm.value = true
   revokingId.value = null
   errorMessage.value = ''
+  void loadOptions()
 }
 
 function nullable(value: string): string | null {
@@ -126,7 +165,7 @@ async function save(): Promise<void> {
   if (saving.value) return
   errorMessage.value = ''
   if (!form.author_id.trim() || !form.user_id.trim()) {
-    errorMessage.value = '请填写作者 ID 和用户 ID。'
+    errorMessage.value = '请选择作者和用户。'
     return
   }
   if (form.permissions.length === 0) {
@@ -231,8 +270,20 @@ watch(() => props.authorId, () => {
     <form v-if="showForm" data-test="authorization-form" class="stacked-form" novalidate @submit.prevent="save">
       <h2>{{ editingId ? '编辑授权' : '添加授权' }}</h2>
       <div class="form-grid">
-        <label>作者 ID<input v-model="form.author_id" :disabled="Boolean(editingId)" required></label>
-        <label>用户 ID<input v-model="form.user_id" data-test="authorization-user-id" :disabled="Boolean(editingId)" required></label>
+        <label>作者
+          <select v-model="form.author_id" data-test="authorization-author-id" :disabled="Boolean(editingId) || optionsLoading" required>
+            <option value="" disabled>请选择作者</option>
+            <option v-for="author in authorOptions" :key="author.id" :value="author.id">{{ author.display_name }}</option>
+            <option v-if="authorOptionMissing" :value="form.author_id">当前作者（已失效）</option>
+          </select>
+        </label>
+        <label>用户
+          <select v-model="form.user_id" data-test="authorization-user-id" :disabled="Boolean(editingId) || optionsLoading" required>
+            <option value="" disabled>请选择用户</option>
+            <option v-for="user in userOptions" :key="user.id" :value="user.id">{{ user.display_name }}（@{{ user.username }}）</option>
+            <option v-if="userOptionMissing" :value="form.user_id">当前用户（已失效）</option>
+          </select>
+        </label>
         <label>开始时间<input v-model="form.valid_from" data-test="valid-from" type="datetime-local" required></label>
         <label>结束时间<input v-model="form.valid_to" data-test="valid-to" type="datetime-local" required></label>
       </div>
@@ -242,7 +293,7 @@ watch(() => props.authorId, () => {
       </fieldset>
       <label>授权依据<input v-model="form.evidence_ref" maxlength="1024"></label>
       <label>备注<textarea v-model="form.notes" rows="3"></textarea></label>
-      <button class="action-button action-button--permission" type="submit" :disabled="saving">保存授权</button>
+      <button class="action-button action-button--permission" type="submit" :disabled="saving || optionsLoading || !optionsLoaded">保存授权</button>
       <button class="action-button action-button--neutral" type="button" @click="showForm = false">取消</button>
     </form>
 

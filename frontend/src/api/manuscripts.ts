@@ -39,6 +39,12 @@ export interface ManuscriptMetadata {
   subject_field?: string | null
   language: string
   funding_statement?: string | null
+  funding_number?: string | null
+  funding_name?: string | null
+  publication_statement?: string | null
+  acknowledgements?: string | null
+  author_contributions?: string | null
+  clinical_trial_number?: string | null
   conflict_of_interest_statement?: string | null
   ethics_statement?: string | null
   data_availability_statement?: string | null

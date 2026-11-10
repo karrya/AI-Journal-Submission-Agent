@@ -24,6 +24,7 @@ import {
   FILE_INTEGRITY_LABELS,
   FILE_SCAN_LABELS,
   FILE_TYPE_LABELS,
+  MANUSCRIPT_LANGUAGE_LABELS,
   MANUSCRIPT_STATUS_LABELS,
 } from '../../utils/display'
 
@@ -55,7 +56,9 @@ let loadSequence = 0
 
 const metadata = reactive({
   title: '', abstract: '', keywords: '', article_type: '', subject_field: '', language: '',
-  funding_statement: '', conflict_of_interest_statement: '', ethics_statement: '',
+  funding_statement: '', funding_number: '', funding_name: '', publication_statement: '',
+  acknowledgements: '', author_contributions: '', clinical_trial_number: '',
+  conflict_of_interest_statement: '', ethics_statement: '',
   data_availability_statement: '', notes: '',
 })
 
@@ -77,6 +80,12 @@ function syncMetadata(value: Manuscript): void {
     subject_field: value.subject_field ?? '',
     language: value.language,
     funding_statement: value.funding_statement ?? '',
+    funding_number: value.funding_number ?? '',
+    funding_name: value.funding_name ?? '',
+    publication_statement: value.publication_statement ?? '',
+    acknowledgements: value.acknowledgements ?? '',
+    author_contributions: value.author_contributions ?? '',
+    clinical_trial_number: value.clinical_trial_number ?? '',
     conflict_of_interest_statement: value.conflict_of_interest_statement ?? '',
     ethics_statement: value.ethics_statement ?? '',
     data_availability_statement: value.data_availability_statement ?? '',
@@ -106,7 +115,9 @@ function clearWorkspace(): void {
   authorOptions.value = []
   Object.assign(metadata, {
     title: '', abstract: '', keywords: '', article_type: '', subject_field: '', language: '',
-    funding_statement: '', conflict_of_interest_statement: '', ethics_statement: '',
+    funding_statement: '', funding_number: '', funding_name: '', publication_statement: '',
+    acknowledgements: '', author_contributions: '', clinical_trial_number: '',
+    conflict_of_interest_statement: '', ethics_statement: '',
     data_availability_statement: '', notes: '',
   })
   metadataError.value = ''
@@ -196,6 +207,12 @@ async function saveMetadata(): Promise<void> {
       subject_field: nullable(metadata.subject_field),
       language: metadata.language.trim(),
       funding_statement: nullable(metadata.funding_statement),
+      funding_number: nullable(metadata.funding_number),
+      funding_name: nullable(metadata.funding_name),
+      publication_statement: nullable(metadata.publication_statement),
+      acknowledgements: nullable(metadata.acknowledgements),
+      author_contributions: nullable(metadata.author_contributions),
+      clinical_trial_number: nullable(metadata.clinical_trial_number),
       conflict_of_interest_statement: nullable(metadata.conflict_of_interest_statement),
       ethics_statement: nullable(metadata.ethics_statement),
       data_availability_statement: nullable(metadata.data_availability_statement),
@@ -211,6 +228,12 @@ async function saveMetadata(): Promise<void> {
       subject_field: result.subject_field,
       language: result.language,
       funding_statement: result.funding_statement,
+      funding_number: result.funding_number,
+      funding_name: result.funding_name,
+      publication_statement: result.publication_statement,
+      acknowledgements: result.acknowledgements,
+      author_contributions: result.author_contributions,
+      clinical_trial_number: result.clinical_trial_number,
       conflict_of_interest_statement: result.conflict_of_interest_statement,
       ethics_statement: result.ethics_statement,
       data_availability_statement: result.data_availability_statement,
@@ -327,12 +350,18 @@ watch(() => props.manuscriptId, () => {
           <div class="form-grid">
             <label>标题<input v-model="metadata.title" data-test="metadata-title" maxlength="1000" required></label>
             <label>文章类型<input v-model="metadata.article_type" maxlength="100" required></label>
-            <label>语言<input v-model="metadata.language" maxlength="32" required></label>
+            <label>语言<select v-model="metadata.language" data-test="metadata-language" required><option value="en">英语</option><option value="zh">中文</option></select></label>
             <label>学科领域<input v-model="metadata.subject_field" maxlength="255"></label>
             <label>关键词（以逗号分隔）<input v-model="metadata.keywords"></label>
+            <label>基金编号<input v-model="metadata.funding_number" data-test="metadata-funding-number" maxlength="255"></label>
+            <label>基金名称<input v-model="metadata.funding_name" data-test="metadata-funding-name" maxlength="255"></label>
+            <label>临床实验编号（医学）<input v-model="metadata.clinical_trial_number" data-test="metadata-clinical-trial-number" maxlength="255"></label>
           </div>
           <label>摘要<textarea v-model="metadata.abstract" rows="6" required></textarea></label>
           <label>基金声明<textarea v-model="metadata.funding_statement" rows="3"></textarea></label>
+          <label>出版声明<textarea v-model="metadata.publication_statement" data-test="metadata-publication-statement" rows="3"></textarea></label>
+          <label>致谢<textarea v-model="metadata.acknowledgements" data-test="metadata-acknowledgements" rows="3"></textarea></label>
+          <label>作者贡献<textarea v-model="metadata.author_contributions" data-test="metadata-author-contributions" rows="3"></textarea></label>
           <label>利益冲突声明<textarea v-model="metadata.conflict_of_interest_statement" rows="3"></textarea></label>
           <label>伦理声明<textarea v-model="metadata.ethics_statement" rows="3"></textarea></label>
           <label>数据可用性声明<textarea v-model="metadata.data_availability_statement" rows="3"></textarea></label>
@@ -345,7 +374,13 @@ watch(() => props.manuscriptId, () => {
           <div><dt>摘要</dt><dd>{{ manuscript.abstract }}</dd></div>
           <div><dt>关键词</dt><dd>{{ manuscript.keywords.join(', ') || '—' }}</dd></div>
           <div><dt>文章类型</dt><dd>{{ manuscript.article_type }}</dd></div>
-          <div><dt>语言</dt><dd>{{ manuscript.language }}</dd></div>
+          <div><dt>语言</dt><dd>{{ displayText(MANUSCRIPT_LANGUAGE_LABELS, manuscript.language) }}</dd></div>
+          <div><dt>基金编号</dt><dd>{{ manuscript.funding_number ?? '—' }}</dd></div>
+          <div><dt>基金名称</dt><dd>{{ manuscript.funding_name ?? '—' }}</dd></div>
+          <div><dt>出版声明</dt><dd>{{ manuscript.publication_statement ?? '—' }}</dd></div>
+          <div><dt>致谢</dt><dd>{{ manuscript.acknowledgements ?? '—' }}</dd></div>
+          <div><dt>作者贡献</dt><dd>{{ manuscript.author_contributions ?? '—' }}</dd></div>
+          <div><dt>临床实验编号（医学）</dt><dd>{{ manuscript.clinical_trial_number ?? '—' }}</dd></div>
         </dl>
       </section>
 
@@ -393,7 +428,13 @@ watch(() => props.manuscriptId, () => {
             <div><dt>关键词</dt><dd>{{ version.metadata_snapshot.keywords.join(', ') || '—' }}</dd></div>
             <div><dt>文章类型</dt><dd>{{ version.metadata_snapshot.article_type }}</dd></div>
             <div><dt>学科领域</dt><dd>{{ version.metadata_snapshot.subject_field ?? '—' }}</dd></div>
-            <div><dt>语言</dt><dd>{{ version.metadata_snapshot.language }}</dd></div>
+            <div><dt>语言</dt><dd>{{ displayText(MANUSCRIPT_LANGUAGE_LABELS, version.metadata_snapshot.language) }}</dd></div>
+            <div><dt>基金编号</dt><dd>{{ version.metadata_snapshot.funding_number ?? '—' }}</dd></div>
+            <div><dt>基金名称</dt><dd>{{ version.metadata_snapshot.funding_name ?? '—' }}</dd></div>
+            <div><dt>出版声明</dt><dd>{{ version.metadata_snapshot.publication_statement ?? '—' }}</dd></div>
+            <div><dt>致谢</dt><dd>{{ version.metadata_snapshot.acknowledgements ?? '—' }}</dd></div>
+            <div><dt>作者贡献</dt><dd>{{ version.metadata_snapshot.author_contributions ?? '—' }}</dd></div>
+            <div><dt>临床实验编号（医学）</dt><dd>{{ version.metadata_snapshot.clinical_trial_number ?? '—' }}</dd></div>
             <div><dt>基金声明</dt><dd>{{ version.metadata_snapshot.funding_statement ?? '—' }}</dd></div>
             <div><dt>利益冲突</dt><dd>{{ version.metadata_snapshot.conflict_of_interest_statement ?? '—' }}</dd></div>
             <div><dt>伦理声明</dt><dd>{{ version.metadata_snapshot.ethics_statement ?? '—' }}</dd></div>

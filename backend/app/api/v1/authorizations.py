@@ -8,6 +8,7 @@ from app.api.v1.deps import Principal, get_principal, require_csrf
 from app.core.database import get_db
 from app.schemas.authors import (
     AuthorizationCreate,
+    AuthorizationOptionsResponse,
     AuthorizationPage,
     AuthorizationResponse,
     AuthorizationRevokeRequest,
@@ -18,6 +19,15 @@ from app.services.authorizations import AuthorizationService
 
 router = APIRouter(prefix="/api/v1/author-authorizations", tags=["authorizations"])
 Order = Literal["asc", "desc"]
+
+
+@router.get("/options", response_model=AuthorizationOptionsResponse)
+def authorization_options(
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    principal: Annotated[Principal, Depends(get_principal)],
+) -> AuthorizationOptionsResponse:
+    return AuthorizationService(db, principal.user, request.state.request_id).options()
 
 
 @router.get("", response_model=AuthorizationPage)

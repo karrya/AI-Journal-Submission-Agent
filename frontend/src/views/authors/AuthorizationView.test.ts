@@ -23,6 +23,10 @@ const authorization: AuthorizationResponse = {
   updated_at: '2026-11-01T00:00:00Z', validity_status: 'active',
 }
 const emptyPage = { items: [], page: 1, page_size: 20, total: 0 }
+const optionResponse = {
+  authors: [{ id: 'a1', display_name: 'Author One' }],
+  users: [{ id: 'user-1', username: 'operator', display_name: 'Operator One' }],
+}
 
 describe('AuthorizationView', () => {
   let adapter: ReturnType<typeof vi.fn<AxiosAdapter>>
@@ -40,13 +44,21 @@ describe('AuthorizationView', () => {
   }
 
   it('offers exactly the nine permissions and creates a finite authorization', async () => {
-    adapter.mockImplementation(async (config) => success(config,
-      config.method === 'post' ? authorization : emptyPage,
-    ))
+    adapter.mockImplementation(async (config) => {
+      if (config.url === '/author-authorizations/options') return success(config, optionResponse)
+      return success(config, config.method === 'post' ? authorization : emptyPage)
+    })
     const wrapper = mountView()
     await flushPromises()
     expect(wrapper.get('[data-test="add-authorization"]').classes()).toContain('action-button--permission')
     await wrapper.get('[data-test="add-authorization"]').trigger('click')
+    await flushPromises()
+    const authorSelect = wrapper.get('[data-test="authorization-author-id"]')
+    const userSelect = wrapper.get('[data-test="authorization-user-id"]')
+    expect(authorSelect.text()).toContain('Author One')
+    expect(userSelect.text()).toContain('Operator One（@operator）')
+    await authorSelect.setValue('a1')
+    await userSelect.setValue('user-1')
     const options = wrapper.findAll('[data-test="permission-option"]')
     expect(options).toHaveLength(9)
     expect(options.map((option) => option.attributes('value'))).toEqual([...PERMISSION_CODES])
@@ -71,9 +83,10 @@ describe('AuthorizationView', () => {
   })
 
   it('rejects an inverted or nonfinite interval before update', async () => {
-    adapter.mockImplementation(async (config) => success(config, {
-      ...emptyPage, items: [authorization], total: 1,
-    }))
+    adapter.mockImplementation(async (config) => {
+      if (config.url === '/author-authorizations/options') return success(config, optionResponse)
+      return success(config, { ...emptyPage, items: [authorization], total: 1 })
+    })
     const wrapper = mountView()
     await flushPromises()
     await wrapper.get('[data-test="edit-authorization-z1"]').trigger('click')
@@ -102,9 +115,12 @@ describe('AuthorizationView', () => {
   })
 
   it('uses a separate revoke confirmation and never reuses the edit submit', async () => {
-    adapter.mockImplementation(async (config) => success(config,
-      config.method === 'post' ? { ...authorization, validity_status: 'revoked' } : { ...emptyPage, items: [authorization], total: 1 },
-    ))
+    adapter.mockImplementation(async (config) => {
+      if (config.url === '/author-authorizations/options') return success(config, optionResponse)
+      return success(config, config.method === 'post'
+        ? { ...authorization, validity_status: 'revoked' }
+        : { ...emptyPage, items: [authorization], total: 1 })
+    })
     const wrapper = mountView()
     await flushPromises()
     await wrapper.get('[data-test="revoke-authorization-z1"]').trigger('click')
@@ -118,6 +134,39 @@ describe('AuthorizationView', () => {
     const revokeCall = adapter.mock.calls.find(([config]) => config.method === 'post')
     expect(revokeCall?.[0].url).toBe('/author-authorizations/z1/revoke')
     expect(JSON.parse(String(revokeCall?.[0].data))).toEqual({ reason: 'Access ended' })
+  })
+
+  it('keeps inactive subjects visible when editing an existing authorization', async () => {
+    const inactiveAuthorization = {
+      ...authorization,
+      author_id: 'inactive-author',
+      user_id: 'inactive-user',
+    }
+    adapter.mockImplementation(async (config) => {
+      if (config.url === '/author-authorizations/options') return success(config, optionResponse)
+      return success(config, { ...emptyPage, items: [inactiveAuthorization], total: 1 })
+    })
+    const wrapper = mountView()
+    await flushPromises()
+    await wrapper.get('[data-test="edit-authorization-z1"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('option[value="inactive-author"]').text()).toContain('当前作者（已失效）')
+    expect(wrapper.get('option[value="inactive-user"]').text()).toContain('当前用户（已失效）')
+  })
+
+  it('blocks submission when database options cannot be loaded', async () => {
+    adapter.mockImplementation(async (config) => {
+      if (config.url === '/author-authorizations/options') throw new Error('offline')
+      return success(config, emptyPage)
+    })
+    const wrapper = mountView()
+    await flushPromises()
+    await wrapper.get('[data-test="add-authorization"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('无法加载授权选项')
+    expect(wrapper.get('button[type="submit"]').attributes('disabled')).toBeDefined()
   })
 
   it('shows an empty state and uses server pagination', async () => {

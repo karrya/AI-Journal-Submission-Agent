@@ -20,6 +20,7 @@ import {
   displayText,
   PERMISSION_LABELS,
 } from '../../utils/display'
+import { showSaveSuccess } from '../../utils/feedback'
 
 const props = withDefaults(defineProps<{ authorId?: string }>(), { authorId: '' })
 const auth = useAuthStore()
@@ -213,6 +214,7 @@ async function save(): Promise<void> {
     showForm.value = false
     editingId.value = null
     await load()
+    showSaveSuccess()
   } catch (error) {
     errorMessage.value = safeError(error, '无法保存授权。')
   } finally {

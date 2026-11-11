@@ -62,6 +62,7 @@ describe('ManuscriptListView', () => {
   })
 
   it('creates a manuscript with selected owner, metadata, and minimal confirmed authorship', async () => {
+    vi.useFakeTimers()
     const extendedMetadata = {
       funding_number: 'FUND-2026-001',
       funding_name: 'National Research Foundation',
@@ -109,6 +110,15 @@ describe('ManuscriptListView', () => {
     expect(payload.authors).toEqual([{ author_id: 'a1', position: 1, is_corresponding: true }])
     expect(JSON.stringify(payload)).not.toContain('display_name')
     expect(JSON.stringify(payload)).not.toContain('private-owner-orcid')
+
+    const toast = document.body.querySelector<HTMLElement>('.el-message--success')
+    expect(toast?.textContent).toContain('保存成功')
+    expect(toast?.getAttribute('role')).toBe('alert')
+    await vi.advanceTimersByTimeAsync(999)
+    expect(toast?.style.display).not.toBe('none')
+    await vi.advanceTimersByTimeAsync(1)
+    await flushPromises()
+    expect(toast?.style.display).toBe('none')
   })
 
   it('does not show an empty state when manuscript loading fails', async () => {

@@ -16,6 +16,7 @@ import { fetchAllPages } from '../../api/pagination'
 import AuthorshipEditor from '../../components/AuthorshipEditor.vue'
 import { useAuthStore } from '../../stores/auth'
 import { displayText, MANUSCRIPT_STATUS_LABELS } from '../../utils/display'
+import { showSaveSuccess } from '../../utils/feedback'
 
 const auth = useAuthStore()
 const canCreate = computed(() => auth.user?.roles.some(
@@ -160,6 +161,7 @@ async function saveCreate(authorship: ManuscriptAuthorsUpdate): Promise<void> {
       data_availability_statement: '', notes: '',
     })
     await load()
+    showSaveSuccess()
   } catch (error) {
     createError.value = safeError(error, '无法创建稿件。')
   } finally {

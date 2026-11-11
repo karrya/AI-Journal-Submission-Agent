@@ -2,6 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import type { AxiosAdapter, AxiosResponse, InternalAxiosRequestConfig } from 'axios'
 import { createPinia, setActivePinia } from 'pinia'
 import { api } from '../../api/client'
+import { expectSaveSuccessToast } from '../../test/toast'
 import { PERMISSION_CODES, type AuthorizationResponse } from '../../api/authors'
 import { useAuthStore, type User } from '../../stores/auth'
 import AuthorizationView from './AuthorizationView.vue'
@@ -80,6 +81,7 @@ describe('AuthorizationView', () => {
       valid_to: new Date('2099-11-02T00:00').toISOString(),
       evidence_ref: null, notes: null,
     })
+    expectSaveSuccessToast()
   })
 
   it('rejects an inverted or nonfinite interval before update', async () => {
@@ -112,6 +114,7 @@ describe('AuthorizationView', () => {
       valid_from: new Date('2099-11-01T00:00').toISOString(),
       valid_to: new Date('2099-11-04T00:00').toISOString(),
     })
+    expectSaveSuccessToast()
   })
 
   it('uses a separate revoke confirmation and never reuses the edit submit', async () => {

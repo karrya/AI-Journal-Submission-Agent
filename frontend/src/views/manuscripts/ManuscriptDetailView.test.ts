@@ -3,6 +3,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import type { AxiosAdapter, AxiosResponse, InternalAxiosRequestConfig } from 'axios'
 import { createPinia, setActivePinia } from 'pinia'
 import { api } from '../../api/client'
+import { expectSaveSuccessToast } from '../../test/toast'
 import { useAuthStore, type User } from '../../stores/auth'
 import FileFamilyUpload from '../../components/FileFamilyUpload.vue'
 import AuthorshipEditor from '../../components/AuthorshipEditor.vue'
@@ -190,6 +191,7 @@ describe('ManuscriptDetailView', () => {
     expect(JSON.parse(String(patch?.[0].data))).toMatchObject({
       language: 'zh', ...extendedMetadata,
     })
+    expectSaveSuccessToast()
   })
 
   it('updates working metadata without rewriting an immutable snapshot', async () => {
@@ -276,6 +278,7 @@ describe('ManuscriptDetailView', () => {
       authors: [owner, coauthor].map(({ author_id, position, is_corresponding }) => ({ author_id, position, is_corresponding })),
       confirm_authorship_change: true,
     })
+    expectSaveSuccessToast()
   })
 
   it('refreshes both the current version and file families after upload', async () => {

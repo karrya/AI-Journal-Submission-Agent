@@ -27,6 +27,7 @@ import {
   MANUSCRIPT_LANGUAGE_LABELS,
   MANUSCRIPT_STATUS_LABELS,
 } from '../../utils/display'
+import { showSaveSuccess } from '../../utils/feedback'
 
 const props = defineProps<{ manuscriptId: string }>()
 const auth = useAuthStore()
@@ -241,6 +242,7 @@ async function saveMetadata(): Promise<void> {
       updated_at: result.updated_at,
     }
     syncMetadata(result)
+    showSaveSuccess()
   } catch (error) {
     if (isCurrent(sequence)) metadataError.value = safeError(error, '无法更新稿件元数据。')
   } finally {
@@ -260,6 +262,7 @@ async function saveAuthorship(payload: ManuscriptAuthorsUpdate): Promise<void> {
     if (!isCurrent(sequence) || !manuscript.value) return
     manuscript.value = { ...manuscript.value, authors }
     authorshipFormKey.value += 1
+    showSaveSuccess()
   } catch (error) {
     if (isCurrent(sequence)) authorshipError.value = safeError(error, '无法更新作者名单。')
   } finally {

@@ -2,6 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { AxiosError, type AxiosAdapter, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios'
 import { createPinia, setActivePinia } from 'pinia'
 import { api } from '../../api/client'
+import { expectSaveSuccessToast } from '../../test/toast'
 import { useAuthStore, type User } from '../../stores/auth'
 import AuthorDetailView from './AuthorDetailView.vue'
 import EmailTable from '../../components/EmailTable.vue'
@@ -174,6 +175,7 @@ describe('AuthorDetailView', () => {
       confirm_email_binding: true,
     })
     expect(adapter.mock.calls.filter(([config]) => config.url === '/authors/a1/emails' && config.method === 'get')).toHaveLength(2)
+    expectSaveSuccessToast()
   })
 
   it('loads summary institutions on demand and creates a confirmed affiliation', async () => {
@@ -213,6 +215,7 @@ describe('AuthorDetailView', () => {
     expect(payload).toMatchObject({ institution_id: 'i1', display_order: 0 })
     expect(payload).not.toHaveProperty('confirm_affiliation_change')
     expect(payload).not.toHaveProperty('address_line1')
+    expectSaveSuccessToast()
   })
 
   it('updates the author identity only through the confirmed edit form', async () => {
@@ -241,6 +244,7 @@ describe('AuthorDetailView', () => {
     expect(payload).toMatchObject({ display_name: 'Confirmed Name', confirm_identity_change: true })
     expect(payload).not.toHaveProperty('id')
     expect(wrapper.text()).toContain('Confirmed Name')
+    expectSaveSuccessToast()
   })
 
   it('updates and unbinds emails with their explicit confirmations', async () => {
@@ -261,6 +265,7 @@ describe('AuthorDetailView', () => {
     await wrapper.get('[data-test="edit-email-confirm"]').setValue(true)
     await wrapper.get('[data-test="edit-email-form"]').trigger('submit')
     await flushPromises()
+    expectSaveSuccessToast()
     await wrapper.get('[data-test="delete-email-e1"]').trigger('click')
     await wrapper.get('[data-test="delete-email-confirm"]').setValue(true)
     await wrapper.get('[data-test="confirm-delete-e1"]').trigger('click')
@@ -298,6 +303,7 @@ describe('AuthorDetailView', () => {
     await wrapper.get('[data-test="affiliation-confirm"]').setValue(true)
     await wrapper.get('form[data-test="affiliation-form"]').trigger('submit')
     await flushPromises()
+    expectSaveSuccessToast()
     await wrapper.get('[data-test="delete-affiliation-l1"]').trigger('click')
     await wrapper.get('[data-test="affiliation-delete-confirm"]').setValue(true)
     await wrapper.get('[data-test="confirm-delete-affiliation-l1"]').trigger('click')

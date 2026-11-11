@@ -1,3 +1,5 @@
+import { ElMessage } from 'element-plus'
+
 type JsdomGlobal = typeof globalThis & {
   jsdom?: {
     window: Window & typeof globalThis
@@ -14,3 +16,9 @@ if (dom) {
     })
   }
 }
+
+afterEach(() => {
+  vi.useRealTimers()
+  ElMessage.closeAll()
+  document.querySelectorAll('.el-message').forEach((element) => element.remove())
+})

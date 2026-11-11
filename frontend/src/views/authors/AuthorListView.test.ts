@@ -2,6 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import type { AxiosAdapter, AxiosResponse, InternalAxiosRequestConfig } from 'axios'
 import { createPinia, setActivePinia } from 'pinia'
 import { api } from '../../api/client'
+import { expectSaveSuccessToast } from '../../test/toast'
 import { useAuthStore, type User } from '../../stores/auth'
 import AuthorListView from './AuthorListView.vue'
 
@@ -77,6 +78,7 @@ describe('AuthorListView', () => {
     expect(JSON.parse(String(createCall?.[0].data))).toMatchObject({
       display_name: 'New Author', confirm_identity_change: true,
     })
+    expectSaveSuccessToast()
   })
 
   it('requires separate confirmation before soft-deleting an author', async () => {
@@ -139,6 +141,7 @@ describe('AuthorListView', () => {
     const updateCall = adapter.mock.calls.find(([config]) => config.method === 'patch')
     expect(updateCall?.[0].url).toBe('/institutions/i1')
     expect(JSON.parse(String(updateCall?.[0].data))).toMatchObject({ name: 'Updated Institution' })
+    expectSaveSuccessToast()
 
     await wrapper.get('[data-test="delete-institution-i1"]').trigger('click')
     await wrapper.get('[data-test="institution-delete-confirm"]').setValue(true)

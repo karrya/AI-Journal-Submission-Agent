@@ -26,6 +26,7 @@ import AuthorForm from '../../components/AuthorForm.vue'
 import { useAuthStore } from '../../stores/auth'
 import { safeResourceUrl } from '../../utils/url'
 import { AUTHOR_STATUS_LABELS, displayText } from '../../utils/display'
+import { showSaveSuccess } from '../../utils/feedback'
 
 const auth = useAuthStore()
 const isAdmin = computed(() => auth.user?.roles.includes('system_admin') ?? false)
@@ -147,6 +148,7 @@ async function saveAuthor(payload: AuthorCreate | AuthorUpdate): Promise<void> {
     await createAuthor(payload as AuthorCreate)
     showAuthorForm.value = false
     await loadAuthors()
+    showSaveSuccess()
   } catch (error) {
     authorError.value = safeError(error, '无法创建作者。')
   } finally {
@@ -285,6 +287,7 @@ async function saveInstitution(): Promise<void> {
     showInstitutionForm.value = false
     editingInstitutionId.value = null
     await loadInstitutions()
+    showSaveSuccess()
   } catch (error) {
     institutionError.value = safeError(error, '无法保存单位。')
   } finally {

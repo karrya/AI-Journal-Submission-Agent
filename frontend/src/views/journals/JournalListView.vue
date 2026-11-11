@@ -31,6 +31,7 @@ import {
   PLATFORM_STATUS_LABELS,
   RESOURCE_KIND_LABELS,
 } from '../../utils/display'
+import { showSaveSuccess } from '../../utils/feedback'
 
 const auth = useAuthStore()
 const isAdmin = computed(() => auth.user?.roles.includes('system_admin') ?? false)
@@ -153,6 +154,7 @@ async function savePublisher(): Promise<void> {
     showPublisherForm.value = false
     editingPublisherId.value = null
     await loadPublishers()
+    showSaveSuccess()
   } catch (error) {
     errorMessage.value = safeError(error, '无法保存出版商。')
   } finally {
@@ -217,6 +219,7 @@ async function savePlatform(): Promise<void> {
     showPlatformForm.value = false
     editingPlatformId.value = null
     await loadPlatforms()
+    showSaveSuccess()
   } catch (error) {
     errorMessage.value = safeError(error, '无法保存平台。')
   } finally {
@@ -399,6 +402,7 @@ async function saveJournal(): Promise<void> {
     showJournalForm.value = false
     editingJournalId.value = null
     await loadJournals()
+    showSaveSuccess()
   } catch (error) {
     errorMessage.value = safeError(error, '无法保存期刊。')
   } finally {

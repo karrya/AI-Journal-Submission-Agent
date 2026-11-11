@@ -2,6 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import type { AxiosAdapter, AxiosResponse, InternalAxiosRequestConfig } from 'axios'
 import { createPinia, setActivePinia } from 'pinia'
 import { api } from '../../api/client'
+import { expectSaveSuccessToast } from '../../test/toast'
 import { useAuthStore, type User } from '../../stores/auth'
 import JournalListView from './JournalListView.vue'
 
@@ -126,6 +127,7 @@ describe('JournalListView', () => {
     const updateCall = adapter.mock.calls.find(([config]) => config.method === 'patch')
     expect(updateCall?.[0].url).toBe('/publishers/p1')
     expect(JSON.parse(String(updateCall?.[0].data))).toMatchObject({ name: 'Updated Publisher' })
+    expectSaveSuccessToast()
   })
 
   it('creates and updates journal platforms', async () => {
@@ -152,6 +154,7 @@ describe('JournalListView', () => {
     const updateCall = adapter.mock.calls.find(([config]) => config.method === 'patch')
     expect(updateCall?.[0].url).toBe('/journal-platforms/s1')
     expect(JSON.parse(String(updateCall?.[0].data))).toMatchObject({ name: 'Updated Platform' })
+    expectSaveSuccessToast()
   })
 
   it('shows Chinese journal status options and submits the selected English value', async () => {
@@ -185,6 +188,7 @@ describe('JournalListView', () => {
     await flushPromises()
     const createCall = adapter.mock.calls.find(([config]) => config.method === 'post')
     expect(JSON.parse(String(createCall?.[0].data))).toMatchObject({ status: 'needs_review' })
+    expectSaveSuccessToast()
   })
 
   it('requires every journal requirement field and an HTTPS source', async () => {

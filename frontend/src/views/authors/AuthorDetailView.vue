@@ -33,6 +33,7 @@ import AuthorForm from '../../components/AuthorForm.vue'
 import { getSafeRequestId } from '../../api/client'
 import { useAuthStore } from '../../stores/auth'
 import { AUTHOR_STATUS_LABELS, displayText } from '../../utils/display'
+import { showSaveSuccess } from '../../utils/feedback'
 
 const props = defineProps<{
   authorId: string
@@ -147,6 +148,7 @@ async function saveAuthor(payload: AuthorCreate | AuthorUpdate): Promise<void> {
     if (!isCurrent(sequence, authorId) || !canManage.value) return
     author.value = result
     showAuthorForm.value = false
+    showSaveSuccess()
   } catch (error) {
     if (isCurrent(sequence, authorId)) {
       authorMutationError.value = safeError(error, '无法更新作者。')
@@ -181,7 +183,10 @@ async function createEmailBinding(payload: EmailCreate): Promise<void> {
     await createEmail(authorId, payload)
     if (!isCurrent(sequence, authorId) || !canManage.value) return
     await refreshEmails(sequence, authorId)
-    if (isCurrent(sequence, authorId)) emailTableKey.value += 1
+    if (isCurrent(sequence, authorId)) {
+      emailTableKey.value += 1
+      showSaveSuccess()
+    }
   } catch (error) {
     if (isCurrent(sequence, authorId)) {
       emailMessage.value = safeError(error, '无法创建邮箱绑定。')
@@ -201,7 +206,10 @@ async function updateEmailBinding(change: { emailId: string; payload: EmailUpdat
     await updateEmail(authorId, change.emailId, change.payload)
     if (!isCurrent(sequence, authorId) || !canManage.value) return
     await refreshEmails(sequence, authorId)
-    if (isCurrent(sequence, authorId)) emailTableKey.value += 1
+    if (isCurrent(sequence, authorId)) {
+      emailTableKey.value += 1
+      showSaveSuccess()
+    }
   } catch (error) {
     if (isCurrent(sequence, authorId)) {
       emailMessage.value = safeError(error, '无法更新邮箱绑定。')
@@ -307,6 +315,7 @@ async function saveAffiliation(
     if (!isCurrent(sequence, authorId)) return
     showAffiliationForm.value = false
     editingLink.value = null
+    showSaveSuccess()
   } catch (error) {
     if (isCurrent(sequence, authorId)) {
       affiliationError.value = safeError(error, '无法保存单位关联。')

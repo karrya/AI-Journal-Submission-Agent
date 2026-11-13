@@ -13,13 +13,15 @@ const loggingOut = ref(false)
 const canReadAudit = computed(() => auth.user?.roles.some(
   (role) => role === 'system_admin' || role === 'auditor',
 ) ?? false)
-const navigation = [
+const isAdmin = computed(() => auth.user?.roles.includes('system_admin') ?? false)
+const navigation = computed(() => [
   { to: '/dashboard', label: '工作台', icon: 'dashboard' },
   { to: '/manuscripts', label: '稿件管理', icon: 'manuscripts' },
   { to: '/authors', label: '作者与单位', icon: 'authors' },
   { to: '/authorizations', label: '作者授权', icon: 'authorizations' },
   { to: '/journals', label: '期刊管理', icon: 'journals' },
-]
+  ...(isAdmin.value ? [{ to: '/users', label: '用户管理', icon: 'users' }] : []),
+])
 
 async function logout(): Promise<void> {
   if (loggingOut.value) return

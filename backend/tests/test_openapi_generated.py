@@ -107,3 +107,14 @@ def test_file_upload_multipart_field_matches_approved_contract():
     assert schema["properties"]["file"]["format"] == "binary"
     assert "upload" not in schema["properties"]
     assert set(schema["required"]) == {"file"}
+
+
+def test_user_management_contract_hides_password_storage():
+    document = app.openapi()
+    paths = document["paths"]
+    assert "/api/v1/users" in paths
+    assert "/api/v1/users/{user_id}/reset-password" in paths
+    properties = document["components"]["schemas"]["ManagedUserResponse"]["properties"]
+    assert "password_hash" not in properties
+    assert "password" not in properties
+    assert "last_login_at" in properties

@@ -19,6 +19,7 @@ from app.api.v1 import (
     journals,
     manuscripts,
     readiness,
+    users,
 )
 from app.api.v1.deps import first_password_gate, get_request_id
 from app.core.config import get_settings
@@ -35,6 +36,11 @@ _OPENAPI_SUMMARIES = {
     "me": "获取当前用户",
     "get_csrf": "获取 CSRF（跨站请求伪造）防护令牌",
     "change_password": "修改密码",
+    "list_users": "获取用户列表",
+    "create_user": "创建用户",
+    "get_user": "获取用户详情",
+    "update_user": "更新用户",
+    "reset_user_password": "重置用户密码",
     "list_authors": "获取作者列表",
     "create_author": "创建作者",
     "get_author": "获取作者详情",
@@ -94,6 +100,7 @@ _OPENAPI_SUMMARIES = {
 }
 _OPENAPI_TAGS = (
     {"name": "authentication", "description": "用户身份认证、会话和密码管理。"},
+    {"name": "users", "description": "系统管理员用户、角色和密码管理。"},
     {"name": "authors", "description": "作者资料、邮箱和机构关联管理。"},
     {"name": "manuscripts", "description": "稿件元数据、署名作者和版本管理。"},
     {"name": "files", "description": "稿件文件上传、下载和完整性管理。"},
@@ -210,6 +217,7 @@ _OPENAPI_FIELD_TITLES = {
     "page": "页码",
     "page_size": "每页数量",
     "password": "密码",
+    "password_confirmation": "确认密码",
     "permission": "权限",
     "permissions": "权限列表",
     "phone_country_code": "电话国家代码",
@@ -323,12 +331,17 @@ _OPENAPI_COMPONENT_TITLES = {
     "Page_JournalResponse_": "期刊分页响应",
     "Page_ManuscriptResponse_": "稿件分页响应",
     "Page_ManuscriptVersionResponse_": "稿件版本分页响应",
+    "Page_ManagedUserResponse_": "用户分页响应",
     "Page_PublisherResponse_": "出版商分页响应",
     "PublisherCreate": "出版商创建请求",
     "PublisherResponse": "出版商响应",
     "PublisherUpdate": "出版商更新请求",
     "RecentOperation": "近期操作",
     "UserResponse": "用户响应",
+    "UserCreate": "用户创建请求",
+    "UserUpdate": "用户更新请求",
+    "UserPasswordReset": "用户密码重置请求",
+    "ManagedUserResponse": "用户管理响应",
     "ValidationError": "校验错误详情",
 }
 _OPENAPI_RESPONSE_DESCRIPTIONS = {
@@ -417,6 +430,7 @@ app.include_router(authorizations.router)
 app.include_router(journals.router)
 app.include_router(dashboard.router)
 app.include_router(audit.router)
+app.include_router(users.router)
 
 
 def _contains_chinese(value: str) -> bool:

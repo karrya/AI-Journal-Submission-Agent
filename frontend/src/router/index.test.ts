@@ -111,4 +111,16 @@ describe('protected router', () => {
     await router.push('/audit')
     expect(router.currentRoute.value.name).toBe('dashboard')
   })
+
+  it('allows only system administrators to open user management', async () => {
+    const router = createAppRouter(createMemoryHistory())
+    const auth = useAuthStore()
+    auth.setSession({ ...activeUser, roles: ['submission_operator'] }, 'csrf')
+    await router.push('/users')
+    expect(router.currentRoute.value.name).toBe('dashboard')
+
+    auth.setSession({ ...activeUser, roles: ['system_admin'] }, 'csrf')
+    await router.push('/users')
+    expect(router.currentRoute.value.name).toBe('user-list')
+  })
 })

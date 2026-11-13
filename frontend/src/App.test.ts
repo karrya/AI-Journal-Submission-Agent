@@ -42,4 +42,14 @@ describe('App navigation', () => {
 
     expect(wrapper.text()).toContain('审计日志')
   })
+
+  it('shows user management only to system administrators', () => {
+    useAuthStore().setSession({ ...user, roles: ['system_admin'] }, 'csrf')
+    const adminWrapper = mount(App, { global })
+    expect(adminWrapper.text()).toContain('用户管理')
+
+    useAuthStore().setSession({ ...user, roles: ['submission_operator'] }, 'csrf')
+    const operatorWrapper = mount(App, { global })
+    expect(operatorWrapper.text()).not.toContain('用户管理')
+  })
 })

@@ -159,7 +159,9 @@ class AuthService:
             raise AppError(429, "TOO_MANY_ATTEMPTS", "登录尝试过多，请稍后重试")
 
         user = self.db.scalar(
-            select(User).where(User.normalized_username == normalized)
+            select(User)
+            .where(User.normalized_username == normalized)
+            .with_for_update()
         )
         password_hash = user.password_hash if user else _timing_dummy_hash()
         password_valid = verify_password(password_hash, password)
@@ -222,6 +224,12 @@ class AuthService:
         new_password: str,
         request_id: str,
     ) -> None:
+        locked_user = self.db.scalar(
+            select(User).where(User.id == user.id).with_for_update()
+        )
+        if locked_user is None or locked_user.deleted_at is not None:
+            raise AppError(401, "UNAUTHORIZED", "当前用户不可用")
+        user = locked_user
         if not verify_password(user.password_hash, current_password):
             self._audit(
                 action="auth.change_password",

@@ -13,6 +13,10 @@ defineProps<{ name: string }>()
     <template v-else-if="name === 'authors'">
       <circle cx="9" cy="8" r="3" /><path d="M3.5 20v-2.5A4.5 4.5 0 0 1 8 13h2a4.5 4.5 0 0 1 4.5 4.5V20M16 5.5a3 3 0 0 1 0 5.8M17 14a4.5 4.5 0 0 1 3.5 4.4V20" />
     </template>
+    <template v-else-if="name === 'users'">
+      <circle cx="8" cy="8" r="3" />
+      <path d="M2.5 20v-2.5A4.5 4.5 0 0 1 7 13h2a4.5 4.5 0 0 1 4.5 4.5V20M16 5.5a3 3 0 0 1 0 5.8M17 14a4.5 4.5 0 0 1 3.5 4.4V20" />
+    </template>
     <template v-else-if="name === 'authorizations'">
       <path d="M12 3 4.5 6v5.5c0 4.6 3.2 7.8 7.5 9.5 4.3-1.7 7.5-4.9 7.5-9.5V6z" /><path d="m8.5 12 2.2 2.2 4.8-5" />
     </template>

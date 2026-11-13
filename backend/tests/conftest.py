@@ -56,6 +56,8 @@ def clear_test_data(connection: Connection) -> None:
     table_names = set(inspect(connection).get_table_names())
     if "manuscripts" in table_names:
         connection.execute(text("UPDATE manuscripts SET current_version_id = NULL"))
+    if "users" in table_names:
+        connection.execute(text("UPDATE users SET created_by = NULL"))
     for table in (
         "operation_logs",
         "manuscript_files",

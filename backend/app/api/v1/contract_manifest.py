@@ -16,6 +16,8 @@ CONTRACTS: tuple[RouteContract, ...] = (
     RouteContract("GET", "/auth/me", "UserResponse"),
     RouteContract("GET", "/auth/csrf", "CsrfResponse"),
     RouteContract("POST", "/auth/change-password", "None"),
+    RouteContract("GET", "/publishers/options", "PublisherOptionsResponse"),
+    RouteContract("GET", "/journals/options", "JournalOptionsResponse"),
     RouteContract("GET", "/publishers/search", "PublisherSearchResponse"),
     RouteContract("GET", "/journals/search", "JournalSearchResponse"),
     RouteContract("POST", "/journals/identify", "IdentifyResponse"),

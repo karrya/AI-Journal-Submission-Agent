@@ -24,6 +24,8 @@ EXPECTED_ROUTES = {
     ("GET", "/auth/me", "UserResponse"),
     ("GET", "/auth/csrf", "CsrfResponse"),
     ("POST", "/auth/change-password", "None"),
+    ("GET", "/publishers/options", "PublisherOptionsResponse"),
+    ("GET", "/journals/options", "JournalOptionsResponse"),
     ("GET", "/publishers/search", "PublisherSearchResponse"),
     ("GET", "/journals/search", "JournalSearchResponse"),
     ("POST", "/journals/identify", "IdentifyResponse"),

@@ -82,6 +82,28 @@ class TaskResponse(OutputModel):
     candidates: list[JournalCandidate]
 
 
+class PublisherOption(OutputModel):
+    id: UUID
+    name: str
+
+
+class PublisherOptionsResponse(OutputModel):
+    items: list[PublisherOption]
+
+
+class JournalOption(OutputModel):
+    id: UUID
+    publisher_id: UUID
+    name: str
+    issn: str | None
+    eissn: str | None
+    website_url: str | None
+
+
+class JournalOptionsResponse(OutputModel):
+    items: list[JournalOption]
+
+
 def normalize_domain(value: str | None) -> str | None:
     if not value:
         return None

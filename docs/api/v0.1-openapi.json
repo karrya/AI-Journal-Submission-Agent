@@ -3396,6 +3396,68 @@
         }
       }
     },
+    "/api/v1/publishers/options": {
+      "get": {
+        "tags": [
+          "journals"
+        ],
+        "summary": "获取出版社下拉选项",
+        "operationId": "publisher_options_api_v1_publishers_options_get",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 255
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "名称"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 20,
+              "minimum": 1,
+              "default": 20,
+              "title": "返回数量上限"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublisherOptionsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "请求参数校验失败"
+          }
+        }
+      }
+    },
     "/api/v1/publishers/search": {
       "get": {
         "tags": [
@@ -4305,6 +4367,78 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/v1/journals/options": {
+      "get": {
+        "tags": [
+          "journals"
+        ],
+        "summary": "获取期刊下拉选项",
+        "operationId": "journal_options_api_v1_journals_options_get",
+        "parameters": [
+          {
+            "name": "publisher_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "出版商 ID"
+            }
+          },
+          {
+            "name": "name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "名称"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 20,
+              "minimum": 1,
+              "default": 20,
+              "title": "返回数量上限"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JournalOptionsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "请求参数校验失败"
           }
         }
       }
@@ -7308,6 +7442,50 @@
         "type": "object",
         "title": "邮箱更新请求"
       },
+      "ErrorResponse": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "代码"
+          },
+          "message": {
+            "type": "string",
+            "title": "消息"
+          },
+          "request_id": {
+            "type": "string",
+            "title": "请求 ID"
+          },
+          "details": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "详细信息"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code",
+          "message",
+          "request_id",
+          "details"
+        ],
+        "title": "错误响应"
+      },
       "FileResponse": {
         "properties": {
           "id": {
@@ -8280,6 +8458,85 @@
           "name"
         ],
         "title": "期刊创建请求"
+      },
+      "JournalOption": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "资源 ID"
+          },
+          "publisher_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "出版商 ID"
+          },
+          "name": {
+            "type": "string",
+            "title": "名称"
+          },
+          "issn": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "ISSN（国际标准连续出版物号）"
+          },
+          "eissn": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "eISSN（电子国际标准连续出版物号）"
+          },
+          "website_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "网站 URL"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "publisher_id",
+          "name",
+          "issn",
+          "eissn",
+          "website_url"
+        ],
+        "title": "期刊下拉选项"
+      },
+      "JournalOptionsResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/JournalOption"
+            },
+            "type": "array",
+            "title": "记录列表"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "期刊下拉选项响应"
       },
       "JournalPlatformCreate": {
         "properties": {
@@ -10635,6 +10892,43 @@
           "name"
         ],
         "title": "出版商创建请求"
+      },
+      "PublisherOption": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "资源 ID"
+          },
+          "name": {
+            "type": "string",
+            "title": "名称"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "出版社下拉选项"
+      },
+      "PublisherOptionsResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PublisherOption"
+            },
+            "type": "array",
+            "title": "记录列表"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "出版社下拉选项响应"
       },
       "PublisherResponse": {
         "properties": {

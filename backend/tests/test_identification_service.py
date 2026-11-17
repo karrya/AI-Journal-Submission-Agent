@@ -6,7 +6,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
-from app.models import DiscoveryTask, Journal, PublisherAlias
+from app.models import DiscoveryTask, Journal, OperationLog, PublisherAlias
 from app.schemas.identification import ConfirmIdentityRequest, IdentifyRequest
 from app.services.identification import (
     JournalIdentificationService,
@@ -273,6 +273,45 @@ def test_concurrent_identify_returns_same_task(db_engine, admin):
     assert db_session_scalar_count(db_engine, Journal) == 1
     first.close()
     second.close()
+
+
+def test_confirmation_note_is_bounded_in_audit(db_session, admin):
+    service = JournalIdentificationService(db_session, admin, "request-note")
+    journal = service.create_journal(
+        publisher_name="Publisher", name="Noted Journal", aliases=[]
+    )
+    long_note = "x" * 250
+    service.confirm_identity(
+        journal.id,
+        ConfirmIdentityRequest(
+            expected_updated_at=journal.updated_at.replace(tzinfo=UTC),
+            confirmation_note=long_note,
+        ),
+    )
+    log = db_session.scalar(
+        select(OperationLog).where(OperationLog.action == "journal.identity.confirm")
+    )
+    assert len(log.after_summary["confirmation_note"]) == 200
+    assert log.after_summary["confirmation_note"] == "x" * 200
+    assert long_note not in str(log.after_summary)
+
+
+def test_blank_confirmation_note_is_omitted_from_audit(db_session, admin):
+    service = JournalIdentificationService(db_session, admin, "request-blank-note")
+    journal = service.create_journal(
+        publisher_name="Publisher", name="Blank Note Journal", aliases=[]
+    )
+    service.confirm_identity(
+        journal.id,
+        ConfirmIdentityRequest(
+            expected_updated_at=journal.updated_at.replace(tzinfo=UTC),
+            confirmation_note=" ",
+        ),
+    )
+    log = db_session.scalar(
+        select(OperationLog).where(OperationLog.action == "journal.identity.confirm")
+    )
+    assert "confirmation_note" not in log.after_summary
 
 
 def db_session_scalar_count(db_engine, model):

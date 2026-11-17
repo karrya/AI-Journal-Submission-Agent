@@ -80,6 +80,20 @@ describe('JournalListView', () => {
     expect(wrapper.text()).toContain('0378-5955')
   })
 
+  it('loads and renders journal management only on the journals tab', async () => {
+    adapter.mockImplementation(async (config) => success(config, page([])))
+    const wrapper = mount(JournalListView)
+    await flushPromises()
+    await wrapper.get('[data-test="identification-tab"]').trigger('click')
+    await flushPromises()
+    expect(adapter.mock.calls.filter(([config]) => config.url === '/journals')).toHaveLength(0)
+    expect(wrapper.find('[aria-label="期刊管理"]').exists()).toBe(false)
+
+    await wrapper.get('[data-test="journals-tab"]').trigger('click')
+    await flushPromises()
+    expect(adapter.mock.calls.filter(([config]) => config.url === '/journals')).toHaveLength(1)
+    expect(wrapper.find('[aria-label="期刊管理"]').exists()).toBe(true)
+  })
   it('shows a specific empty state for every resource', async () => {
     adapter.mockImplementation(async (config) => success(config, page([])))
     const wrapper = mount(JournalListView)

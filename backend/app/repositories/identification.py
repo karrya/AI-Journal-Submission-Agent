@@ -58,7 +58,9 @@ class IdentificationRepository:
                 .where(
                     JournalIdentifier.identifier_type == "ISSN",
                     JournalIdentifier.identifier_value == issn,
+                    JournalIdentifier.journal_id == Journal.id,
                 )
+                .correlate(Journal)
                 .exists()
             )
         if eissn:
@@ -67,7 +69,9 @@ class IdentificationRepository:
                 .where(
                     JournalIdentifier.identifier_type == "EISSN",
                     JournalIdentifier.identifier_value == eissn,
+                    JournalIdentifier.journal_id == Journal.id,
                 )
+                .correlate(Journal)
                 .exists()
             )
         conditions: list[ColumnElement[bool]] = [Journal.deleted_at.is_(None)]
@@ -99,6 +103,41 @@ class IdentificationRepository:
             .limit(page_size)
         ).all()
         return [(journal, name) for journal, name in records], total
+
+    def publisher_options(self, name: str | None, limit: int) -> list[tuple[str, str]]:
+        statement = select(Publisher.id, Publisher.name).where(Publisher.deleted_at.is_(None))
+        if name:
+            statement = statement.where(
+                Publisher.normalized_name.startswith(normalize_comparison(name))
+            )
+        rows = self.db.execute(
+            statement.order_by(Publisher.name, Publisher.id).limit(limit)
+        ).all()
+        return [(row.id, row.name) for row in rows]
+
+    def journal_options(
+        self, publisher_id: str, name: str | None, limit: int
+    ) -> list[tuple[str, str, str, str | None, str | None, str | None]]:
+        statement = select(
+            Journal.id,
+            Journal.publisher_id,
+            Journal.name,
+            Journal.issn,
+            Journal.eissn,
+            Journal.website_url,
+        ).where(
+            Journal.publisher_id == publisher_id,
+            Journal.deleted_at.is_(None),
+        )
+        if name:
+            statement = statement.where(Journal.name.startswith(name))
+        rows = self.db.execute(
+            statement.order_by(Journal.name, Journal.id).limit(limit)
+        ).all()
+        return [
+            (row.id, row.publisher_id, row.name, row.issn, row.eissn, row.website_url)
+            for row in rows
+        ]
 
     def publisher_by_normalized_name(self, name: str) -> Publisher | None:
         normalized = normalize_comparison(name)

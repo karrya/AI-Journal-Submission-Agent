@@ -24,8 +24,12 @@ from app.schemas.identification import (
     IdentifyRequest,
     IdentifyResponse,
     JournalCandidate,
+    JournalOption,
+    JournalOptionsResponse,
     JournalSearchResponse,
     PublisherCandidate,
+    PublisherOption,
+    PublisherOptionsResponse,
     PublisherSearchResponse,
     TaskResponse,
     normalize_domain,
@@ -120,6 +124,13 @@ class PublisherIdentificationService(DomainService):
             primary_domain=publisher.primary_domain,
             status=publisher.status,
             match_reasons=reasons,
+        )
+
+    def options(self, name: str | None, limit: int) -> PublisherOptionsResponse:
+        self._require_reader()
+        rows = self.repository.publisher_options(name, limit)
+        return PublisherOptionsResponse(
+            items=[PublisherOption(id=UUID(row_id), name=name) for row_id, name in rows]
         )
 
     def search(
@@ -383,6 +394,25 @@ class JournalIdentificationService(DomainService):
             )
         return candidates, total
 
+    def options(
+        self, publisher_id: str, name: str | None, limit: int
+    ) -> JournalOptionsResponse:
+        self._require_reader()
+        rows = self.repository.journal_options(publisher_id, name, limit)
+        return JournalOptionsResponse(
+            items=[
+                JournalOption(
+                    id=UUID(row_id),
+                    publisher_id=UUID(row_publisher_id),
+                    name=row_name,
+                    issn=issn,
+                    eissn=eissn,
+                    website_url=website_url,
+                )
+                for row_id, row_publisher_id, row_name, issn, eissn, website_url in rows
+            ]
+        )
+
     def search(
         self,
         *,
@@ -457,10 +487,13 @@ class JournalIdentificationService(DomainService):
             if not value:
                 continue
             other = self.db.scalar(
-                select(JournalIdentifier).where(
+                select(JournalIdentifier)
+                .join(Journal, Journal.id == JournalIdentifier.journal_id)
+                .where(
                     JournalIdentifier.identifier_type == identifier_type,
                     JournalIdentifier.identifier_value == value,
                     JournalIdentifier.journal_id != journal.id,
+                    Journal.deleted_at.is_(None),
                 )
             )
             if other is not None:
@@ -491,12 +524,16 @@ class JournalIdentificationService(DomainService):
             before = {"identity_status": journal.identity_status}
             journal.identity_status = "VERIFIED"
             journal.verified_at = utc_now()
+            after = {"identity_status": "VERIFIED"}
+            note = (payload.confirmation_note or "").strip()
+            if note:
+                after["confirmation_note"] = note[:200]
             self._business_audit(
                 action="journal.identity.confirm",
                 target_type="journal",
                 target_id=journal.id,
                 before=before,
-                after={"identity_status": "VERIFIED"},
+                after=after,
             )
             self._commit()
             publisher = self.db.get(Publisher, journal.publisher_id)

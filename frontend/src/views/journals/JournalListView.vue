@@ -451,7 +451,7 @@ function selectTab(tab: 'publishers' | 'platforms' | 'journals' | 'identificatio
   errorMessage.value = ''
   if (tab === 'publishers') void loadPublishers()
   else if (tab === 'platforms') void loadPlatforms()
-  else void loadJournals()
+  else if (tab === 'journals') void loadJournals()
 }
 
 function formatIssn(value: string | null | undefined): string {
@@ -524,7 +524,7 @@ onMounted(() => void loadPublishers())
       <nav class="pagination" aria-label="平台分页"><button class="action-button action-button--compact action-button--neutral" type="button" :disabled="platformQuery.page === 1 || platformLoading" @click="platformPage(platformQuery.page - 1)">上一页</button><span>第 {{ platformQuery.page }} 页 · 共 {{ platformTotal }} 条</span><button class="action-button action-button--compact action-button--neutral" type="button" data-test="next-platforms" :disabled="platformQuery.page * platformQuery.page_size >= platformTotal || platformLoading" @click="platformPage(platformQuery.page + 1)">下一页</button></nav>
     </section>
 
-    <section v-else aria-label="期刊管理">
+    <section v-else-if="activeTab === 'journals'" aria-label="期刊管理">
       <div class="toolbar">
         <label>搜索名称<input v-model="journalQuery.name" @change="journalQuery.page = 1; loadJournals()"></label>
         <label>排序<select v-model="journalQuery.sort" data-test="journal-sort" @change="journalSortChanged"><option value="name">名称</option><option value="created_at">创建时间</option><option value="updated_at">更新时间</option></select></label>

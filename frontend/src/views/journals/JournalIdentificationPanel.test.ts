@@ -34,6 +34,10 @@ describe('JournalIdentificationPanel', () => {
     api.defaults.adapter = adapter
   })
 
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   it('shows candidates and requires manual selection before confirmation', async () => {
     adapter.mockImplementation(async (config) => {
       if (config.url === '/journals/identify') return success(config, identifyResponse)
@@ -71,6 +75,84 @@ describe('JournalIdentificationPanel', () => {
     await flushPromises()
     expect(wrapper.text()).toContain('ISSN（国际标准连续出版物号）校验位无效')
     expect(wrapper.findAll('[data-test="identity-candidate"]').length).toBe(0)
+  })
+
+  it('links publisher and journal options and autofills identifiers', async () => {
+    vi.useFakeTimers()
+    adapter.mockImplementation(async (config) => {
+      if (config.url === '/publishers/options') {
+        return success(config, { items: [{ id: 'p1', name: 'Publisher One' }] })
+      }
+      if (config.url === '/journals/options') {
+        return success(config, {
+          items: [{
+            id: 'j1', publisher_id: 'p1', name: 'Journal One', issn: '03785955',
+            eissn: '18781128', website_url: 'https://journal.example',
+          }],
+        })
+      }
+      return success(config, emptyPage)
+    })
+    const wrapper = mount(JournalIdentificationPanel)
+    await flushPromises()
+    const publisherInput = wrapper.get('[data-test="identify-publisher-name"]')
+    expect(publisherInput.attributes('list')).toBe('publisher-options')
+    await publisherInput.setValue('Publisher One')
+    await vi.advanceTimersByTimeAsync(250)
+    await flushPromises()
+    expect(adapter.mock.calls.some(([config]) => (
+      config.url === '/journals/options' && config.params?.publisher_id === 'p1'
+    ))).toBe(true)
+
+    const journalInput = wrapper.get('[data-test="identify-journal-name"]')
+    expect(journalInput.attributes('list')).toBe('journal-options')
+    await journalInput.setValue('Journal One')
+    await vi.advanceTimersByTimeAsync(250)
+    await flushPromises()
+    expect((wrapper.get('[data-test="identify-issn"]').element as HTMLInputElement).value).toBe('03785955')
+    expect((wrapper.get('[data-test="identify-eissn"]').element as HTMLInputElement).value).toBe('18781128')
+    expect((wrapper.get('[data-test="identify-website"]').element as HTMLInputElement).value).toBe('https://journal.example')
+
+    await publisherInput.setValue('Publisher Two')
+    await vi.advanceTimersByTimeAsync(250)
+    await flushPromises()
+    expect((journalInput.element as HTMLInputElement).value).toBe('')
+    expect((wrapper.get('[data-test="identify-issn"]').element as HTMLInputElement).value).toBe('')
+    expect((wrapper.get('[data-test="identify-eissn"]').element as HTMLInputElement).value).toBe('')
+  })
+  it('autofills a journal entered before publisher options finish loading', async () => {
+    vi.useFakeTimers()
+    let finishPublisherOptions: (() => void) | undefined
+    adapter.mockImplementation(async (config) => {
+      if (config.url === '/publishers/options' && config.params?.name === 'Publisher One') {
+        return new Promise<AxiosResponse>((resolve) => {
+          finishPublisherOptions = () => resolve(success(config, {
+            items: [{ id: 'p1', name: 'Publisher One' }],
+          }))
+        })
+      }
+      if (config.url === '/journals/options') {
+        return success(config, {
+          items: [{
+            id: 'j1', publisher_id: 'p1', name: 'Journal One', issn: '03785955',
+            eissn: '18781128', website_url: 'https://journal.example',
+          }],
+        })
+      }
+      return success(config, emptyPage)
+    })
+    const wrapper = mount(JournalIdentificationPanel)
+    await flushPromises()
+    await wrapper.get('[data-test="identify-publisher-name"]').setValue('Publisher One')
+    await wrapper.get('[data-test="identify-journal-name"]').setValue('Journal One')
+    await vi.advanceTimersByTimeAsync(250)
+    expect(finishPublisherOptions).toBeDefined()
+    finishPublisherOptions?.()
+    await flushPromises()
+
+    expect((wrapper.get('[data-test="identify-issn"]').element as HTMLInputElement).value).toBe('03785955')
+    expect((wrapper.get('[data-test="identify-eissn"]').element as HTMLInputElement).value).toBe('18781128')
+    expect((wrapper.get('[data-test="identify-website"]').element as HTMLInputElement).value).toBe('https://journal.example')
   })
 
   it('does not confirm conflict candidates', async () => {

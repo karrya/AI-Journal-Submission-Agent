@@ -1,10 +1,14 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import {
   confirmIdentity,
+  getJournalOptions,
+  getPublisherOptions,
   identifyJournal,
   type IdentifyResponse,
   type JournalCandidate,
+  type JournalOption,
+  type PublisherOption,
 } from '../../api/identification'
 import { getSafeRequestId } from '../../api/client'
 import { showSaveSuccess } from '../../utils/feedback'
@@ -26,6 +30,92 @@ const confirming = ref(false)
 const errorMessage = ref('')
 const taskStatus = ref('')
 const confirmationNote = ref('')
+const publisherOptions = ref<PublisherOption[]>([])
+const journalOptions = ref<JournalOption[]>([])
+const selectedPublisherId = ref('')
+let publisherTimer: ReturnType<typeof setTimeout> | undefined
+let journalTimer: ReturnType<typeof setTimeout> | undefined
+let publisherSequence = 0
+let journalSequence = 0
+
+function clearJournalSelection(clearValues = true): void {
+  selectedPublisherId.value = ''
+  journalOptions.value = []
+  if (clearValues) {
+    form.journal_name = ''
+    form.issn = ''
+    form.eissn = ''
+    form.website_url = ''
+  }
+}
+
+async function loadPublisherOptions(query: string): Promise<void> {
+  const sequence = ++publisherSequence
+  try {
+    const result = await getPublisherOptions(query)
+    if (sequence !== publisherSequence) return
+    publisherOptions.value = result
+    const selected = result.find((publisher) => publisher.name === form.publisher_name.trim())
+    if (!selected) {
+      selectedPublisherId.value = ''
+      return
+    }
+    selectedPublisherId.value = selected.id
+    await loadJournalOptions('')
+  } catch (error) {
+    if (sequence === publisherSequence) errorMessage.value = errorText(error, '无法加载出版社选项。')
+  }
+}
+
+function handlePublisherInput(): void {
+  clearJournalSelection(Boolean(selectedPublisherId.value))
+  if (publisherTimer) clearTimeout(publisherTimer)
+  const query = form.publisher_name.trim()
+  publisherTimer = setTimeout(() => void loadPublisherOptions(query), 250)
+}
+
+function autofillJournalIdentifiers(): void {
+  const selected = journalOptions.value.find((journal) => (
+    journal.name === form.journal_name.trim() && journal.publisher_id === selectedPublisherId.value
+  ))
+  if (!selected) return
+  if (!form.issn) form.issn = selected.issn ?? ''
+  if (!form.eissn) form.eissn = selected.eissn ?? ''
+  if (!form.website_url) form.website_url = selected.website_url ?? ''
+}
+
+async function loadJournalOptions(query: string): Promise<void> {
+  const publisherId = selectedPublisherId.value
+  if (!publisherId) {
+    journalOptions.value = []
+    return
+  }
+  const sequence = ++journalSequence
+  try {
+    const result = await getJournalOptions(publisherId, query)
+    if (sequence !== journalSequence || publisherId !== selectedPublisherId.value) return
+    journalOptions.value = result
+    autofillJournalIdentifiers()
+  } catch (error) {
+    if (sequence === journalSequence) errorMessage.value = errorText(error, '无法加载期刊选项。')
+  }
+}
+
+function handleJournalInput(): void {
+  form.issn = ''
+  form.eissn = ''
+  form.website_url = ''
+  autofillJournalIdentifiers()
+  if (journalTimer) clearTimeout(journalTimer)
+  const query = form.journal_name.trim()
+  journalTimer = setTimeout(() => void loadJournalOptions(query), 250)
+}
+
+onMounted(() => void loadPublisherOptions(''))
+onUnmounted(() => {
+  if (publisherTimer) clearTimeout(publisherTimer)
+  if (journalTimer) clearTimeout(journalTimer)
+})
 
 const canConfirm = computed(() => Boolean(
   selectedJournalId.value
@@ -128,11 +218,17 @@ function statusText(status: JournalCandidate['identity_status']): string {
     <h2 id="journal-identification-title">出版社与期刊识别</h2>
     <form data-test="identify-form" class="stacked-form" novalidate @submit.prevent="identify">
       <div class="form-grid">
-        <label>出版社名称<input v-model="form.publisher_name" data-test="identify-publisher-name" maxlength="255"></label>
-        <label>期刊名称<input v-model="form.journal_name" data-test="identify-journal-name" maxlength="500" required></label>
+        <label>出版社名称
+          <input v-model="form.publisher_name" data-test="identify-publisher-name" list="publisher-options" maxlength="255" @input="handlePublisherInput">
+          <datalist id="publisher-options"><option v-for="publisher in publisherOptions" :key="publisher.id" :value="publisher.name"></option></datalist>
+        </label>
+        <label>期刊名称
+          <input v-model="form.journal_name" data-test="identify-journal-name" list="journal-options" maxlength="500" required @input="handleJournalInput">
+          <datalist id="journal-options"><option v-for="journal in journalOptions" :key="journal.id" :value="journal.name"></option></datalist>
+        </label>
         <label>ISSN<input v-model="form.issn" data-test="identify-issn" placeholder="0378-5955"></label>
-        <label>EISSN<input v-model="form.eissn" placeholder="1878-1128"></label>
-        <label>期刊官网<input v-model="form.website_url" type="url" placeholder="https://journal.example"></label>
+        <label>EISSN<input v-model="form.eissn" data-test="identify-eissn" placeholder="1878-1128"></label>
+        <label>期刊官网<input v-model="form.website_url" data-test="identify-website" type="url" placeholder="https://journal.example"></label>
         <label>目标文章类型<input v-model="form.article_type" maxlength="100"></label>
       </div>
       <button class="action-button action-button--create" type="submit" :disabled="identifying">开始识别</button>

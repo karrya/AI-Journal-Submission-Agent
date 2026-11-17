@@ -122,8 +122,42 @@ def test_user_management_contract_hides_password_storage():
 
 def test_identification_contract_present():
     paths = app.openapi()["paths"]
+    assert "/api/v1/publishers/options" in paths
+    assert "/api/v1/journals/options" in paths
     assert "/api/v1/publishers/search" in paths
     assert "/api/v1/journals/search" in paths
     assert "/api/v1/journals/identify" in paths
     assert "/api/v1/journals/{journal_id}/confirm-identity" in paths
     assert "/api/v1/tasks/{task_id}" in paths
+
+
+def test_options_contract_binds_response_schemas_and_operation_metadata():
+    paths = app.openapi()["paths"]
+    expected = {
+        "/api/v1/publishers/options": (
+            "publisher_options_api_v1_publishers_options_get",
+            "获取出版社下拉选项",
+            "PublisherOptionsResponse",
+        ),
+        "/api/v1/journals/options": (
+            "journal_options_api_v1_journals_options_get",
+            "获取期刊下拉选项",
+            "JournalOptionsResponse",
+        ),
+    }
+    for path, (operation_id, summary, response_name) in expected.items():
+        operation = paths[path]["get"]
+        assert operation["operationId"] == operation_id
+        assert operation["summary"] == summary
+        assert operation["responses"]["200"]["content"]["application/json"]["schema"] == {
+            "$ref": f"#/components/schemas/{response_name}"
+        }
+
+
+def test_options_validation_errors_use_standard_error_schema():
+    paths = app.openapi()["paths"]
+    for path in ("/api/v1/publishers/options", "/api/v1/journals/options"):
+        response = paths[path]["get"]["responses"]["422"]
+        assert response["content"]["application/json"]["schema"] == {
+            "$ref": "#/components/schemas/ErrorResponse"
+        }

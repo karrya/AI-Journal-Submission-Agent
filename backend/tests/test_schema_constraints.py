@@ -191,6 +191,8 @@ EXPECTED_NEW_COLUMNS = {
         "identity_status",
         "source_url",
         "verified_at",
+        "active_issn",
+        "active_eissn",
         "created_at",
         "updated_at",
         "created_by",
@@ -488,7 +490,8 @@ def test_journal_issn_provenance_and_audit_read_only_contract():
         assert isinstance(column.type, CHAR)
         assert column.type.length == 8
         assert column.nullable is True
-        assert (name,) in model_unique_columns(journals)
+        assert (name,) not in model_unique_columns(journals)
+        assert (f"active_{name}",) in model_unique_columns(journals)
     assert isinstance(journals.c.requirements_source_url.type, VARCHAR)
     assert journals.c.requirements_source_url.type.length == 1024
     assert isinstance(journals.c.requirements_verified_at.type, DATETIME)
@@ -582,7 +585,7 @@ def test_mig_01_empty_upgrade_head_is_cleanly_repeatable(db_engine):
             name: inspect(db_engine).get_table_options(name) for name in EXPECTED_TABLES
         } == first_options
         with db_engine.connect() as connection:
-            assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0004"
+            assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0005"
             assert connection.scalar(text("SELECT COUNT(*) FROM alembic_version")) == 1
     finally:
         command.upgrade(config, "head")
@@ -634,6 +637,7 @@ def test_identity_migration_backfills_existing_issn(db_engine, db_session):
         rows = connection.execute(
             text("SELECT identifier_type, identifier_value FROM journal_identifiers")
         ).all()
+    command.upgrade(Config(str(BACKEND_DIR / "alembic.ini")), "head")
     if previous_url is None:
         os.environ.pop("ALEMBIC_DATABASE_URL", None)
     else:
@@ -693,9 +697,9 @@ def test_invalid_legacy_issn_aborts_before_any_ddl(db_engine, db_session):
         {"issn": "03785955", "id": "invalid-journal"},
     )
     db_session.commit()
-    command.upgrade(Config(str(BACKEND_DIR / "alembic.ini")), "0004")
+    command.upgrade(Config(str(BACKEND_DIR / "alembic.ini")), "head")
     with db_engine.connect() as connection:
-        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0004"
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0005"
     if previous_url is None:
         os.environ.pop("ALEMBIC_DATABASE_URL", None)
     else:

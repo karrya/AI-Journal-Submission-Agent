@@ -5,6 +5,7 @@ from sqlalchemy import (
     CHAR,
     TEXT,
     VARCHAR,
+    Computed,
     ForeignKey,
     Index,
     UniqueConstraint,
@@ -64,8 +65,8 @@ class JournalPlatform(
 class Journal(UUIDPrimaryKeyMixin, CreatedUpdatedByMixin, SoftDeleteMixin, Base):
     __tablename__ = "journals"
     __table_args__ = (
-        UniqueConstraint("issn", name="uq_journals_issn"),
-        UniqueConstraint("eissn", name="uq_journals_eissn"),
+        UniqueConstraint("active_issn", name="uq_journals_active_issn"),
+        UniqueConstraint("active_eissn", name="uq_journals_active_eissn"),
         Index("ix_journals_publisher_name", "publisher_id", "name"),
         Index("ix_journals_platform", "platform_id"),
         MYSQL_TABLE_OPTIONS,
@@ -106,6 +107,16 @@ class Journal(UUIDPrimaryKeyMixin, CreatedUpdatedByMixin, SoftDeleteMixin, Base)
     )
     source_url: Mapped[str | None] = mapped_column(VARCHAR(2048), nullable=True)
     verified_at: Mapped[datetime | None] = mapped_column(DATETIME(fsp=6), nullable=True)
+    active_issn: Mapped[str | None] = mapped_column(
+        CHAR(8),
+        Computed("CASE WHEN deleted_at IS NULL THEN issn ELSE NULL END", persisted=True),
+        nullable=True,
+    )
+    active_eissn: Mapped[str | None] = mapped_column(
+        CHAR(8),
+        Computed("CASE WHEN deleted_at IS NULL THEN eissn ELSE NULL END", persisted=True),
+        nullable=True,
+    )
 
 
 class PublisherAlias(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
@@ -145,7 +156,12 @@ class JournalAlias(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
 class JournalIdentifier(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
     __tablename__ = "journal_identifiers"
     __table_args__ = (
-        UniqueConstraint("identifier_type", "identifier_value", name="uq_journal_identifier"),
+        Index(
+            "ix_identifiers_type_value_journal",
+            "identifier_type",
+            "identifier_value",
+            "journal_id",
+        ),
         Index("ix_journal_identifiers_journal", "journal_id"),
         MYSQL_TABLE_OPTIONS,
     )

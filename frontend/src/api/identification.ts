@@ -40,6 +40,34 @@ export interface DiscoveryTask {
   candidates: JournalCandidate[]
 }
 
+export interface PublisherOption {
+  id: string
+  name: string
+}
+
+export interface JournalOption {
+  id: string
+  publisher_id: string
+  name: string
+  issn: string | null
+  eissn: string | null
+  website_url: string | null
+}
+
+export async function getPublisherOptions(name = ''): Promise<PublisherOption[]> {
+  const response = await api.get<{ items: PublisherOption[] }>('/publishers/options', {
+    params: { name: name || undefined, limit: 20 },
+  })
+  return response.data.items
+}
+
+export async function getJournalOptions(publisherId: string, name = ''): Promise<JournalOption[]> {
+  const response = await api.get<{ items: JournalOption[] }>('/journals/options', {
+    params: { publisher_id: publisherId, name: name || undefined, limit: 20 },
+  })
+  return response.data.items
+}
+
 export async function identifyJournal(payload: IdentifyRequest): Promise<IdentifyResponse> {
   const response = await api.post<IdentifyResponse>('/journals/identify', payload)
   return response.data

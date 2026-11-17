@@ -6,7 +6,13 @@ from sqlalchemy.orm import Session
 
 from app.api.v1.deps import Principal, get_principal, require_csrf
 from app.core.database import get_db
-from app.schemas.identification import JournalSearchResponse, PublisherSearchResponse
+from app.schemas.common import ErrorResponse
+from app.schemas.identification import (
+    JournalOptionsResponse,
+    JournalSearchResponse,
+    PublisherOptionsResponse,
+    PublisherSearchResponse,
+)
 from app.schemas.journals import (
     JournalCreate,
     JournalPage,
@@ -64,6 +70,23 @@ def create_publisher(
     principal: Annotated[Principal, Depends(require_csrf)],
 ) -> PublisherResponse:
     return PublisherService(db, principal.user, request.state.request_id).create(payload)
+
+
+@router.get(
+    "/publishers/options",
+    response_model=PublisherOptionsResponse,
+    responses={422: {"model": ErrorResponse}},
+)
+def publisher_options(
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    principal: Annotated[Principal, Depends(get_principal)],
+    name: str | None = Query(None, max_length=255),
+    limit: Annotated[int, Query(ge=1, le=20)] = 20,
+) -> PublisherOptionsResponse:
+    return PublisherIdentificationService(
+        db, principal.user, request.state.request_id
+    ).options(name, limit)
 
 
 @router.get("/publishers/search", response_model=PublisherSearchResponse)
@@ -261,6 +284,24 @@ def create_journal(
     principal: Annotated[Principal, Depends(require_csrf)],
 ) -> JournalResponse:
     return JournalService(db, principal.user, request.state.request_id).create(payload)
+
+
+@router.get(
+    "/journals/options",
+    response_model=JournalOptionsResponse,
+    responses={422: {"model": ErrorResponse}},
+)
+def journal_options(
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    principal: Annotated[Principal, Depends(get_principal)],
+    publisher_id: UUID,
+    name: str | None = Query(None, max_length=500),
+    limit: Annotated[int, Query(ge=1, le=20)] = 20,
+) -> JournalOptionsResponse:
+    return JournalIdentificationService(
+        db, principal.user, request.state.request_id
+    ).options(str(publisher_id), name, limit)
 
 
 @router.get("/journals/search", response_model=JournalSearchResponse)

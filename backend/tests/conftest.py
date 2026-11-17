@@ -60,6 +60,10 @@ def clear_test_data(connection: Connection) -> None:
         connection.execute(text("UPDATE users SET created_by = NULL"))
     for table in (
         "operation_logs",
+        "discovery_tasks",
+        "journal_identifiers",
+        "journal_aliases",
+        "publisher_aliases",
         "manuscript_files",
         "file_families",
         "manuscript_authors",

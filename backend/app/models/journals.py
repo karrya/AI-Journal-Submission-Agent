@@ -15,6 +15,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.models.base import (
     MYSQL_TABLE_OPTIONS,
     Base,
+    CreatedAtMixin,
     CreatedUpdatedByMixin,
     SoftDeleteMixin,
     UUIDPrimaryKeyMixin,
@@ -25,6 +26,7 @@ class Publisher(UUIDPrimaryKeyMixin, CreatedUpdatedByMixin, SoftDeleteMixin, Bas
     __tablename__ = "publishers"
     __table_args__ = (
         UniqueConstraint("normalized_name", name="uq_publishers_normalized_name"),
+        Index("ix_publishers_domain", "primary_domain"),
         MYSQL_TABLE_OPTIONS,
     )
 
@@ -32,6 +34,16 @@ class Publisher(UUIDPrimaryKeyMixin, CreatedUpdatedByMixin, SoftDeleteMixin, Bas
     normalized_name: Mapped[str] = mapped_column(VARCHAR(255), nullable=False)
     website_url: Mapped[str | None] = mapped_column(VARCHAR(1024), nullable=True)
     notes: Mapped[str | None] = mapped_column(TEXT, nullable=True)
+    publisher_name_en: Mapped[str | None] = mapped_column(VARCHAR(255), nullable=True)
+    primary_domain: Mapped[str | None] = mapped_column(VARCHAR(255), nullable=True)
+    country: Mapped[str | None] = mapped_column(VARCHAR(100), nullable=True)
+    publisher_type: Mapped[str | None] = mapped_column(VARCHAR(50), nullable=True)
+    parent_organization_id: Mapped[str | None] = mapped_column(
+        CHAR(36), ForeignKey("publishers.id", ondelete="RESTRICT"), nullable=True
+    )
+    status: Mapped[str] = mapped_column(VARCHAR(30), default="ACTIVE", nullable=False)
+    source_url: Mapped[str | None] = mapped_column(VARCHAR(2048), nullable=True)
+    verified_at: Mapped[datetime | None] = mapped_column(DATETIME(fsp=6), nullable=True)
 
 
 class JournalPlatform(
@@ -86,3 +98,62 @@ class Journal(UUIDPrimaryKeyMixin, CreatedUpdatedByMixin, SoftDeleteMixin, Base)
     )
     status: Mapped[str] = mapped_column(VARCHAR(32), default="active", nullable=False)
     notes: Mapped[str | None] = mapped_column(TEXT, nullable=True)
+    journal_name_en: Mapped[str | None] = mapped_column(VARCHAR(500), nullable=True)
+    aims_scope: Mapped[str | None] = mapped_column(TEXT, nullable=True)
+    open_access_status: Mapped[str | None] = mapped_column(VARCHAR(50), nullable=True)
+    identity_status: Mapped[str] = mapped_column(
+        VARCHAR(30), default="UNVERIFIED", index=True, nullable=False
+    )
+    source_url: Mapped[str | None] = mapped_column(VARCHAR(2048), nullable=True)
+    verified_at: Mapped[datetime | None] = mapped_column(DATETIME(fsp=6), nullable=True)
+
+
+class PublisherAlias(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
+    __tablename__ = "publisher_aliases"
+    __table_args__ = (
+        UniqueConstraint("publisher_id", "normalized_alias", name="uq_publisher_alias"),
+        Index("ix_publisher_alias_normalized", "normalized_alias"),
+        MYSQL_TABLE_OPTIONS,
+    )
+
+    publisher_id: Mapped[str] = mapped_column(
+        CHAR(36), ForeignKey("publishers.id", ondelete="RESTRICT"), nullable=False
+    )
+    alias: Mapped[str] = mapped_column(VARCHAR(500), nullable=False)
+    normalized_alias: Mapped[str] = mapped_column(VARCHAR(500), nullable=False)
+    source_url: Mapped[str | None] = mapped_column(VARCHAR(2048), nullable=True)
+    verified_at: Mapped[datetime | None] = mapped_column(DATETIME(fsp=6), nullable=True)
+
+
+class JournalAlias(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
+    __tablename__ = "journal_aliases"
+    __table_args__ = (
+        UniqueConstraint("journal_id", "normalized_alias", name="uq_journal_alias"),
+        Index("ix_journal_alias_normalized", "normalized_alias"),
+        MYSQL_TABLE_OPTIONS,
+    )
+
+    journal_id: Mapped[str] = mapped_column(
+        CHAR(36), ForeignKey("journals.id", ondelete="RESTRICT"), nullable=False
+    )
+    alias: Mapped[str] = mapped_column(VARCHAR(500), nullable=False)
+    normalized_alias: Mapped[str] = mapped_column(VARCHAR(500), nullable=False)
+    source_url: Mapped[str | None] = mapped_column(VARCHAR(2048), nullable=True)
+    verified_at: Mapped[datetime | None] = mapped_column(DATETIME(fsp=6), nullable=True)
+
+
+class JournalIdentifier(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
+    __tablename__ = "journal_identifiers"
+    __table_args__ = (
+        UniqueConstraint("identifier_type", "identifier_value", name="uq_journal_identifier"),
+        Index("ix_journal_identifiers_journal", "journal_id"),
+        MYSQL_TABLE_OPTIONS,
+    )
+
+    journal_id: Mapped[str] = mapped_column(
+        CHAR(36), ForeignKey("journals.id", ondelete="RESTRICT"), nullable=False
+    )
+    identifier_type: Mapped[str] = mapped_column(VARCHAR(30), nullable=False)
+    identifier_value: Mapped[str] = mapped_column(VARCHAR(50), nullable=False)
+    source_url: Mapped[str | None] = mapped_column(VARCHAR(2048), nullable=True)
+    verified_at: Mapped[datetime | None] = mapped_column(DATETIME(fsp=6), nullable=True)

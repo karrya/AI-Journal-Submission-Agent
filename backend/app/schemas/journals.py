@@ -33,12 +33,14 @@ class PublisherCreate(InputModel):
     name: str = Field(min_length=1, max_length=255)
     website_url: SecureUrl | None = Field(default=None, max_length=1024)
     notes: str | None = None
+    aliases: list[str] = Field(default_factory=list)
 
 
 class PublisherUpdate(InputModel):
     name: str | None = Field(default=None, min_length=1, max_length=255)
     website_url: SecureUrl | None = Field(default=None, max_length=1024)
     notes: str | None = None
+    aliases: list[str] | None = None
 
     @model_validator(mode="after")
     def require_change(self):
@@ -128,6 +130,7 @@ class JournalCreate(InputModel):
     requirements_verified_at: datetime | None = None
     status: str = Field(default="active", min_length=1, max_length=32)
     notes: str | None = None
+    aliases: list[str] = Field(default_factory=list)
 
 
 class JournalUpdate(InputModel):
@@ -146,6 +149,7 @@ class JournalUpdate(InputModel):
     requirements_verified_at: datetime | None = None
     status: str | None = Field(default=None, min_length=1, max_length=32)
     notes: str | None = None
+    aliases: list[str] | None = None
 
     @model_validator(mode="after")
     def require_change(self):

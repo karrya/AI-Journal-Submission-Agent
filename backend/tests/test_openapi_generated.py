@@ -118,3 +118,12 @@ def test_user_management_contract_hides_password_storage():
     assert "password_hash" not in properties
     assert "password" not in properties
     assert "last_login_at" in properties
+
+
+def test_identification_contract_present():
+    paths = app.openapi()["paths"]
+    assert "/api/v1/publishers/search" in paths
+    assert "/api/v1/journals/search" in paths
+    assert "/api/v1/journals/identify" in paths
+    assert "/api/v1/journals/{journal_id}/confirm-identity" in paths
+    assert "/api/v1/tasks/{task_id}" in paths

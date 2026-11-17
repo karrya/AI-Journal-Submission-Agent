@@ -32,6 +32,11 @@ from app.services.authors import (
     normalize_comparison,
     normalize_display_name,
 )
+from app.schemas.identification import normalize_domain
+from app.services.identification import (
+    JournalIdentificationService,
+    PublisherIdentificationService,
+)
 
 
 def _not_found() -> AppError:
@@ -114,7 +119,9 @@ class PublisherService(JournalResourceService):
     def create(self, payload: PublisherCreate) -> PublisherResponse:
         self._require_admin()
         values = payload.model_dump()
+        aliases = values.pop("aliases", [])
         values["name"] = normalize_display_name(values["name"])
+        values["primary_domain"] = normalize_domain(values["website_url"])
         publisher = self.repository.add(
             Publisher(
                 **values,
@@ -123,6 +130,9 @@ class PublisherService(JournalResourceService):
             )
         )
         self._flush()
+        PublisherIdentificationService(
+            self.db, self.user, self.request_id
+        ).replace_publisher_aliases(publisher, aliases)
         self._business_audit(
             action="publisher.create",
             target_type="publisher",
@@ -138,11 +148,14 @@ class PublisherService(JournalResourceService):
         if publisher is None:
             raise _not_found()
         values = payload.model_dump(exclude_unset=True)
+        aliases = values.pop("aliases", None)
         if "name" in values:
             if values["name"] is None:
                 raise _validation("name 不能为空")
             values["name"] = normalize_display_name(values["name"])
             values["normalized_name"] = normalize_comparison(values["name"])
+        if "website_url" in values:
+            values["primary_domain"] = normalize_domain(values["website_url"])
         before = {
             key: getattr(publisher, key)
             for key in ("name", "website_url")
@@ -150,6 +163,10 @@ class PublisherService(JournalResourceService):
         }
         for key, value in values.items():
             setattr(publisher, key, value)
+        if aliases is not None:
+            PublisherIdentificationService(
+                self.db, self.user, self.request_id
+            ).replace_publisher_aliases(publisher, aliases)
         self._flush()
         self._business_audit(
             action="publisher.update",
@@ -395,12 +412,16 @@ class JournalService(JournalResourceService):
     def create(self, payload: JournalCreate) -> JournalResponse:
         self._require_admin()
         values = payload.model_dump()
+        aliases = values.pop("aliases", [])
         if "name" in values:
             values["name"] = normalize_display_name(values["name"])
         self._require_related(values)
         values = self._database_values(values)
         journal = self.repository.add(Journal(**values, created_by=self.user.id))
         self._flush()
+        identification = JournalIdentificationService(self.db, self.user, self.request_id)
+        identification.replace_journal_aliases(journal, aliases)
+        identification.replace_journal_identifiers(journal)
         self._business_audit(
             action="journal.create",
             target_type="journal",
@@ -423,6 +444,7 @@ class JournalService(JournalResourceService):
         if journal is None:
             raise _not_found()
         values = payload.model_dump(exclude_unset=True)
+        aliases = values.pop("aliases", None)
         for field in (
             "name",
             "subject_categories",
@@ -440,6 +462,10 @@ class JournalService(JournalResourceService):
         before = {key: getattr(journal, key) for key in safe_fields if key in values}
         for key, value in values.items():
             setattr(journal, key, value)
+        identification = JournalIdentificationService(self.db, self.user, self.request_id)
+        if aliases is not None:
+            identification.replace_journal_aliases(journal, aliases)
+        identification.replace_journal_identifiers(journal)
         self._flush()
         self._business_audit(
             action="journal.update",

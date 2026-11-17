@@ -8,8 +8,16 @@ from app.models.authors import (
     Institution,
 )
 from app.models.base import Base, new_uuid, utc_now
+from app.models.discovery import DiscoveryTask
 from app.models.files import FileFamily, ManuscriptFile
-from app.models.journals import Journal, JournalPlatform, Publisher
+from app.models.journals import (
+    Journal,
+    JournalAlias,
+    JournalIdentifier,
+    JournalPlatform,
+    Publisher,
+    PublisherAlias,
+)
 from app.models.manuscripts import Manuscript, ManuscriptAuthor, ManuscriptVersion
 
 __all__ = [
@@ -19,9 +27,12 @@ __all__ = [
     "AuthorInstitution",
     "AuthSession",
     "Base",
+    "DiscoveryTask",
     "FileFamily",
     "Institution",
     "Journal",
+    "JournalAlias",
+    "JournalIdentifier",
     "JournalPlatform",
     "Manuscript",
     "ManuscriptAuthor",
@@ -29,6 +40,7 @@ __all__ = [
     "ManuscriptVersion",
     "OperationLog",
     "Publisher",
+    "PublisherAlias",
     "Role",
     "User",
     "UserRole",

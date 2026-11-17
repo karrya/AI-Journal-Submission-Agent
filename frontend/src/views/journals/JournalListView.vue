@@ -24,6 +24,7 @@ import {
 } from '../../api/journals'
 import type { SortOrder } from '../../api/authors'
 import { getSafeRequestId } from '../../api/client'
+import JournalIdentificationPanel from './JournalIdentificationPanel.vue'
 import { useAuthStore } from '../../stores/auth'
 import { safeResourceUrl } from '../../utils/url'
 import {
@@ -35,7 +36,7 @@ import { showSaveSuccess } from '../../utils/feedback'
 
 const auth = useAuthStore()
 const isAdmin = computed(() => auth.user?.roles.includes('system_admin') ?? false)
-const activeTab = ref<'publishers' | 'platforms' | 'journals'>('publishers')
+const activeTab = ref<'publishers' | 'platforms' | 'journals' | 'identification'>('publishers')
 const errorMessage = ref('')
 const busy = ref(false)
 
@@ -444,7 +445,7 @@ async function confirmDelete(): Promise<void> {
   }
 }
 
-function selectTab(tab: 'publishers' | 'platforms' | 'journals'): void {
+function selectTab(tab: 'publishers' | 'platforms' | 'journals' | 'identification'): void {
   activeTab.value = tab
   deleteTarget.value = null
   errorMessage.value = ''
@@ -473,7 +474,9 @@ onMounted(() => void loadPublishers())
       <button type="button" role="tab" data-test="publishers-tab" :aria-selected="activeTab === 'publishers'" @click="selectTab('publishers')">出版商</button>
       <button type="button" role="tab" data-test="platforms-tab" :aria-selected="activeTab === 'platforms'" @click="selectTab('platforms')">平台</button>
       <button type="button" role="tab" data-test="journals-tab" :aria-selected="activeTab === 'journals'" @click="selectTab('journals')">期刊</button>
+      <button type="button" role="tab" data-test="identification-tab" :aria-selected="activeTab === 'identification'" @click="selectTab('identification')">识别</button>
     </div>
+    <JournalIdentificationPanel v-if="activeTab === 'identification'" />
     <p v-if="errorMessage" class="form-error" role="alert">{{ errorMessage }}</p>
 
     <section v-if="activeTab === 'publishers'" aria-label="出版商管理">

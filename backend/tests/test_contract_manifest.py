@@ -5,7 +5,7 @@ import pytest
 from pydantic import ValidationError
 
 from app.api.v1.contract_manifest import CONTRACTS
-from app.schemas import audit, auth, authors, common, files, journals, manuscripts, users
+from app.schemas import audit, auth, authors, common, files, identification, journals, manuscripts, users
 from app.schemas.authors import (
     AuthorizationCreate,
     AuthorizationResponse,
@@ -24,6 +24,11 @@ EXPECTED_ROUTES = {
     ("GET", "/auth/me", "UserResponse"),
     ("GET", "/auth/csrf", "CsrfResponse"),
     ("POST", "/auth/change-password", "None"),
+    ("GET", "/publishers/search", "PublisherSearchResponse"),
+    ("GET", "/journals/search", "JournalSearchResponse"),
+    ("POST", "/journals/identify", "IdentifyResponse"),
+    ("POST", "/journals/{journal_id}/confirm-identity", "JournalCandidate"),
+    ("GET", "/tasks/{task_id}", "TaskResponse"),
     ("GET", "/users", "UserPage"),
     ("POST", "/users", "ManagedUserResponse"),
     ("GET", "/users/{user_id}", "ManagedUserResponse"),
@@ -141,7 +146,7 @@ def test_manifest_matches_the_complete_approved_route_contract():
 
 
 def test_manifest_response_names_resolve_to_schema_exports():
-    modules = (audit, auth, authors, common, files, journals, manuscripts, users)
+    modules = (audit, auth, authors, common, files, identification, journals, manuscripts, users)
     exported_names = {
         name
         for module in modules

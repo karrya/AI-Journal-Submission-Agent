@@ -36,6 +36,10 @@ EXPECTED_TABLES = {
     "journal_platforms",
     "journals",
     "operation_logs",
+    "publisher_aliases",
+    "journal_aliases",
+    "journal_identifiers",
+    "discovery_tasks",
 }
 
 NEW_MODELS = {
@@ -48,6 +52,10 @@ NEW_MODELS = {
     "JournalPlatform",
     "Journal",
     "OperationLog",
+    "PublisherAlias",
+    "JournalAlias",
+    "JournalIdentifier",
+    "DiscoveryTask",
 }
 
 EXPECTED_NEW_COLUMNS = {
@@ -136,6 +144,14 @@ EXPECTED_NEW_COLUMNS = {
         "normalized_name",
         "website_url",
         "notes",
+        "publisher_name_en",
+        "primary_domain",
+        "country",
+        "publisher_type",
+        "parent_organization_id",
+        "status",
+        "source_url",
+        "verified_at",
         "created_at",
         "updated_at",
         "created_by",
@@ -169,10 +185,63 @@ EXPECTED_NEW_COLUMNS = {
         "requirements_verified_at",
         "status",
         "notes",
+        "journal_name_en",
+        "aims_scope",
+        "open_access_status",
+        "identity_status",
+        "source_url",
+        "verified_at",
         "created_at",
         "updated_at",
         "created_by",
         "deleted_at",
+    },
+    "publisher_aliases": {
+        "id",
+        "publisher_id",
+        "alias",
+        "normalized_alias",
+        "source_url",
+        "verified_at",
+        "created_at",
+    },
+    "journal_aliases": {
+        "id",
+        "journal_id",
+        "alias",
+        "normalized_alias",
+        "source_url",
+        "verified_at",
+        "created_at",
+    },
+    "journal_identifiers": {
+        "id",
+        "journal_id",
+        "identifier_type",
+        "identifier_value",
+        "source_url",
+        "verified_at",
+        "created_at",
+    },
+    "discovery_tasks": {
+        "id",
+        "task_type",
+        "journal_id",
+        "owner_author_id",
+        "idempotency_key",
+        "payload",
+        "status",
+        "progress",
+        "attempt_count",
+        "max_attempts",
+        "checkpoint",
+        "last_error_code",
+        "last_error_message",
+        "created_by",
+        "created_at",
+        "started_at",
+        "completed_at",
+        "updated_at",
     },
     "operation_logs": {
         "id",
@@ -337,6 +406,8 @@ def test_column_types_json_and_immutable_timestamps_match_the_contract():
         ("journals", "requirements"),
         ("operation_logs", "before_summary"),
         ("operation_logs", "after_summary"),
+        ("discovery_tasks", "payload"),
+        ("discovery_tasks", "checkpoint"),
     }
     actual_json_columns = {
         (table_name, column.name)
@@ -511,7 +582,7 @@ def test_mig_01_empty_upgrade_head_is_cleanly_repeatable(db_engine):
             name: inspect(db_engine).get_table_options(name) for name in EXPECTED_TABLES
         } == first_options
         with db_engine.connect() as connection:
-            assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0003"
+            assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0004"
             assert connection.scalar(text("SELECT COUNT(*) FROM alembic_version")) == 1
     finally:
         command.upgrade(config, "head")
@@ -519,6 +590,116 @@ def test_mig_01_empty_upgrade_head_is_cleanly_repeatable(db_engine):
             os.environ.pop("ALEMBIC_DATABASE_URL", None)
         else:
             os.environ["ALEMBIC_DATABASE_URL"] = previous_url
+
+
+def test_identity_migration_backfills_existing_issn(db_engine, db_session):
+    import os
+
+    from alembic import command
+    from alembic.config import Config
+    from conftest import BACKEND_DIR
+
+    previous_url = os.environ.get("ALEMBIC_DATABASE_URL")
+    os.environ["ALEMBIC_DATABASE_URL"] = os.environ["TEST_DATABASE_URL"]
+    command.downgrade(Config(str(BACKEND_DIR / "alembic.ini")), "0003")
+    db_session.execute(
+        text(
+            "INSERT INTO publishers (id, name, normalized_name, created_at, updated_at) "
+            "VALUES (:id, :name, :normalized_name, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))"
+        ),
+        {
+            "id": "migration-publisher",
+            "name": "Migration Publisher",
+            "normalized_name": "migration publisher",
+        },
+    )
+    db_session.execute(
+        text(
+            "INSERT INTO journals (id, publisher_id, name, issn, eissn, "
+            "subject_categories, article_types, requirements, status, created_at, updated_at) "
+            "VALUES (:id, :publisher_id, :name, :issn, :eissn, '[]', '[]', '[]', 'active', "
+            "CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))"
+        ),
+        {
+            "id": "migration-journal",
+            "publisher_id": "migration-publisher",
+            "name": "Migration Journal",
+            "issn": "03785955",
+            "eissn": "18781128",
+        },
+    )
+    db_session.commit()
+    command.upgrade(Config(str(BACKEND_DIR / "alembic.ini")), "0004")
+    with db_engine.connect() as connection:
+        rows = connection.execute(
+            text("SELECT identifier_type, identifier_value FROM journal_identifiers")
+        ).all()
+    if previous_url is None:
+        os.environ.pop("ALEMBIC_DATABASE_URL", None)
+    else:
+        os.environ["ALEMBIC_DATABASE_URL"] = previous_url
+    assert {(row.identifier_type, row.identifier_value) for row in rows} == {
+        ("ISSN", "03785955"),
+        ("EISSN", "18781128"),
+    }
+
+
+def test_invalid_legacy_issn_aborts_before_any_ddl(db_engine, db_session):
+    import os
+
+    from alembic import command
+    from alembic.config import Config
+    from conftest import BACKEND_DIR
+
+    previous_url = os.environ.get("ALEMBIC_DATABASE_URL")
+    os.environ["ALEMBIC_DATABASE_URL"] = os.environ["TEST_DATABASE_URL"]
+    command.downgrade(Config(str(BACKEND_DIR / "alembic.ini")), "0003")
+    db_session.execute(
+        text(
+            "INSERT INTO publishers (id, name, normalized_name, created_at, updated_at) "
+            "VALUES (:id, :name, :normalized_name, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))"
+        ),
+        {
+            "id": "invalid-publisher",
+            "name": "Invalid Publisher",
+            "normalized_name": "invalid publisher",
+        },
+    )
+    db_session.execute(
+        text(
+            "INSERT INTO journals (id, publisher_id, name, issn, eissn, "
+            "subject_categories, article_types, requirements, status, created_at, updated_at) "
+            "VALUES (:id, :publisher_id, :name, :issn, :eissn, '[]', '[]', '[]', 'active', "
+            "CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))"
+        ),
+        {
+            "id": "invalid-journal",
+            "publisher_id": "invalid-publisher",
+            "name": "Invalid Journal",
+            "issn": "bad",
+            "eissn": None,
+        },
+    )
+    db_session.commit()
+    with pytest.raises(ValueError):
+        command.upgrade(Config(str(BACKEND_DIR / "alembic.ini")), "0004")
+    inspector = inspect(db_engine)
+    assert "publisher_aliases" not in inspector.get_table_names()
+    assert "identity_status" not in {
+        column["name"] for column in inspector.get_columns("journals")
+    }
+    db_session.execute(
+        text("UPDATE journals SET issn = :issn WHERE id = :id"),
+        {"issn": "03785955", "id": "invalid-journal"},
+    )
+    db_session.commit()
+    command.upgrade(Config(str(BACKEND_DIR / "alembic.ini")), "0004")
+    with db_engine.connect() as connection:
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0004"
+    if previous_url is None:
+        os.environ.pop("ALEMBIC_DATABASE_URL", None)
+    else:
+        os.environ["ALEMBIC_DATABASE_URL"] = previous_url
 
 
 def test_current_version_must_belong_to_same_manuscript(

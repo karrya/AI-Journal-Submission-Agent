@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.api.v1.deps import Principal, get_principal, require_csrf
 from app.core.database import get_db
+from app.schemas.identification import JournalSearchResponse, PublisherSearchResponse
 from app.schemas.journals import (
     JournalCreate,
     JournalPage,
@@ -19,6 +20,10 @@ from app.schemas.journals import (
     PublisherPage,
     PublisherResponse,
     PublisherUpdate,
+)
+from app.services.identification import (
+    JournalIdentificationService,
+    PublisherIdentificationService,
 )
 from app.services.journals import JournalPlatformService, JournalService, PublisherService
 
@@ -59,6 +64,21 @@ def create_publisher(
     principal: Annotated[Principal, Depends(require_csrf)],
 ) -> PublisherResponse:
     return PublisherService(db, principal.user, request.state.request_id).create(payload)
+
+
+@router.get("/publishers/search", response_model=PublisherSearchResponse)
+def search_publishers(
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    principal: Annotated[Principal, Depends(get_principal)],
+    name: str | None = None,
+    website_url: str | None = None,
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=100)] = 20,
+) -> PublisherSearchResponse:
+    return PublisherIdentificationService(
+        db, principal.user, request.state.request_id
+    ).search(name=name, website_url=website_url, page=page, page_size=page_size)
 
 
 @router.get(
@@ -241,6 +261,32 @@ def create_journal(
     principal: Annotated[Principal, Depends(require_csrf)],
 ) -> JournalResponse:
     return JournalService(db, principal.user, request.state.request_id).create(payload)
+
+
+@router.get("/journals/search", response_model=JournalSearchResponse)
+def search_journals(
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    principal: Annotated[Principal, Depends(get_principal)],
+    name: str | None = None,
+    issn: str | None = None,
+    eissn: str | None = None,
+    publisher_id: UUID | None = None,
+    website_url: str | None = None,
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=100)] = 20,
+) -> JournalSearchResponse:
+    return JournalIdentificationService(
+        db, principal.user, request.state.request_id
+    ).search(
+        name=name,
+        issn=issn,
+        eissn=eissn,
+        publisher_id=str(publisher_id) if publisher_id else None,
+        website_url=website_url,
+        page=page,
+        page_size=page_size,
+    )
 
 
 @router.get(

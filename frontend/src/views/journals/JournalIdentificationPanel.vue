@@ -111,6 +111,31 @@ function handleJournalInput(): void {
   journalTimer = setTimeout(() => void loadJournalOptions(query), 250)
 }
 
+function clearIdentification(): void {
+  if (publisherTimer) clearTimeout(publisherTimer)
+  if (journalTimer) clearTimeout(journalTimer)
+  publisherTimer = undefined
+  journalTimer = undefined
+  publisherSequence += 1
+  journalSequence += 1
+  form.publisher_name = ''
+  form.journal_name = ''
+  form.issn = ''
+  form.eissn = ''
+  form.website_url = ''
+  form.article_type = ''
+  publisherOptions.value = []
+  journalOptions.value = []
+  selectedPublisherId.value = ''
+  candidates.value = []
+  selectedJournalId.value = ''
+  identified.value = false
+  taskStatus.value = ''
+  confirmationNote.value = ''
+  errorMessage.value = ''
+  void loadPublisherOptions('')
+}
+
 onMounted(() => void loadPublisherOptions(''))
 onUnmounted(() => {
   if (publisherTimer) clearTimeout(publisherTimer)
@@ -232,6 +257,7 @@ function statusText(status: JournalCandidate['identity_status']): string {
         <label>目标文章类型<input v-model="form.article_type" maxlength="100"></label>
       </div>
       <button class="action-button action-button--create" type="submit" :disabled="identifying">开始识别</button>
+      <button class="action-button action-button--neutral" type="button" data-test="clear-identification" :disabled="identifying || confirming" @click="clearIdentification">清空全部</button>
     </form>
     <p v-if="errorMessage" class="form-error" role="alert">{{ errorMessage }}</p>
     <p v-if="taskStatus">识别任务状态：{{ taskStatus }}</p>

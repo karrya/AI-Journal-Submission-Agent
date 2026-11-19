@@ -145,6 +145,48 @@ def test_create_binds_verified_portal_and_adapter_without_client_url(
     assert not hasattr(task, "registration_url")
 
 
+def test_create_skips_unsupported_newer_portal_for_supported_older_portal(
+    db_session, operator, approved_input, registration_records
+):
+    newer_adapter = PlatformAdapter(
+        adapter_code="NEWER_ADAPTER",
+        adapter_name="Newer Test Adapter",
+        platform_type="TEST_PLATFORM",
+        adapter_version="9.9.9",
+        support_status="SUPPORTED",
+        allowed_domains=["register.example"],
+        last_verified_at=utc_now(),
+    )
+    db_session.add(newer_adapter)
+    db_session.flush()
+    db_session.add(
+        JournalSubmissionPortal(
+            journal_id=registration_records.journal.id,
+            original_url="https://register.example/newer",
+            final_url="https://register.example/newer",
+            redirect_chain=[],
+            verification_status="VERIFIED",
+            access_status="ACCESSIBLE",
+            platform_code="TEST_PLATFORM",
+            confidence=1.0,
+            evidence_summary=[],
+            normalized_host="register.example",
+            platform_adapter_id=newer_adapter.id,
+            support_status="TESTING",
+            created_at=registration_records.portal.created_at + timedelta(minutes=1),
+        )
+    )
+    db_session.commit()
+
+    task = RegistrationService(db_session, operator, "request-create").create_task(
+        approved_input
+    )
+
+    assert task.portal_id == registration_records.portal.id
+    assert task.adapter_code == "TEST_ADAPTER"
+    assert task.adapter_version == "1.2.3"
+
+
 def test_concurrent_create_with_same_key_creates_one_task(
     db_engine, db_session, registration_records, approved_input
 ):

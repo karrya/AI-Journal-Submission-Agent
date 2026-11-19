@@ -81,27 +81,35 @@ class RegistrationService:
     def _admit_new_target(
         self, payload: RegistrationTaskCreate
     ) -> AdmissionResult:
-        portal_id = self.db.scalar(
-            select(JournalSubmissionPortal.id)
-            .where(
-                JournalSubmissionPortal.journal_id == str(payload.journal_id),
-                JournalSubmissionPortal.platform_code == payload.platform_code,
+        portal_ids = list(
+            self.db.scalars(
+                select(JournalSubmissionPortal.id)
+                .where(
+                    JournalSubmissionPortal.journal_id == str(payload.journal_id),
+                    JournalSubmissionPortal.platform_code == payload.platform_code,
+                )
+                .order_by(
+                    JournalSubmissionPortal.created_at.desc(),
+                    JournalSubmissionPortal.id.asc(),
+                )
             )
-            .order_by(
-                JournalSubmissionPortal.created_at.desc(),
-                JournalSubmissionPortal.id.asc(),
-            )
-            .limit(1)
         )
-        if portal_id is None:
-            raise AppError(404, "JOURNAL_ENDPOINT_NOT_FOUND", "期刊入口不存在")
-        return require_supported_registration_target(
-            self.db,
-            str(payload.publisher_id),
-            str(payload.journal_id),
-            portal_id,
-            payload.platform_code,
-        )
+        first_error: AppError | None = None
+        for portal_id in portal_ids:
+            try:
+                return require_supported_registration_target(
+                    self.db,
+                    str(payload.publisher_id),
+                    str(payload.journal_id),
+                    portal_id,
+                    payload.platform_code,
+                )
+            except AppError as exc:
+                if first_error is None:
+                    first_error = exc
+        if first_error is not None:
+            raise first_error
+        raise AppError(404, "JOURNAL_ENDPOINT_NOT_FOUND", "期刊入口不存在")
 
     def create_task(self, payload: RegistrationTaskCreate) -> RegistrationTask:
         self._require_consent(str(payload.author_id), str(payload.authorization_id))

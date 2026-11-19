@@ -332,3 +332,62 @@ def test_hostname_matching_normalizes_case_and_trailing_dot(
     )
 
     assert result.portal is portal
+
+
+def test_adapter_platform_type_must_match_portal(
+    db_session, publisher, journal, portal, adapter
+):
+    adapter.platform_type = "OTHER_PLATFORM"
+    db_session.commit()
+
+    assert_admission_error(
+        db_session,
+        publisher.id,
+        journal.id,
+        portal.id,
+        portal.platform_code,
+        409,
+        "PLATFORM_ADAPTER_NOT_SUPPORTED",
+    )
+
+
+@pytest.mark.parametrize(
+    "final_url",
+    [
+        "http://example.com/register",
+        "https://example.com:8443/register",
+        "https://example.com:80/register",
+    ],
+)
+def test_registration_requires_https_on_the_standard_tls_port(
+    db_session, publisher, journal, portal, final_url
+):
+    portal.final_url = final_url
+    db_session.commit()
+
+    assert_admission_error(
+        db_session,
+        publisher.id,
+        journal.id,
+        portal.id,
+        portal.platform_code,
+        403,
+        "PLATFORM_DOMAIN_NOT_ALLOWED",
+    )
+
+
+def test_normalized_host_must_match_final_url_host(
+    db_session, publisher, journal, portal
+):
+    portal.normalized_host = "other.example.com"
+    db_session.commit()
+
+    assert_admission_error(
+        db_session,
+        publisher.id,
+        journal.id,
+        portal.id,
+        portal.platform_code,
+        403,
+        "PLATFORM_DOMAIN_NOT_ALLOWED",
+    )

@@ -43,11 +43,11 @@ def unique_column_sets(table):
     }
 
 
-def test_registration_schema_is_at_0007(db_engine):
+def test_registration_schema_is_at_0008(db_engine):
     from sqlalchemy import inspect, text
 
     with db_engine.connect() as connection:
-        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0007"
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0008"
     expected = {
         "publisher_registration_support",
         "platform_adapters",
@@ -93,6 +93,14 @@ def test_registration_uniqueness_and_generated_column_match_the_contract():
         "IF(deleted_at IS NULL, normalized_email, NULL)"
     )
     assert ("idempotency_key",) in unique_column_sets(RegistrationTask.__table__)
+    assert (
+        "author_id",
+        "portal_id",
+        "blocking_scope",
+    ) in unique_column_sets(RegistrationTask.__table__)
+    blocking_scope = RegistrationTask.__table__.c.blocking_scope
+    assert blocking_scope.computed is not None
+    assert blocking_scope.computed.persisted is True
     assert ("token_hash",) in unique_column_sets(RegistrationConfirmation.__table__)
     assert isinstance(RegistrationConfirmation.__table__.c.summary_hash.type, CHAR)
     assert RegistrationConfirmation.__table__.c.summary_hash.type.length == 64

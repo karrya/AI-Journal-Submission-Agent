@@ -12222,18 +12222,6 @@
             "type": "array",
             "title": "允许的域名列表"
           },
-          "capability_config": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "适配器能力配置"
-          },
           "last_verified_at": {
             "anyOf": [
               {
@@ -12245,17 +12233,6 @@
               }
             ],
             "title": "最近验收时间"
-          },
-          "verification_notes": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "验收说明"
           },
           "created_at": {
             "type": "string",
@@ -12278,9 +12255,7 @@
           "adapter_version",
           "support_status",
           "allowed_domains",
-          "capability_config",
           "last_verified_at",
-          "verification_notes",
           "created_at",
           "updated_at"
         ],
@@ -13175,6 +13150,22 @@
             "type": "string",
             "title": "平台代码"
           },
+          "platform_adapter_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "平台适配器 ID"
+          },
+          "support_status": {
+            "type": "string",
+            "title": "支持状态"
+          },
           "confidence": {
             "type": "number",
             "title": "置信度"
@@ -13198,6 +13189,8 @@
           "verification_status",
           "access_status",
           "platform_code",
+          "platform_adapter_id",
+          "support_status",
           "confidence",
           "evidence_summary"
         ],

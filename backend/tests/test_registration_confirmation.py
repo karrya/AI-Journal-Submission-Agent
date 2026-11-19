@@ -68,11 +68,26 @@ def task_factory(db_session, registration_records):
     author, publisher, journal, portal, grant = registration_records
 
     def create():
+        task_portal = JournalSubmissionPortal(
+            journal_id=journal.id,
+            original_url=f"https://register.example/confirm/{uuid4()}",
+            final_url=f"https://register.example/confirm/{uuid4()}",
+            redirect_chain=[],
+            verification_status="VERIFIED",
+            access_status="ACCESSIBLE",
+            platform_code="TEST_PLATFORM",
+            confidence=1.0,
+            evidence_summary=[],
+            normalized_host="register.example",
+            support_status="SUPPORTED",
+        )
+        db_session.add(task_portal)
+        db_session.flush()
         task = RegistrationTask(
             author_id=author.id,
             publisher_id=publisher.id,
             journal_id=journal.id,
-            portal_id=portal.id,
+            portal_id=task_portal.id,
             authorization_id=grant.id,
             platform_code="TEST_PLATFORM",
             task_status="READY_TO_SUBMIT",
@@ -103,7 +118,9 @@ def create_challenge(service, task, user, **overrides):
         "user": user,
     }
     arguments.update(overrides)
-    return service.create_challenge(**arguments)
+    challenge = service.create_challenge(**arguments)
+    service.db.commit()
+    return challenge
 
 
 def test_create_challenge_hashes_canonical_summary_and_persists_only_hashes(
@@ -157,10 +174,17 @@ def test_successful_consume_does_not_log_or_write_raw_token_to_task(
     caplog.set_level(logging.DEBUG)
     service = ConfirmationService(db_session)
     challenge = create_challenge(service, task, admin)
+    db_session.refresh(task)
     original_task_values = vars(task).copy()
 
     consumed = service.consume(
-        task, challenge.id, challenge.token, challenge.summary_hash, admin
+        task,
+        challenge.id,
+        challenge.token,
+        challenge.summary_hash,
+        admin,
+        expected_action="SUBMIT_REGISTRATION",
+        legal_states={"READY_TO_SUBMIT"},
     )
 
     assert consumed.consumed_at is not None
@@ -174,14 +198,36 @@ def test_confirmation_cannot_be_replayed_or_used_after_summary_change(
     service = ConfirmationService(db_session)
     challenge = create_challenge(service, task, admin)
     consumed = service.consume(
-        task, challenge.id, challenge.token, challenge.summary_hash, admin
+        task,
+        challenge.id,
+        challenge.token,
+        challenge.summary_hash,
+        admin,
+        expected_action="SUBMIT_REGISTRATION",
+        legal_states={"READY_TO_SUBMIT"},
     )
     assert consumed.consumed_at is not None
 
     with pytest.raises(AppError):
-        service.consume(task, challenge.id, challenge.token, challenge.summary_hash, admin)
+        service.consume(
+            task,
+            challenge.id,
+            challenge.token,
+            challenge.summary_hash,
+            admin,
+            expected_action="SUBMIT_REGISTRATION",
+            legal_states={"READY_TO_SUBMIT"},
+        )
     with pytest.raises(AppError):
-        service.consume(task, challenge.id, challenge.token, "0" * 64, admin)
+        service.consume(
+            task,
+            challenge.id,
+            challenge.token,
+            "0" * 64,
+            admin,
+            expected_action="SUBMIT_REGISTRATION",
+            legal_states={"READY_TO_SUBMIT"},
+        )
 
 
 def test_expired_confirmation_is_rejected(db_session, admin, task):
@@ -189,7 +235,15 @@ def test_expired_confirmation_is_rejected(db_session, admin, task):
     challenge = create_challenge(service, task, admin, ttl_seconds=-1)
 
     with pytest.raises(AppError) as caught:
-        service.consume(task, challenge.id, challenge.token, challenge.summary_hash, admin)
+        service.consume(
+            task,
+            challenge.id,
+            challenge.token,
+            challenge.summary_hash,
+            admin,
+            expected_action="SUBMIT_REGISTRATION",
+            legal_states={"READY_TO_SUBMIT"},
+        )
 
     assert caught.value.code == "CONFIRMATION_EXPIRED"
     assert db_session.get(RegistrationConfirmation, challenge.id).consumed_at is None
@@ -210,7 +264,15 @@ def test_confirmation_rejects_changed_bindings_without_consuming(
     summary_hash = "0" * 64 if binding == "changed_summary" else challenge.summary_hash
 
     with pytest.raises(AppError) as caught:
-        service.consume(target_task, challenge.id, token, summary_hash, user)
+        service.consume(
+            target_task,
+            challenge.id,
+            token,
+            summary_hash,
+            user,
+            expected_action="SUBMIT_REGISTRATION",
+            legal_states={"READY_TO_SUBMIT"},
+        )
 
     assert caught.value.code == "CONFIRMATION_INVALID"
     db_session.expire_all()
@@ -235,6 +297,8 @@ def test_concurrent_consume_has_exactly_one_winner(
                     challenge.token,
                     challenge.summary_hash,
                     session.get(User, user_id),
+                    expected_action="SUBMIT_REGISTRATION",
+                    legal_states={"READY_TO_SUBMIT"},
                 )
                 return "CONSUMED"
             except AppError as exc:
@@ -247,3 +311,50 @@ def test_concurrent_consume_has_exactly_one_winner(
     db_session.expire_all()
     record = db_session.get(RegistrationConfirmation, challenge.id)
     assert record.consumed_at is not None
+
+
+def test_confirmation_binds_expected_action_and_legal_task_state(
+    db_session, admin, task
+):
+    service = ConfirmationService(db_session)
+    challenge = create_challenge(
+        service, task, admin, action_type="VERIFY_EMAIL"
+    )
+
+    with pytest.raises(AppError) as caught:
+        service.consume(
+            task,
+            challenge.id,
+            challenge.token,
+            challenge.summary_hash,
+            admin,
+            expected_action="SUBMIT_REGISTRATION",
+            legal_states={"READY_TO_SUBMIT"},
+        )
+
+    assert caught.value.code == "CONFIRMATION_INVALID"
+    assert db_session.get(RegistrationConfirmation, challenge.id).consumed_at is None
+
+
+def test_cancelled_task_cannot_consume_confirmation(
+    db_session, admin, task
+):
+    service = ConfirmationService(db_session)
+    challenge = create_challenge(service, task, admin)
+    task.task_status = "CANCELLED"
+    db_session.commit()
+
+    with pytest.raises(AppError) as caught:
+        service.consume(
+            task,
+            challenge.id,
+            challenge.token,
+            challenge.summary_hash,
+            admin,
+            expected_action="SUBMIT_REGISTRATION",
+            legal_states={"READY_TO_SUBMIT"},
+        )
+
+    assert caught.value.code == "INVALID_TASK_STATE"
+    db_session.expire_all()
+    assert db_session.get(RegistrationConfirmation, challenge.id).consumed_at is None

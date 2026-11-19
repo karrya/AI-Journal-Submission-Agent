@@ -57,9 +57,7 @@ class PlatformAdapterResponse(OutputModel):
     adapter_version: str
     support_status: str
     allowed_domains: list[str]
-    capability_config: dict | None
     last_verified_at: datetime | None
-    verification_notes: str | None
     created_at: datetime
     updated_at: datetime
 

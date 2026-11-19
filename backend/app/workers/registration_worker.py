@@ -1,26 +1,42 @@
 import logging
+import random
 from dataclasses import dataclass, field
 from datetime import timedelta
 from threading import Event
-from uuid import UUID
+from typing import Any
+from uuid import UUID, uuid4
 
 from sqlalchemy import and_, or_, select, update
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
 from app.models import RegistrationTask, User, utc_now
+from app.services.audit import AuditService
 from app.services.registration_admission import require_supported_registration_target
 from app.services.registration_authorization import require_registration_consent
+from app.services.registration_workflow import (
+    SUBMISSION_ACTIONS,
+    RegistrationWorkflowService,
+)
 
 logger = logging.getLogger(__name__)
 
-_SUBMISSION_ACTIONS = frozenset({"SUBMIT", "SUBMITTING", "SUBMISSION_UNKNOWN"})
+_SUBMISSION_ACTIONS = SUBMISSION_ACTIONS
 _CHECKPOINT_FIELDS = frozenset(
     {
         "current_step",
         "last_external_action",
         "external_evidence_ref",
         "browser_handoff_id",
+    }
+)
+_AUDIT_FIELDS = frozenset(
+    {
+        "task_status",
+        "current_step",
+        "retryable",
+        "retry_count",
+        "error_code",
     }
 )
 
@@ -62,13 +78,22 @@ class RegistrationWorker:
         lease_seconds: int = 300,
         retry_base_seconds: int = 5,
         max_retry_delay_seconds: int = 300,
+        retry_jitter_ratio: float = 0.2,
+        max_retries: int = 3,
     ):
+        if retry_jitter_ratio < 0 or retry_jitter_ratio > 1:
+            raise ValueError("retry_jitter_ratio must be between 0 and 1")
+        if max_retries < 0:
+            raise ValueError("max_retries must not be negative")
         self.engine = engine
         self.worker_id = worker_id
         self.executor = executor
         self.lease_seconds = lease_seconds
         self.retry_base_seconds = retry_base_seconds
         self.max_retry_delay_seconds = max_retry_delay_seconds
+        self.retry_jitter_ratio = retry_jitter_ratio
+        self.max_retries = max_retries
+        self.workflow = RegistrationWorkflowService()
 
     @staticmethod
     def _has_no_unknown_submission():
@@ -108,11 +133,93 @@ class RegistrationWorker:
             conditions.append(RegistrationTask.cancel_requested.is_(False))
         return and_(*conditions)
 
+    @staticmethod
+    def _audit(
+        session: Session,
+        task: RegistrationTask,
+        *,
+        action: str,
+        result: str,
+        before: dict[str, Any] | None = None,
+        after: dict[str, Any] | None = None,
+        error_code: str | None = None,
+    ) -> None:
+        AuditService(session).record(
+            actor_user_id=None,
+            actor_type="system",
+            category="business",
+            action=action,
+            target_type="registration_task",
+            target_id=task.id,
+            author_id=task.author_id,
+            request_id=str(uuid4()),
+            result=result,
+            before=before,
+            after=after,
+            allowed_fields=_AUDIT_FIELDS,
+            error_code=error_code,
+            error_message=(
+                "注册任务执行失败；未将执行器详细消息写入审计"
+                if error_code
+                else None
+            ),
+        )
+
+    def _recover_expired_submissions(self, now) -> None:
+        with Session(bind=self.engine, expire_on_commit=False) as session:
+            candidate_ids = list(
+                session.scalars(
+                    select(RegistrationTask.id).where(
+                        RegistrationTask.task_status == "PROCESSING",
+                        RegistrationTask.lease_expires_at.is_not(None),
+                        RegistrationTask.lease_expires_at < now,
+                        RegistrationTask.last_external_action.in_(
+                            _SUBMISSION_ACTIONS
+                        ),
+                    )
+                )
+            )
+            for task_id in candidate_ids:
+                task = session.scalar(
+                    select(RegistrationTask)
+                    .where(RegistrationTask.id == task_id)
+                    .with_for_update()
+                )
+                if (
+                    task is None
+                    or task.task_status != "PROCESSING"
+                    or task.lease_expires_at is None
+                    or task.lease_expires_at >= now
+                    or task.last_external_action not in _SUBMISSION_ACTIONS
+                ):
+                    continue
+                before = {
+                    "task_status": task.task_status,
+                    "retryable": task.retryable,
+                }
+                self.workflow.recover_submission_unknown(
+                    task, actor_id=self.worker_id
+                )
+                self._audit(
+                    session,
+                    task,
+                    action="registration.task.recover_submission_unknown",
+                    result="success",
+                    before=before,
+                    after={
+                        "task_status": task.task_status,
+                        "current_step": task.current_step,
+                        "retryable": task.retryable,
+                    },
+                )
+            session.commit()
+
     def claim_next(self) -> str | None:
         now = utc_now()
+        self._recover_expired_submissions(now)
         with Session(bind=self.engine, expire_on_commit=False) as session:
-            candidate_id = session.scalar(
-                select(RegistrationTask.id)
+            candidate = session.scalar(
+                select(RegistrationTask)
                 .where(
                     RegistrationTask.cancel_requested.is_(False),
                     self._has_no_unknown_submission(),
@@ -134,8 +241,14 @@ class RegistrationWorker:
                 .order_by(RegistrationTask.created_at, RegistrationTask.id)
                 .limit(1)
             )
-            if candidate_id is None:
+            if candidate is None:
                 return None
+            candidate_id = candidate.id
+            self.workflow.validate_transition(candidate, "PROCESSING")
+            before = {
+                "task_status": candidate.task_status,
+                "retry_count": candidate.retry_count,
+            }
             result = session.execute(
                 update(RegistrationTask)
                 .where(self._claimable(candidate_id, now))
@@ -154,10 +267,24 @@ class RegistrationWorker:
                     error_code=None,
                     error_message=None,
                 )
+                .execution_options(synchronize_session=False)
             )
             if result.rowcount != 1:
                 session.rollback()
                 return None
+            self._audit(
+                session,
+                candidate,
+                action="registration.task.claim",
+                result="success",
+                before=before,
+                after={
+                    "task_status": "PROCESSING",
+                    "current_step": "CLAIMED",
+                    "retry_count": candidate.retry_count + 1,
+                    "retryable": False,
+                },
+            )
             session.commit()
             return candidate_id
 
@@ -221,6 +348,10 @@ class RegistrationWorker:
                 result = executor(task, session)
 
                 self._revalidate_claimed(task_id)
+                evidence_ref = result.checkpoint.get("external_evidence_ref")
+                self.workflow.validate_worker_result(
+                    task, result.status, evidence_ref=evidence_ref
+                )
                 now = utc_now()
                 updated = session.execute(
                     update(RegistrationTask)
@@ -238,12 +369,25 @@ class RegistrationWorker:
                         error_code=None,
                         error_message=None,
                     )
+                    .execution_options(synchronize_session=False)
                 )
                 if updated.rowcount != 1:
                     session.rollback()
                     if self._cancel_requested(task_id):
                         raise TaskCancelled()
                     raise TaskLeaseLost()
+                self._audit(
+                    session,
+                    task,
+                    action="registration.task.result",
+                    result="success",
+                    before={"task_status": "PROCESSING"},
+                    after={
+                        "task_status": result.status,
+                        "current_step": result.checkpoint.get("current_step"),
+                        "retryable": False,
+                    },
+                )
                 session.commit()
         except TaskCancelled:
             self._save_cancelled(task_id)
@@ -310,7 +454,7 @@ class RegistrationWorker:
     def _default_executor(task, session) -> RegistrationExecutionResult:
         return RegistrationExecutionResult(
             "NEEDS_MANUAL_REVIEW",
-            checkpoint={"current_step": "MANUAL_REVIEW_REQUIRED"},
+            checkpoint={"current_step": "MANUAL_REVIEW_REQUIRED_NO_EXTERNAL_ACTION"},
         )
 
     def _revalidate_claimed(self, task_id: UUID | str) -> None:
@@ -334,8 +478,15 @@ class RegistrationWorker:
 
     def _save_cancelled(self, task_id: UUID | str) -> None:
         now = utc_now()
-        with Session(bind=self.engine) as session:
-            session.execute(
+        with Session(bind=self.engine, expire_on_commit=False) as session:
+            task = session.get(RegistrationTask, str(task_id))
+            if task is None or task.worker_id != self.worker_id:
+                return
+            before = {"task_status": task.task_status, "retryable": task.retryable}
+            self.workflow.cancel(
+                task, actor_id=self.worker_id, reason="Worker 在下一安全检查点停止"
+            )
+            updated = session.execute(
                 update(RegistrationTask)
                 .where(
                     RegistrationTask.id == str(task_id),
@@ -354,15 +505,30 @@ class RegistrationWorker:
                     error_code=None,
                     error_message=None,
                 )
+                .execution_options(synchronize_session=False)
+            )
+            if updated.rowcount != 1:
+                session.rollback()
+                return
+            self._audit(
+                session,
+                task,
+                action="registration.task.cancel",
+                result="success",
+                before=before,
+                after={"task_status": "CANCELLED", "retryable": False},
             )
             session.commit()
 
     def _retry_delay(self, retry_count: int) -> int:
         exponent = min(max(retry_count - 1, 0), 31)
-        return min(
+        base = min(
             self.retry_base_seconds * (2**exponent),
             self.max_retry_delay_seconds,
         )
+        bound = base * self.retry_jitter_ratio
+        jittered = base + random.uniform(-bound, bound)
+        return max(0, min(self.max_retry_delay_seconds, round(jittered)))
 
     def _save_failure(
         self,
@@ -378,13 +544,25 @@ class RegistrationWorker:
                 return
             now = utc_now()
             submission_unknown = task.last_external_action in _SUBMISSION_ACTIONS
-            can_retry = retryable and not submission_unknown
+            can_retry = (
+                retryable
+                and not submission_unknown
+                and task.retry_count < self.max_retries
+            )
+            exhausted = retryable and not submission_unknown and not can_retry
+            target = (
+                "SUBMISSION_UNKNOWN"
+                if submission_unknown
+                else "PENDING"
+                if can_retry
+                else "NEEDS_MANUAL_REVIEW"
+                if exhausted
+                else "FAILED"
+            )
+            self.workflow.validate_transition(task, target)
+            before = {"task_status": task.task_status, "retryable": task.retryable}
             values = {
-                "task_status": (
-                    "SUBMISSION_UNKNOWN"
-                    if submission_unknown
-                    else "PENDING" if can_retry else "FAILED"
-                ),
+                "task_status": target,
                 "retryable": can_retry,
                 "available_at": (
                     now + timedelta(seconds=self._retry_delay(task.retry_count))
@@ -403,16 +581,34 @@ class RegistrationWorker:
                 values["current_step"] = "SUBMISSION_UNKNOWN"
             elif can_retry:
                 values["current_step"] = "RETRY_WAIT"
+            elif exhausted:
+                values["current_step"] = "RETRY_LIMIT_MANUAL_REVIEW"
             updated = session.execute(
                 update(RegistrationTask)
                 .where(self._owned(task.id, allow_cancel=False))
                 .values(**values)
+                .execution_options(synchronize_session=False)
             )
             if updated.rowcount != 1:
                 session.rollback()
                 if self._cancel_requested(task_id):
                     self._save_cancelled(task_id)
                 return
+            self._audit(
+                session,
+                task,
+                action="registration.task.failure",
+                result="failure",
+                before=before,
+                after={
+                    "task_status": target,
+                    "current_step": values.get("current_step"),
+                    "retryable": can_retry,
+                    "retry_count": task.retry_count,
+                    "error_code": code,
+                },
+                error_code=code,
+            )
             session.commit()
 
     def run_forever(self, *, poll_interval: float = 1.0, stop_event: Event | None = None) -> None:

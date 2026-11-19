@@ -62,11 +62,28 @@ def require_supported_registration_target(
     )
     if adapter is None or adapter.support_status != "SUPPORTED":
         raise AppError(409, "PLATFORM_ADAPTER_NOT_SUPPORTED", "平台适配器尚未验收")
-    if portal.platform_code != platform_code:
+    if portal.platform_code != platform_code or adapter.platform_type != portal.platform_code:
         raise AppError(409, "PLATFORM_ADAPTER_NOT_SUPPORTED", "平台代码与入口不一致")
 
-    host = (urlsplit(portal.final_url).hostname or "").lower().rstrip(".")
-    if host not in set(adapter.allowed_domains or []):
+    try:
+        parsed = urlsplit(portal.final_url)
+        host = (parsed.hostname or "").lower().rstrip(".")
+        port = parsed.port
+    except ValueError:
+        raise AppError(
+            403, "PLATFORM_DOMAIN_NOT_ALLOWED", "目标入口 URL 或端口不受信任"
+        ) from None
+    normalized_host = (portal.normalized_host or "").lower().rstrip(".")
+    allowed_domains = {
+        str(domain).lower().rstrip(".") for domain in adapter.allowed_domains or []
+    }
+    if (
+        parsed.scheme.lower() != "https"
+        or port not in {None, 443}
+        or not host
+        or normalized_host != host
+        or host not in allowed_domains
+    ):
         raise AppError(403, "PLATFORM_DOMAIN_NOT_ALLOWED", "目标域名不在适配器白名单")
 
     publisher = db.get(Publisher, publisher_id)

@@ -3,6 +3,7 @@
 import hashlib
 import json
 import secrets
+from collections.abc import Collection
 from datetime import timedelta
 from typing import NoReturn
 
@@ -59,14 +60,35 @@ class ConfirmationService:
         token: str,
         summary_hash: str,
         user: User,
+        *,
+        expected_action: str,
+        legal_states: Collection[str],
     ) -> RegistrationConfirmation:
         now = utc_now()
         token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+        locked_task = self.db.scalar(
+            select(RegistrationTask)
+            .where(RegistrationTask.id == task.id)
+            .with_for_update()
+        )
+        if locked_task is None or locked_task.task_status not in set(legal_states):
+            self.db.rollback()
+            raise AppError(
+                409,
+                "INVALID_TASK_STATE",
+                "当前任务状态不允许核销该人工确认",
+            )
+        legal_task = select(RegistrationTask.id).where(
+            RegistrationTask.id == locked_task.id,
+            RegistrationTask.task_status.in_(set(legal_states)),
+        )
         result = self.db.execute(
             update(RegistrationConfirmation)
             .where(
                 RegistrationConfirmation.id == confirmation_id,
-                RegistrationConfirmation.task_id == task.id,
+                RegistrationConfirmation.task_id == locked_task.id,
+                RegistrationConfirmation.task_id.in_(legal_task),
+                RegistrationConfirmation.action_type == expected_action,
                 RegistrationConfirmation.requested_by == user.id,
                 RegistrationConfirmation.consumed_at.is_(None),
                 RegistrationConfirmation.expires_at > now,
@@ -78,12 +100,13 @@ class ConfirmationService:
         )
         if result.rowcount != 1:
             self._reject_consume(
-                task,
+                locked_task,
                 confirmation_id,
                 token_hash,
                 summary_hash,
                 user,
                 now,
+                expected_action,
             )
 
         record = self.db.execute(
@@ -102,7 +125,10 @@ class ConfirmationService:
         summary_hash: str,
         user: User,
         now,
+        expected_action: str,
     ) -> None:
+        # The service owns this transaction; rejected consumes never leave work pending.
+        self.db.rollback()
         record = self.db.scalar(
             select(RegistrationConfirmation)
             .where(RegistrationConfirmation.id == confirmation_id)
@@ -110,6 +136,7 @@ class ConfirmationService:
         )
         if record is None or not (
             record.task_id == task.id
+            and record.action_type == expected_action
             and record.requested_by == user.id
             and secrets.compare_digest(record.token_hash, token_hash)
             and secrets.compare_digest(record.summary_hash, summary_hash)

@@ -24,6 +24,16 @@ const unsupportedPlatform = {
   ...supportedPlatform, id: 'adapter-2', adapter_code: 'TEST_ADAPTER', adapter_name: 'Unverified adapter',
   platform_type: 'TEST', support_status: 'DISABLED', last_verified_at: null,
 }
+const supportedPortal = {
+  id: 'portal-1', journal_id: 'j1', original_url: 'https://register.example/start',
+  final_url: 'https://register.example/register', redirect_chain: [], verification_status: 'VERIFIED',
+  access_status: 'ACCESSIBLE', platform_code: 'EM', confidence: 1, evidence_summary: [],
+  platform_adapter_id: 'adapter-1', support_status: 'SUPPORTED',
+}
+const unsupportedPortal = {
+  ...supportedPortal, id: 'portal-2', platform_code: 'TEST', platform_adapter_id: 'adapter-2',
+  support_status: 'DISABLED',
+}
 const journal = {
   id: 'j1', publisher_id: 'p1', name: 'Journal of Tests', issn: '1234-5678', eissn: null,
   website_url: 'https://journal.example',
@@ -76,6 +86,7 @@ describe('RegistrationView', () => {
         return success(config, { items: [supportedPlatform, unsupportedPlatform] })
       }
       if (config.url === '/registration/publishers/p1/journals') return success(config, { items: [journal] })
+      if (config.url === '/journals/j1/submission-portals') return success(config, { items: [supportedPortal, unsupportedPortal] })
       if (config.url === '/registration/publishers/p2/journals') return success(config, { items: [] })
       if (config.url === '/registration/tasks') return success(config, page([task]))
       if (config.url === '/publisher-accounts') return success(config, page([account]))
@@ -105,7 +116,8 @@ describe('RegistrationView', () => {
     await wrapper.get('[data-test="registration-publisher"]').setValue('p1')
     await flushPromises()
     await wrapper.get('[data-test="registration-journal"]').setValue('j1')
-    await wrapper.get('[data-test="registration-platform"]').setValue('EM')
+    await flushPromises()
+    await wrapper.get('[data-test="registration-platform"]').setValue('adapter-1')
   }
 
   it('shows workflow steps and disables unsupported targets without exposing secrets', async () => {
@@ -114,6 +126,8 @@ describe('RegistrationView', () => {
 
     expect(wrapper.find('[data-test="registration-workflow"]').exists()).toBe(true)
     expect(wrapper.get('[data-test="unsupported-target"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.find('[data-test="registration-platform"]').text()).toContain('请选择投稿平台')
+    await selectSupportedTarget(wrapper)
     expect(wrapper.get('[data-test="unsupported-platform"]').attributes('disabled')).toBeDefined()
     expect(wrapper.text()).toContain('授权核验')
     expect(wrapper.text()).toContain('人工确认')
@@ -135,6 +149,7 @@ describe('RegistrationView', () => {
       if (config.url === '/registration/publishers') return success(config, { items: [supportedPublisher, unsupportedPublisher] })
       if (config.url === '/registration/platform-adapters') return success(config, { items: [supportedPlatform, unsupportedPlatform] })
       if (config.url === '/registration/publishers/p1/journals') return success(config, { items: [journal] })
+      if (config.url === '/journals/j1/submission-portals') return success(config, { items: [supportedPortal, unsupportedPortal] })
       if (config.url === '/registration/tasks') return success(config, page([task]))
       if (config.url === '/publisher-accounts') return success(config, page([]))
       if (config.url === '/author-authorizations/options') return success(config, { authors: [{ id: 'a1', display_name: 'Author One' }], users: [] })
@@ -314,6 +329,7 @@ describe('RegistrationView', () => {
       if (config.url === '/registration/publishers') return success(config, { items: [supportedPublisher] })
       if (config.url === '/registration/platform-adapters') return success(config, { items: [supportedPlatform] })
       if (config.url === '/registration/publishers/p1/journals') return success(config, { items: [journal] })
+      if (config.url === '/journals/j1/submission-portals') return success(config, { items: [supportedPortal, unsupportedPortal] })
       if (config.url === '/registration/tasks') return success(config, page([]))
       if (config.url === '/publisher-accounts') return success(config, page([]))
       if (config.url === '/author-authorizations/options') return success(config, { authors: [{ id: 'a1', display_name: 'Author One' }], users: [] })
@@ -475,4 +491,67 @@ describe('RegistrationView', () => {
     expect(document.activeElement).toBe(wrapper.get('[data-test="open-evidence-t1"]').element)
     expect(wrapper.get('[data-test="open-evidence-t1"]').attributes('type')).toBe('button')
   })
+  it('scopes exact adapter versions to the selected journal without duplicate values', async () => {
+    const secondVersion = {
+      ...supportedPlatform, id: 'adapter-3', adapter_version: '2.0.0', adapter_name: 'Editorial Manager v2',
+    }
+    const secondPortal = {
+      ...supportedPortal, id: 'portal-3', platform_adapter_id: 'adapter-3',
+    }
+    const unboundPlatform = {
+      ...supportedPlatform, id: 'adapter-unbound', adapter_version: '9.0.0', adapter_name: 'Unbound adapter',
+    }
+    adapter.mockImplementation(async (config) => {
+      if (config.url === '/registration/publishers') return success(config, { items: [supportedPublisher] })
+      if (config.url === '/registration/platform-adapters') {
+        return success(config, { items: [supportedPlatform, secondVersion, unboundPlatform] })
+      }
+      if (config.url === '/registration/publishers/p1/journals') return success(config, { items: [journal] })
+      if (config.url === '/journals/j1/submission-portals') return success(config, { items: [supportedPortal, secondPortal] })
+      if (config.url === '/registration/tasks') return success(config, page([]))
+      if (config.url === '/publisher-accounts') return success(config, page([]))
+      if (config.url === '/author-authorizations/options') return success(config, { authors: [{ id: 'a1', display_name: 'Author One' }], users: [] })
+      if (config.url === '/author-authorizations') return success(config, page([authorization]))
+      if (config.url === '/authors/a1/emails') return success(config, page([email]))
+      throw new Error(`Unexpected request: ${config.method} ${config.url}`)
+    })
+    const wrapper = mountView()
+    await flushPromises()
+    const platformSelect = wrapper.get('[data-test="registration-platform"]')
+    expect(platformSelect.findAll('option')).toHaveLength(1)
+    expect((platformSelect.element as HTMLSelectElement).disabled).toBe(true)
+
+    await wrapper.get('[data-test="registration-author"]').setValue('a1')
+    await flushPromises()
+    await wrapper.get('[data-test="registration-publisher"]').setValue('p1')
+    await flushPromises()
+    await wrapper.get('[data-test="registration-journal"]').setValue('j1')
+    await flushPromises()
+
+    const options = platformSelect.findAll('option')
+    expect(options.map((option) => option.attributes('value'))).toEqual(['', 'adapter-1', 'adapter-3'])
+    expect(new Set(options.map((option) => option.attributes('value'))).size).toBe(options.length)
+    expect(platformSelect.text()).toContain('1.0.0')
+    expect(platformSelect.text()).toContain('2.0.0')
+    expect(platformSelect.text()).not.toContain('Unbound adapter')
+  })
+
+  it('maps PROCESSING to the execution phase and uses phase-one safe messages', async () => {
+    const processingTask = { ...task, task_status: 'PROCESSING', current_step: 'CLAIMED' }
+    adapter.mockImplementation(async (config) => {
+      if (config.url === '/registration/publishers') return success(config, { items: [supportedPublisher] })
+      if (config.url === '/registration/platform-adapters') return success(config, { items: [supportedPlatform] })
+      if (config.url === '/registration/tasks') return success(config, page([processingTask]))
+      if (config.url === '/publisher-accounts') return success(config, page([]))
+      if (config.url === '/author-authorizations/options') return success(config, { authors: [], users: [] })
+      throw new Error(`Unexpected request: ${config.method} ${config.url}`)
+    })
+    const wrapper = mountView()
+    await flushPromises()
+
+    expect(wrapper.get('[data-test="selected-task-status"]').text()).toContain('正在处理')
+    expect(wrapper.get('[data-test="registration-workflow"]').text()).toContain('当前阶段')
+    expect(wrapper.text()).toContain('阶段一不执行外部注册')
+  })
+
 })

@@ -309,7 +309,8 @@ EXPECTED_NEW_COLUMNS = {
         "lease_expires_at", "available_at", "last_heartbeat_at", "retryable",
         "cancel_requested", "last_external_action", "external_evidence_ref",
         "browser_handoff_id", "idempotency_key", "error_code", "error_message",
-        "started_at", "last_activity_at", "completed_at", "created_at", "updated_at",
+        "blocking_scope", "started_at", "last_activity_at", "completed_at",
+        "created_at", "updated_at",
         "created_by",
     },
     "email_verification_records": {
@@ -680,7 +681,7 @@ def test_mig_01_empty_upgrade_head_is_cleanly_repeatable(db_engine):
             name: inspect(db_engine).get_table_options(name) for name in EXPECTED_TABLES
         } == first_options
         with db_engine.connect() as connection:
-            assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0007"
+            assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0008"
             assert connection.scalar(text("SELECT COUNT(*) FROM alembic_version")) == 1
     finally:
         command.upgrade(config, "head")
@@ -794,7 +795,7 @@ def test_invalid_legacy_issn_aborts_before_any_ddl(db_engine, db_session):
     db_session.commit()
     command.upgrade(Config(str(BACKEND_DIR / "alembic.ini")), "head")
     with db_engine.connect() as connection:
-        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0007"
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0008"
     if previous_url is None:
         os.environ.pop("ALEMBIC_DATABASE_URL", None)
     else:

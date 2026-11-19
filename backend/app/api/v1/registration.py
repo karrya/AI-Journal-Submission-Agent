@@ -40,11 +40,21 @@ from app.schemas.registration import (
     RegistrationTaskPage,
     RegistrationTaskResponse,
 )
+from app.services.audit import AuditService
 from app.services.permissions import require_roles
 from app.services.registration import RegistrationService
 
 router = APIRouter(prefix="/api/v1", tags=["registration"])
 VALIDATION_RESPONSE: dict[int | str, dict[str, Any]] = {422: {"model": ErrorResponse}}
+_CONFIG_AUDIT_FIELDS = frozenset(
+    {
+        "publisher_code",
+        "support_status",
+        "support_level",
+        "platform_adapter_id",
+        "disabled_reason",
+    }
+)
 SupportStatus = Literal["SUPPORTED", "TESTING", "DISABLED"]
 PublisherCode = Literal[
     "SPRINGER_NATURE", "ELSEVIER", "WILEY", "TAYLOR_FRANCIS", "SAGE"
@@ -76,6 +86,60 @@ def registration_service(
     db: Session, principal: Principal, request: Request
 ) -> RegistrationService:
     return RegistrationService(db, principal.user, request.state.request_id)
+
+
+def _config_audit(
+    db: Session,
+    principal: Principal,
+    request: Request,
+    *,
+    action: str,
+    target_type: str,
+    target_id: str,
+    result: str,
+    before: dict[str, Any] | None = None,
+    after: dict[str, Any] | None = None,
+    error: AppError | None = None,
+) -> None:
+    AuditService(db).record(
+        actor_user_id=principal.user.id,
+        actor_type="user",
+        category="business",
+        action=action,
+        target_type=target_type,
+        target_id=target_id,
+        request_id=request.state.request_id,
+        result=result,
+        before=before,
+        after=after,
+        allowed_fields=_CONFIG_AUDIT_FIELDS,
+        error_code=error.code if error else None,
+        error_message=error.message if error else None,
+    )
+
+
+def _failed_config(
+    db: Session,
+    principal: Principal,
+    request: Request,
+    *,
+    action: str,
+    target_type: str,
+    target_id: str,
+    error: AppError,
+) -> None:
+    db.rollback()
+    _config_audit(
+        db,
+        principal,
+        request,
+        action=action,
+        target_type=target_type,
+        target_id=target_id,
+        result="failure",
+        error=error,
+    )
+    db.commit()
 
 
 def require_admin_csrf(
@@ -167,40 +231,86 @@ def list_registration_journals(
 def configure_registration_publisher(
     publisher_id: UUID,
     payload: PublisherSupportConfig,
+    request: Request,
     db: Annotated[Session, Depends(get_db)],
     principal: Annotated[Principal, Depends(require_admin_csrf)],
 ) -> PublisherRegistrationSupport:
-    publisher = db.get(Publisher, str(publisher_id))
-    if publisher is None or publisher.deleted_at is not None:
-        raise _not_found()
-    repository = RegistrationRepository(db)
-    support = repository.publisher_support(str(publisher_id))
-    conflicting = db.scalar(
-        select(PublisherRegistrationSupport).where(
-            PublisherRegistrationSupport.publisher_code == payload.publisher_code,
-            PublisherRegistrationSupport.publisher_id != str(publisher_id),
-        )
-    )
-    if conflicting is not None:
-        raise AppError(409, "CONFLICT", "出版社代码已用于其他出版社")
-    values = payload.model_dump()
-    if support is None:
-        support = PublisherRegistrationSupport(
-            publisher_id=str(publisher_id),
-            created_by=principal.user.id,
-            **values,
-        )
-        db.add(support)
-    else:
-        for field, value in values.items():
-            setattr(support, field, value)
-    support.updated_by = principal.user.id
+    action = "registration.publisher.configure"
+    target_id = str(publisher_id)
     try:
+        publisher = db.get(Publisher, target_id)
+        if publisher is None or publisher.deleted_at is not None:
+            raise _not_found()
+        repository = RegistrationRepository(db)
+        support = repository.publisher_support(target_id)
+        before = (
+            {
+                field: getattr(support, field)
+                for field in ("publisher_code", "support_status", "support_level")
+            }
+            if support is not None
+            else None
+        )
+        conflicting = db.scalar(
+            select(PublisherRegistrationSupport).where(
+                PublisherRegistrationSupport.publisher_code == payload.publisher_code,
+                PublisherRegistrationSupport.publisher_id != target_id,
+            )
+        )
+        if conflicting is not None:
+            raise AppError(409, "CONFLICT", "出版社代码已用于其他出版社")
+        values = payload.model_dump()
+        if support is None:
+            support = PublisherRegistrationSupport(
+                publisher_id=target_id,
+                created_by=principal.user.id,
+                **values,
+            )
+            db.add(support)
+        else:
+            for field, value in values.items():
+                setattr(support, field, value)
+        support.updated_by = principal.user.id
+        after = {
+            field: values[field]
+            for field in ("publisher_code", "support_status", "support_level")
+        }
+        _config_audit(
+            db,
+            principal,
+            request,
+            action=action,
+            target_type="publisher",
+            target_id=target_id,
+            result="success",
+            before=before,
+            after=after,
+        )
         db.commit()
+        return support
+    except AppError as exc:
+        _failed_config(
+            db,
+            principal,
+            request,
+            action=action,
+            target_type="publisher",
+            target_id=target_id,
+            error=exc,
+        )
+        raise
     except IntegrityError:
-        db.rollback()
-        raise AppError(409, "CONFLICT", "出版社支持配置唯一性冲突") from None
-    return support
+        error = AppError(409, "CONFLICT", "出版社支持配置唯一性冲突")
+        _failed_config(
+            db,
+            principal,
+            request,
+            action=action,
+            target_type="publisher",
+            target_id=target_id,
+            error=error,
+        )
+        raise error from None
 
 
 @router.get(
@@ -210,7 +320,9 @@ def configure_registration_publisher(
 )
 def list_registration_adapters(
     db: Annotated[Session, Depends(get_db)],
-    principal: Annotated[Principal, Depends(get_principal)],
+    principal: Annotated[
+        Principal, Depends(require_roles("submission_operator"))
+    ],
 ) -> PlatformAdapterListResponse:
     records = db.scalars(
         select(PlatformAdapter).order_by(
@@ -232,28 +344,64 @@ def list_registration_adapters(
 def update_registration_portal(
     portal_id: UUID,
     payload: RegistrationPortalUpdate,
+    request: Request,
     db: Annotated[Session, Depends(get_db)],
     principal: Annotated[Principal, Depends(require_admin_csrf)],
 ) -> JournalSubmissionPortal:
-    portal = RegistrationRepository(db).supported_portal(str(portal_id))
-    if portal is None:
-        raise _not_found()
-    values = payload.model_dump(exclude_unset=True)
-    if "platform_adapter_id" in values:
-        adapter_id = values["platform_adapter_id"]
-        if adapter_id is not None:
-            adapter = db.get(PlatformAdapter, str(adapter_id))
-            if adapter is None:
-                raise AppError(404, "RESOURCE_NOT_FOUND", "平台适配器不存在")
-            if adapter.platform_type != portal.platform_code:
-                raise AppError(
-                    422, "VALIDATION_ERROR", "适配器平台与投稿入口不一致"
-                )
-            values["platform_adapter_id"] = adapter.id
-    for field, value in values.items():
-        setattr(portal, field, value)
-    db.commit()
-    return portal
+    action = "registration.portal.configure"
+    target_id = str(portal_id)
+    try:
+        portal = RegistrationRepository(db).supported_portal(target_id)
+        if portal is None:
+            raise _not_found()
+        values = payload.model_dump(exclude_unset=True)
+        before = {
+            field: getattr(portal, field)
+            for field in ("platform_adapter_id", "support_status", "disabled_reason")
+            if field in values
+        }
+        if "platform_adapter_id" in values:
+            adapter_id = values["platform_adapter_id"]
+            if adapter_id is not None:
+                adapter = db.get(PlatformAdapter, str(adapter_id))
+                if adapter is None:
+                    raise AppError(404, "RESOURCE_NOT_FOUND", "平台适配器不存在")
+                if adapter.platform_type != portal.platform_code:
+                    raise AppError(
+                        422, "VALIDATION_ERROR", "适配器平台与投稿入口不一致"
+                    )
+                values["platform_adapter_id"] = adapter.id
+        for field, value in values.items():
+            setattr(portal, field, value)
+        after = {
+            field: values[field]
+            for field in ("platform_adapter_id", "support_status", "disabled_reason")
+            if field in values
+        }
+        _config_audit(
+            db,
+            principal,
+            request,
+            action=action,
+            target_type="journal_submission_portal",
+            target_id=target_id,
+            result="success",
+            before=before,
+            after=after,
+        )
+        db.commit()
+        return portal
+    except AppError as exc:
+        _failed_config(
+            db,
+            principal,
+            request,
+            action=action,
+            target_type="journal_submission_portal",
+            target_id=target_id,
+            error=exc,
+        )
+        raise
 
 
 @router.post(

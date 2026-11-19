@@ -8,7 +8,11 @@ import {
   type EmailResponse,
 } from '../../api/authors'
 import { getSafeRequestId } from '../../api/client'
-import type { JournalOption } from '../../api/identification'
+import {
+  getSubmissionPortals,
+  type JournalOption,
+  type SubmissionPortal,
+} from '../../api/identification'
 import {
   cancelRegistrationTask,
   createRegistrationTask,
@@ -26,6 +30,7 @@ import {
 
 const TASK_STATUS_LABELS: Record<string, string> = {
   PENDING: '待执行',
+  PROCESSING: '正在处理',
   CHECKING_AUTHORIZATION: '正在核验授权',
   OPENING_PAGE: '正在打开页面',
   DETECTING_FORM: '正在识别表单',
@@ -54,6 +59,7 @@ const publishers = ref<RegistrationPublisher[]>([])
 const platforms = ref<RegistrationPlatform[]>([])
 const authors = ref<Array<{ id: string; display_name: string }>>([])
 const journals = ref<JournalOption[]>([])
+const journalPortals = ref<SubmissionPortal[]>([])
 const filterJournals = ref<JournalOption[]>([])
 const authorizations = ref<AuthorizationResponse[]>([])
 const registrationEmail = ref<EmailResponse | null>(null)
@@ -64,6 +70,7 @@ const total = ref(0)
 const catalogLoading = ref(false)
 const authorDataLoading = ref(false)
 const journalsLoading = ref(false)
+const platformsLoading = ref(false)
 const filterJournalsLoading = ref(false)
 const tasksLoading = ref(false)
 const accountsLoading = ref(false)
@@ -76,7 +83,7 @@ const accountError = ref('')
 const actionMessage = ref('')
 
 const target = reactive({
-  author_id: '', authorization_id: '', publisher_id: '', journal_id: '', platform_code: '',
+  author_id: '', authorization_id: '', publisher_id: '', journal_id: '', platform_adapter_id: '',
 })
 const filters = reactive({
   page: 1,
@@ -97,6 +104,7 @@ const evidenceDrawer = ref<HTMLElement | null>(null)
 let taskLoadSequence = 0
 let journalLoadSequence = 0
 let filterJournalLoadSequence = 0
+let platformLoadSequence = 0
 let authorDataSequence = 0
 let createAttempt: { signature: string; key: string } | null = null
 
@@ -105,14 +113,32 @@ const evidenceTask = computed(() => tasks.value.find((item) => item.id === evide
 const selectedAuthor = computed(() => authors.value.find((item) => item.id === target.author_id) ?? null)
 const selectedPublisher = computed(() => publishers.value.find((item) => item.publisher_id === target.publisher_id) ?? null)
 const selectedJournal = computed(() => journals.value.find((item) => item.id === target.journal_id) ?? null)
-const selectedPlatform = computed(() => platforms.value.find((item) => item.platform_type === target.platform_code) ?? null)
+const platformOptions = computed(() => {
+  const bound = new Map<string, RegistrationPlatform>()
+  for (const platform of platforms.value) {
+    const portal = journalPortals.value.find((item) => (
+      item.journal_id === target.journal_id
+      && item.platform_adapter_id === platform.id
+      && item.platform_code === platform.platform_type
+      && item.verification_status === 'VERIFIED'
+    ))
+    if (portal) bound.set(platform.id, platform)
+  }
+  return [...bound.values()]
+})
+const selectedPlatform = computed(() => platformOptions.value.find((item) => item.id === target.platform_adapter_id) ?? null)
+const selectedPortal = computed(() => journalPortals.value.find((item) => (
+  item.journal_id === target.journal_id && item.platform_adapter_id === target.platform_adapter_id
+) && item.platform_code === selectedPlatform.value?.platform_type) ?? null)
 const selectedAuthorization = computed(() => authorizations.value.find((item) => item.id === target.authorization_id) ?? null)
 const canCreate = computed(() => Boolean(
-  target.author_id && target.authorization_id && target.publisher_id && target.journal_id && target.platform_code
+  target.author_id && target.authorization_id && target.publisher_id && target.journal_id && target.platform_adapter_id
   && selectedPublisher.value?.support_status === 'SUPPORTED'
   && selectedPlatform.value?.support_status === 'SUPPORTED'
+  && selectedPortal.value?.support_status === 'SUPPORTED'
+  && selectedPortal.value?.verification_status === 'VERIFIED'
   && selectedAuthorization.value?.validity_status === 'active'
-  && !authorDataLoading.value && !journalsLoading.value && !creating.value,
+  && !authorDataLoading.value && !journalsLoading.value && !platformsLoading.value && !creating.value,
 ))
 const manualGroups = computed(() => [
   {
@@ -250,8 +276,12 @@ async function onAuthorChange(): Promise<void> {
 
 async function onPublisherChange(): Promise<void> {
   const sequence = ++journalLoadSequence
+  platformLoadSequence += 1
   target.journal_id = ''
+  target.platform_adapter_id = ''
   journals.value = []
+  journalPortals.value = []
+  platformsLoading.value = false
   authorDataError.value = ''
   if (!target.publisher_id || selectedPublisher.value?.support_status !== 'SUPPORTED') {
     journalsLoading.value = false
@@ -267,6 +297,28 @@ async function onPublisherChange(): Promise<void> {
     }
   } finally {
     if (sequence === journalLoadSequence) journalsLoading.value = false
+  }
+}
+
+async function onJournalChange(): Promise<void> {
+  const sequence = ++platformLoadSequence
+  target.platform_adapter_id = ''
+  journalPortals.value = []
+  authorDataError.value = ''
+  if (!target.journal_id) {
+    platformsLoading.value = false
+    return
+  }
+  platformsLoading.value = true
+  try {
+    const items = await getSubmissionPortals(target.journal_id)
+    if (sequence === platformLoadSequence) journalPortals.value = items
+  } catch (error) {
+    if (sequence === platformLoadSequence) {
+      authorDataError.value = safeError(error, '无法加载该期刊已绑定的投稿平台。')
+    }
+  } finally {
+    if (sequence === platformLoadSequence) platformsLoading.value = false
   }
 }
 
@@ -369,7 +421,7 @@ async function submitRegistrationTask(): Promise<void> {
       publisher_id: target.publisher_id,
       journal_id: target.journal_id,
       authorization_id: target.authorization_id,
-      platform_code: target.platform_code,
+      platform_code: selectedPlatform.value!.platform_type,
     }
     const signature = JSON.stringify(confirmedPayload)
     if (!createAttempt || createAttempt.signature !== signature) {
@@ -383,7 +435,7 @@ async function submitRegistrationTask(): Promise<void> {
     tasks.value = [created, ...tasks.value.filter((item) => item.id !== created.id)]
     total.value += 1
     selectedTaskId.value = created.id
-    actionMessage.value = `注册任务 ${created.id} 已创建；外部注册仍由受控工作器执行。`
+    actionMessage.value = `注册任务 ${created.id} 已创建；工作器仅复核授权与入口并转人工复核，不执行外部注册。`
   } catch (error) {
     taskError.value = safeError(error, '无法创建注册任务，请核对授权与支持状态后重试。')
   } finally {
@@ -441,7 +493,7 @@ async function retryTask(item: RegistrationTask): Promise<void> {
   actionMessage.value = ''
   try {
     replaceTask(await retryRegistrationTask(item.id))
-    actionMessage.value = '任务已安全转入待执行状态；工作器将先重新识别并核查平台状态。'
+    actionMessage.value = '任务已转入待执行状态；阶段一只重新核验授权和入口准入，不执行外部动作。'
   } catch (error) {
     taskError.value = safeError(error, '无法重试任务，当前状态已保留。')
   } finally {
@@ -495,7 +547,8 @@ function workflowStepState(index: number): { className: string; label: string; m
     return { className: 'unknown', label: '阶段未知 · 流程终止', marker: '?' }
   }
   let currentIndex = 0
-  if (['OPENING_PAGE', 'DETECTING_FORM', 'FILLING_FORM'].includes(item.task_status)) currentIndex = 1
+  if (['PROCESSING', 'CHECKING_AUTHORIZATION'].includes(item.task_status)) currentIndex = 0
+  else if (['OPENING_PAGE', 'DETECTING_FORM', 'FILLING_FORM'].includes(item.task_status)) currentIndex = 1
   else if (['WAITING_CAPTCHA', 'READY_TO_SUBMIT', 'SUBMITTING', 'SUBMITTED', 'SUBMISSION_UNKNOWN', 'NEEDS_MANUAL_REVIEW'].includes(item.task_status)) currentIndex = 2
   else if (['WAITING_EMAIL', 'WAITING_EMAIL_CONFIRM', 'VERIFYING_EMAIL'].includes(item.task_status)) currentIndex = 3
   if (index < currentIndex) return { className: 'complete', label: '已完成', marker: '✓' }
@@ -535,7 +588,7 @@ onMounted(() => {
         <h1 id="registration-title">注册任务工作台</h1>
         <p class="page-intro">集中核对授权目标、跟踪任务状态并处理人工介入。仅支持已核验的出版社与平台。</p>
       </div>
-      <span class="scope-note">不展示密码、凭据引用或完整验证链接</span>
+      <span class="scope-note">阶段一不执行外部注册、邮箱读取或提交；不展示密码、凭据引用或完整验证链接</span>
     </header>
 
     <p v-if="catalogError" class="inline-alert" role="alert">
@@ -577,7 +630,7 @@ onMounted(() => {
         <div class="target-card">
           <span class="target-number">3</span>
           <label for="registration-journal">期刊</label>
-          <select id="registration-journal" v-model="target.journal_id" data-test="registration-journal" :disabled="!target.publisher_id || journalsLoading">
+          <select id="registration-journal" v-model="target.journal_id" data-test="registration-journal" :disabled="!target.publisher_id || journalsLoading" @change="onJournalChange">
             <option value="">{{ journalsLoading ? '正在加载期刊…' : '请选择期刊' }}</option>
             <option v-for="journal in journals" :key="journal.id" :value="journal.id">{{ journal.name }}</option>
           </select>
@@ -587,15 +640,15 @@ onMounted(() => {
         <div class="target-card">
           <span class="target-number">4</span>
           <label for="registration-platform">投稿平台</label>
-          <select id="registration-platform" v-model="target.platform_code" data-test="registration-platform" :disabled="catalogLoading">
-            <option value="">请选择投稿平台</option>
+          <select id="registration-platform" v-model="target.platform_adapter_id" data-test="registration-platform" :disabled="catalogLoading || !target.journal_id || platformsLoading">
+            <option value="">{{ platformsLoading ? '正在加载已绑定平台…' : '请选择投稿平台' }}</option>
             <option
-              v-for="platform in platforms" :key="platform.id" :value="platform.platform_type"
-              :disabled="platform.support_status !== 'SUPPORTED'"
+              v-for="platform in platformOptions" :key="platform.id" :value="platform.id"
+              :disabled="platform.support_status !== 'SUPPORTED' || journalPortals.find((portal) => portal.platform_adapter_id === platform.id)?.support_status !== 'SUPPORTED'"
               :data-test="platform.support_status !== 'SUPPORTED' ? 'unsupported-platform' : undefined"
-            >{{ platform.adapter_name }} · {{ platform.support_status === 'SUPPORTED' ? '已支持' : '未验收，不可选' }}</option>
+            >{{ platform.adapter_name }} · v{{ platform.adapter_version }} · {{ platform.support_status === 'SUPPORTED' ? '已支持' : '未验收，不可选' }}</option>
           </select>
-          <p>适配器必须处于已支持状态，平台最终准入由服务端复核。</p>
+          <p>仅列出当前期刊已核验入口绑定的具体适配器版本；平台最终准入由服务端复核。</p>
         </div>
       </div>
       <p v-if="authorDataError" class="inline-alert" role="alert">{{ authorDataError }}</p>

@@ -133,6 +133,12 @@ class RegistrationTask(UUIDPrimaryKeyMixin, CreatedUpdatedByMixin, Base):
     __tablename__ = "registration_tasks"
     __table_args__ = (
         UniqueConstraint("idempotency_key", name="uk_registration_idempotency"),
+        UniqueConstraint(
+            "author_id",
+            "portal_id",
+            "blocking_scope",
+            name="uk_registration_blocking_scope",
+        ),
         Index("idx_registration_author_status", "author_id", "task_status"),
         Index("idx_registration_account", "account_id"),
         Index("idx_registration_created", "created_at"),
@@ -187,6 +193,15 @@ class RegistrationTask(UUIDPrimaryKeyMixin, CreatedUpdatedByMixin, Base):
     external_evidence_ref: Mapped[str | None] = mapped_column(VARCHAR(255), nullable=True)
     browser_handoff_id: Mapped[str | None] = mapped_column(VARCHAR(64), nullable=True)
     idempotency_key: Mapped[str] = mapped_column(VARCHAR(128), nullable=False)
+    blocking_scope: Mapped[str | None] = mapped_column(
+        VARCHAR(7),
+        Computed(
+            "CASE WHEN task_status NOT IN ('CANCELLED', 'FAILED', 'EXPIRED') "
+            "OR last_external_action IS NOT NULL THEN 'BLOCKED' ELSE NULL END",
+            persisted=True,
+        ),
+        nullable=True,
+    )
     error_code: Mapped[str | None] = mapped_column(VARCHAR(64), nullable=True)
     error_message: Mapped[str | None] = mapped_column(TEXT, nullable=True)
     started_at: Mapped[datetime | None] = mapped_column(DATETIME(fsp=6), nullable=True)

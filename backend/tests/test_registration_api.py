@@ -2,8 +2,10 @@
 
 from datetime import timedelta
 from types import SimpleNamespace
+from uuid import uuid4
 
 import pytest
+from sqlalchemy import select
 
 from app.models import (
     Author,
@@ -14,6 +16,7 @@ from app.models import (
     Publisher,
     PublisherAccount,
     PublisherRegistrationSupport,
+    OperationLog,
     utc_now,
 )
 
@@ -332,3 +335,181 @@ def test_registration_openapi_documents_routes_in_chinese_with_standard_errors(c
             assert operation["responses"]["422"]["content"]["application/json"][
                 "schema"
             ] == {"$ref": "#/components/schemas/ErrorResponse"}
+
+
+@pytest.mark.parametrize(
+    ("role", "expected_status"),
+    [
+        ("system_admin", 200),
+        ("submission_operator", 200),
+        ("reviewer", 403),
+        ("auditor", 403),
+        ("author", 403),
+    ],
+)
+def test_adapter_catalog_role_matrix_and_safe_fields(
+    client,
+    db_session,
+    registration_records,
+    user_factory,
+    auth_context_factory,
+    role,
+    expected_status,
+):
+    registration_records.adapter.capability_config = {
+        "credential_ref": "must-not-be-exposed"
+    }
+    registration_records.adapter.verification_notes = "internal-only-note"
+    db_session.commit()
+    user = user_factory(f"adapter-{role}", roles=(role,))
+    auth_context_factory(user)
+
+    response = client.get("/api/v1/registration/platform-adapters")
+
+    assert response.status_code == expected_status, response.text
+    if expected_status == 200:
+        item = response.json()["items"][0]
+        assert "capability_config" not in item
+        assert "verification_notes" not in item
+        assert "must-not-be-exposed" not in response.text
+        assert "internal-only-note" not in response.text
+    else:
+        assert_error(response, 403, "PERMISSION_DENIED")
+
+
+def registration_write_request(kind, approved_input, registration_records):
+    if kind == "create":
+        return "post", "/api/v1/registration/tasks", approved_input
+    if kind in {"cancel", "retry"}:
+        return (
+            "post",
+            f"/api/v1/registration/tasks/{uuid4()}/{kind}",
+            None,
+        )
+    if kind == "publisher_config":
+        return (
+            "put",
+            f"/api/v1/registration/publishers/{registration_records.publisher.id}/support",
+            {
+                "publisher_code": "ELSEVIER",
+                "display_name": "Elsevier",
+                "support_status": "SUPPORTED",
+                "support_level": "V0_1",
+            },
+        )
+    return (
+        "patch",
+        f"/api/v1/registration/submission-portals/{registration_records.portal.id}",
+        {"support_status": "DISABLED", "disabled_reason": "review test"},
+    )
+
+
+@pytest.mark.parametrize(
+    "kind", ["create", "cancel", "retry", "publisher_config", "portal_config"]
+)
+@pytest.mark.parametrize(
+    "mode", ["missing_csrf", "wrong_csrf", "untrusted_origin", "missing_origin"]
+)
+def test_all_registration_writes_reject_negative_csrf_and_origin(
+    client,
+    admin_context,
+    approved_input,
+    registration_records,
+    kind,
+    mode,
+):
+    method, path, payload = registration_write_request(
+        kind, approved_input, registration_records
+    )
+    headers = {}
+    if mode == "missing_csrf":
+        client.headers.pop("X-CSRF-Token", None)
+    elif mode == "wrong_csrf":
+        headers["X-CSRF-Token"] = "definitely-wrong"
+    elif mode == "untrusted_origin":
+        headers["Origin"] = "https://attacker.invalid"
+    else:
+        client.headers.pop("Origin", None)
+
+    response = getattr(client, method)(path, json=payload, headers=headers)
+
+    assert_error(response, 403, "SECURITY_CHECK_FAILED")
+
+
+@pytest.mark.parametrize(
+    "kind", ["create", "cancel", "retry", "publisher_config", "portal_config"]
+)
+def test_ordinary_users_cannot_use_registration_write_or_config_routes(
+    client,
+    operator_context,
+    reviewer,
+    auth_context_factory,
+    approved_input,
+    registration_records,
+    kind,
+):
+    method, path, payload = registration_write_request(
+        kind, approved_input, registration_records
+    )
+    if kind in {"cancel", "retry"}:
+        created = create_task(client, approved_input)
+        path = f"/api/v1/registration/tasks/{created['id']}/{kind}"
+    auth_context_factory(reviewer)
+
+    response = getattr(client, method)(path, json=payload)
+
+    assert_error(response, 403, "PERMISSION_DENIED")
+
+
+def test_registration_configuration_success_and_failure_are_audited(
+    client,
+    db_session,
+    admin_context,
+    registration_records,
+):
+    support_path = (
+        f"/api/v1/registration/publishers/{registration_records.publisher.id}/support"
+    )
+    response = client.put(
+        support_path,
+        json={
+            "publisher_code": "ELSEVIER",
+            "display_name": "Elsevier",
+            "support_status": "DISABLED",
+            "support_level": "V0_1",
+        },
+    )
+    assert response.status_code == 200, response.text
+    success = db_session.scalar(
+        select(OperationLog).where(
+            OperationLog.action == "registration.publisher.configure",
+            OperationLog.result == "success",
+        )
+    )
+    assert success is not None
+    assert success.after_summary["support_status"] == "DISABLED"
+    assert "notes" not in success.after_summary
+
+    other_adapter = PlatformAdapter(
+        adapter_code="WRONG_ADAPTER",
+        adapter_name="Wrong Adapter",
+        platform_type="OTHER_PLATFORM",
+        adapter_version="1.0.0",
+        support_status="SUPPORTED",
+        allowed_domains=["register.example"],
+    )
+    db_session.add(other_adapter)
+    db_session.commit()
+    response = client.patch(
+        f"/api/v1/registration/submission-portals/{registration_records.portal.id}",
+        json={"platform_adapter_id": other_adapter.id},
+    )
+    assert response.status_code == 422, response.text
+    failure = db_session.scalar(
+        select(OperationLog).where(
+            OperationLog.action == "registration.portal.configure",
+            OperationLog.result == "failure",
+        )
+    )
+    assert failure is not None
+    assert failure.error_code == "VALIDATION_ERROR"

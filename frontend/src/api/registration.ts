@@ -25,9 +25,7 @@ export interface RegistrationPlatform {
   adapter_version: string
   support_status: RegistrationSupportStatus
   allowed_domains: string[]
-  capability_config: Record<string, unknown> | null
   last_verified_at: string | null
-  verification_notes: string | null
   created_at: string
   updated_at: string
 }

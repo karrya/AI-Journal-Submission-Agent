@@ -98,6 +98,28 @@ export async function getJournalOptions(publisherId: string, name = ''): Promise
   return response.data.items
 }
 
+export interface SubmissionPortal {
+  id: string
+  journal_id: string
+  original_url: string
+  final_url: string
+  redirect_chain: string[]
+  verification_status: string
+  access_status: string
+  platform_code: string
+  platform_adapter_id: string | null
+  support_status: string
+  confidence: number
+  evidence_summary: EvidenceSummary[]
+}
+
+export async function getSubmissionPortals(journalId: string): Promise<SubmissionPortal[]> {
+  const response = await api.get<{ items: SubmissionPortal[] }>(
+    `/journals/${encodeURIComponent(journalId)}/submission-portals`,
+  )
+  return response.data.items
+}
+
 export async function identifyJournal(payload: IdentifyRequest): Promise<IdentifyResponse> {
   const response = await api.post<IdentifyResponse>('/journals/identify', payload)
   return response.data

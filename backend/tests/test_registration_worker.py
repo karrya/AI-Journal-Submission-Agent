@@ -141,7 +141,11 @@ def test_worker_persists_successful_execution(db_engine, db_session, task):
         db_engine,
         worker_id="worker-success",
         executor=lambda task, db: RegistrationExecutionResult(
-            "REGISTERED", checkpoint={"current_step": "COMPLETED"}
+            "REGISTERED",
+            checkpoint={
+                "current_step": "COMPLETED",
+                "external_evidence_ref": "platform-registration-evidence",
+            },
         ),
     )
 
@@ -164,7 +168,10 @@ def test_expired_lease_can_be_reclaimed(db_engine, db_session, task):
     worker = RegistrationWorker(
         db_engine,
         worker_id="live-worker",
-        executor=lambda task, db: RegistrationExecutionResult("REGISTERED"),
+        executor=lambda task, db: RegistrationExecutionResult(
+            "REGISTERED",
+            checkpoint={"external_evidence_ref": "platform-registration-evidence"},
+        ),
     )
 
     assert worker.run_once() is True
@@ -178,12 +185,18 @@ def test_lost_lease_cannot_overwrite_new_owner(db_engine, db_session, task):
     first = RegistrationWorker(
         db_engine,
         worker_id="worker-a",
-        executor=lambda task, db: RegistrationExecutionResult("REGISTERED"),
+        executor=lambda task, db: RegistrationExecutionResult(
+            "REGISTERED",
+            checkpoint={"external_evidence_ref": "platform-registration-evidence"},
+        ),
     )
     second = RegistrationWorker(
         db_engine,
         worker_id="worker-b",
-        executor=lambda task, db: RegistrationExecutionResult("REGISTERED"),
+        executor=lambda task, db: RegistrationExecutionResult(
+            "REGISTERED",
+            checkpoint={"external_evidence_ref": "platform-registration-evidence"},
+        ),
     )
     assert first.claim_next() == task.id
     task.lease_expires_at = utc_now() - timedelta(seconds=1)
@@ -274,8 +287,12 @@ def test_portal_disablement_during_execution_stops_at_checkpoint(
 
 
 def test_retryable_failures_use_bounded_exponential_backoff(
-    db_engine, db_session, task
+    db_engine, db_session, task, monkeypatch
 ):
+    monkeypatch.setattr(
+        "app.workers.registration_worker.random.uniform", lambda low, high: 0
+    )
+
     def fail(claimed, session):
         raise RegistrationExecutionError("temporary outage", retryable=True)
 
@@ -350,7 +367,7 @@ def test_default_executor_only_admits_then_requests_manual_review(
 
     review = refresh_task(db_session, task.id)
     assert review.task_status == "NEEDS_MANUAL_REVIEW"
-    assert review.current_step == "MANUAL_REVIEW_REQUIRED"
+    assert review.current_step == "MANUAL_REVIEW_REQUIRED_NO_EXTERNAL_ACTION"
     assert review.error_code is None
     assert review.worker_id is None
 
@@ -395,5 +412,7 @@ def test_recovered_task_with_submission_action_is_not_executed(
     assert worker.run_once() is False
     assert executed is False
     recovered = refresh_task(db_session, task.id)
-    assert recovered.task_status == "PROCESSING"
-    assert recovered.worker_id == "dead-worker"
+    assert recovered.task_status == "SUBMISSION_UNKNOWN"
+    assert recovered.worker_id is None
+    assert recovered.lease_expires_at is None
+    assert recovered.retryable is False

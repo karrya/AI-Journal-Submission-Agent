@@ -348,17 +348,6 @@ def test_cancelled_or_completed_task_can_be_restarted(db_session, operator, task
     assert restarted.last_activity_at is not None
 
 
-def test_registered_task_can_be_restarted(db_session, operator, task):
-    task.task_status = "REGISTERED"
-    db_session.commit()
-
-    restarted = RegistrationService(
-        db_session, operator, "request-retry"
-    ).retry_task(task.id)
-
-    assert restarted.task_status == "PENDING"
-
-
 def test_pending_task_cannot_be_restarted(db_session, operator, task):
     with pytest.raises(AppError) as caught:
         RegistrationService(db_session, operator, "request-retry").retry_task(task.id)
@@ -388,8 +377,25 @@ def test_submission_states_require_dedicated_workflow_methods(task):
     assert_app_error(caught, 409, "INVALID_TASK_STATE")
 
     task.task_status = "FILLING_FORM"
+    task.external_evidence_ref = "controlled-form-evidence"
     workflow.mark_ready_to_submit(task, actor_id=actor_id, reason="表单已填写")
-    workflow.start_submission(task, actor_id=actor_id, reason="确认令牌已核销")
+    from app.models import RegistrationConfirmation
+
+    confirmation = RegistrationConfirmation(
+        task_id=task.id,
+        action_type="SUBMIT_REGISTRATION",
+        summary_hash="0" * 64,
+        token_hash="1" * 64,
+        requested_by=actor_id,
+        expires_at=utc_now() + timedelta(minutes=5),
+        consumed_at=utc_now(),
+    )
+    workflow.start_submission(
+        task,
+        actor_id=actor_id,
+        confirmation=confirmation,
+        reason="确认令牌已核销",
+    )
     workflow.mark_submission_unknown(task, actor_id=actor_id, reason="提交结果未知")
 
     assert task.task_status == "SUBMISSION_UNKNOWN"
@@ -400,7 +406,10 @@ def test_submission_states_require_dedicated_workflow_methods(task):
 def test_submission_cannot_start_before_ready(task):
     with pytest.raises(AppError) as caught:
         RegistrationWorkflowService().start_submission(
-            task, actor_id=str(uuid4()), reason="尚未确认"
+            task,
+            actor_id=str(uuid4()),
+            confirmation=None,
+            reason="尚未确认",
         )
 
     assert_app_error(caught, 409, "INVALID_TASK_STATE")

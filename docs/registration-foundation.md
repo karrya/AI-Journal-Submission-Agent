@@ -36,7 +36,7 @@ cd "$PROJECT_ROOT/backend"
 ../.venv/bin/python -m alembic check
 ```
 
-完全迁移后的模式包含 31 张应用表和 1 张 `alembic_version` 表。模块 3 的迁移为 `0007_registration_foundation`；它新增 6 张表并扩展模块 2 的投稿入口表。
+完全迁移后的模式包含 31 张应用表和 1 张 `alembic_version` 表。模块 3 的初始迁移为 `0007_registration_foundation`，它新增 6 张表并扩展模块 2 的投稿入口表；`0008_registration_conflict_guard` 增加作者与投稿入口维度的数据库冲突唯一约束。升级前如已有相同作用域的未决任务，必须先人工核查并整理这些任务，不能靠删除或覆盖历史记录绕过冲突。
 
 ### 2.3 启动后端、两个 Worker 和前端
 
@@ -84,7 +84,7 @@ curl --fail --silent http://127.0.0.1:5173/ >/dev/null
 
 ### 4.1 角色能力和作者授权必须同时成立
 
-- 注册相关操作要求登录会话；创建、取消和重试任务还要求 CSRF。出版社支持配置及投稿入口配置仅系统管理员可修改，并要求 CSRF。
+- 注册相关操作要求登录会话；创建、取消和重试任务还要求 CSRF。出版社支持配置及投稿入口配置仅系统管理员可修改，并要求 CSRF。平台适配器目录仅系统管理员和投稿操作员可读取，响应不包含能力配置或内部验收说明。
 - `account:register`、`email:verification:read` 和 `credential:use` 是三个独立权限，任何一个都不能由其他权限或 `manuscript:read` 替代。
 - 注册任务要求当前角色具备 `account:register` 能力，并且请求中的 `authorization_id` 对应当前用户、当前作者的有效 `author_authorizations` 记录。授权必须已生效、未到期、未撤销，且包含该权限。
 - 系统管理员也不能省略作者显式授权；只读角色即使持有授权记录也仍被角色能力拒绝。
@@ -95,16 +95,18 @@ curl --fail --silent http://127.0.0.1:5173/ >/dev/null
 1. 出版社属于 Springer Nature、Elsevier、Wiley、Taylor & Francis 或 SAGE 的 V0.1 支持集合，支持级别为 `V0_1` 且状态为 `SUPPORTED`。
 2. 期刊存在、未删除且确实属于该出版社。
 3. 投稿入口属于该期刊，`support_status=SUPPORTED` 且 `verification_status=VERIFIED`。
-4. 入口绑定的适配器为 `SUPPORTED`，平台代码与入口一致。
-5. 入口最终 URL 的精确主机名位于该适配器的允许域名集合中；大小写和末尾点规范化不放宽主机匹配。
+4. 入口绑定的适配器为 `SUPPORTED`，适配器平台类型、入口平台代码与请求平台代码一致。
+5. 入口最终 URL 必须使用 HTTPS 和标准 TLS 端口（缺省或 443），其精确主机名与入口 `normalized_host` 一致，并位于该适配器的允许域名集合中；大小写和末尾点规范化不放宽主机匹配。
 
 ## 5. 任务、Worker 恢复与确认防重放
 
-注册任务创建使用唯一幂等键；相同输入返回既有任务，相同幂等键用于不同输入会被拒绝。创建 API 返回 `202`，任务 API 不返回原始凭据、Cookie 或确认 Token。
+注册任务创建使用唯一幂等键；相同输入返回既有任务，相同幂等键用于不同输入会被拒绝。入口行锁内的冲突检查与数据库生成列唯一约束共同保证：同一作者和投稿入口不能由不同幂等键并发创建多个活跃、结果不确定或已完成注册的任务。创建 API 返回 `202`，任务 API 不返回原始凭据、Cookie 或确认 Token。
 
-注册 Worker 原子认领待执行任务，并记录 Worker ID、心跳和租约。过期租约可由存活 Worker 重新认领；失去租约的旧 Worker 不能覆盖新所有者的检查点或结果。可重试失败使用有上限的指数退避。执行中出现提交动作或提交结果未知时进入保守保护，不自动重放外部提交；`SUBMITTING`、`SUBMISSION_UNKNOWN` 或已有提交动作的恢复任务不会被默认执行器再次提交。
+任务状态只能按 Workflow Service 的显式源/目标图迁移。提交确认、平台接受证据和注册完成证据分别由专用方法校验；`REGISTERED` 是终态，不能重试。`CANCELLED` 或明确可重试的 `FAILED` 只有在没有外部动作标记时才可重新排队，否则返回 `PLATFORM_RECONCILIATION_REQUIRED`，等待人工核查平台实际状态。
 
-确认挑战与任务、动作、请求用户和规范化摘要哈希绑定，默认十分钟到期。数据库只保存 Token 哈希和摘要哈希。消费使用带全部绑定条件的原子更新，只有一个并发请求能成功；重放返回 `CONFIRMATION_CONSUMED`，过期返回 `CONFIRMATION_EXPIRED`，任务、用户、Token 或摘要不匹配返回 `CONFIRMATION_INVALID`。
+注册 Worker 原子认领待执行任务，并记录 Worker ID、心跳和租约。过期租约可由存活 Worker 重新认领；失去租约的旧 Worker 不能覆盖新所有者的检查点或结果。可重试失败使用带配置上限、最大次数和有界随机抖动的指数退避，耗尽后进入 `NEEDS_MANUAL_REVIEW`。如果过期任务已记录提交标记，Worker 会在同一事务中将其恢复为 `SUBMISSION_UNKNOWN`、清除所有权并审计，不会调用执行器。任务创建、配置、取消、重试、Worker 认领、结果、取消、失败和恢复均复用 `operation_logs`，只写显式白名单摘要。
+
+确认挑战与任务、动作、请求用户和规范化摘要哈希绑定，默认十分钟到期。数据库只保存 Token 哈希和摘要哈希。消费时锁定任务并同时校验预期动作与合法当前状态，再使用带全部绑定条件的原子更新；只有一个并发请求能成功。重放返回 `CONFIRMATION_CONSUMED`，过期返回 `CONFIRMATION_EXPIRED`，跨动作、任务、用户、Token 或摘要不匹配返回 `CONFIRMATION_INVALID`，已取消或其他非法状态返回 `INVALID_TASK_STATE`。拒绝路径显式回滚，不保留部分消费。
 
 ## 6. 阶段一自动化验收
 
@@ -127,9 +129,12 @@ bash -n scripts/dev_services.sh scripts/dev_backend.sh scripts/dev_worker.sh scr
 cd "$PROJECT_ROOT/backend"
 ENVIRONMENT=test PYTHONPATH=. ../.venv/bin/python -m pytest \
   tests/test_registration_authorization.py \
+  tests/test_registration_service.py \
   tests/test_registration_admission.py \
   tests/test_registration_worker.py \
-  tests/test_registration_confirmation.py -q
+  tests/test_registration_confirmation.py \
+  tests/test_registration_api.py \
+  tests/test_registration_hardening.py -q
 ```
 
 按下表核对覆盖的安全行为；这些测试全部使用固定测试库和模拟执行器：

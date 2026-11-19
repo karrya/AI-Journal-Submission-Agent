@@ -695,6 +695,12 @@ class JournalIdentificationService(DomainService):
                     verification_status=record.verification_status,
                     access_status=record.access_status,
                     platform_code=record.platform_code,
+                    platform_adapter_id=(
+                        UUID(record.platform_adapter_id)
+                        if record.platform_adapter_id
+                        else None
+                    ),
+                    support_status=record.support_status,
                     confidence=record.confidence,
                     evidence_summary=record.evidence_summary,
                 )

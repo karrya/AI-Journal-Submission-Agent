@@ -284,6 +284,8 @@ def test_task_page_applies_all_documented_filters(db_session, registration_recor
 def test_task_page_is_deterministic_and_paginates(db_session, registration_records):
     first = registration_records.task
     first.created_at = utc_now() - timedelta(hours=1)
+    first.task_status = "CANCELLED"
+    db_session.commit()
     second = create_task(registration_records, db_session, created_at=utc_now())
     db_session.commit()
     repository = RegistrationRepository(db_session)

@@ -1,6 +1,8 @@
 """Authorized registration task creation, queries, cancellation, and retry."""
 
 from collections.abc import Mapping
+from typing import Any
+from uuid import uuid4
 
 from sqlalchemy import ColumnElement, func, select
 from sqlalchemy.exc import IntegrityError
@@ -20,6 +22,7 @@ from app.models import (
 from app.repositories.authorizations import AuthorizationRepository
 from app.repositories.registration import RegistrationRepository
 from app.schemas.registration import RegistrationTaskCreate
+from app.services.audit import AuditService
 from app.services.permissions import Permission, has_author_permission
 from app.services.registration_admission import (
     AdmissionResult,
@@ -28,14 +31,25 @@ from app.services.registration_admission import (
 from app.services.registration_authorization import require_registration_consent
 from app.services.registration_workflow import RegistrationWorkflowService
 
+_AUDIT_FIELDS = frozenset(
+    {
+        "task_status",
+        "current_step",
+        "retryable",
+        "retry_count",
+        "reused",
+    }
+)
+
 
 class RegistrationService:
     def __init__(self, db: Session, user: User, request_id: str | None = None):
         self.db = db
         self.user = user
-        self.request_id = request_id
+        self.request_id = request_id or str(uuid4())
         self.repository = RegistrationRepository(db)
         self.workflow = RegistrationWorkflowService()
+        self.audit = AuditService(db)
 
     def _require_consent(self, author_id: str, authorization_id: str) -> None:
         require_registration_consent(
@@ -45,6 +59,34 @@ class RegistrationService:
             authorization_id,
             {"account:register"},
             self.request_id,
+        )
+
+    def _audit(
+        self,
+        *,
+        action: str,
+        target_id: str,
+        result: str,
+        author_id: str | None = None,
+        before: dict[str, Any] | None = None,
+        after: dict[str, Any] | None = None,
+        error: AppError | None = None,
+    ) -> None:
+        self.audit.record(
+            actor_user_id=self.user.id,
+            actor_type="user",
+            category="business",
+            action=action,
+            target_type="registration_task",
+            target_id=target_id,
+            author_id=author_id,
+            request_id=self.request_id,
+            result=result,
+            before=before,
+            after=after,
+            allowed_fields=_AUDIT_FIELDS,
+            error_code=error.code if error else None,
+            error_message=error.message if error else None,
         )
 
     @staticmethod
@@ -96,6 +138,7 @@ class RegistrationService:
                     JournalSubmissionPortal.created_at.desc(),
                     JournalSubmissionPortal.id.asc(),
                 )
+                .with_for_update()
             )
         )
         first_error: AppError | None = None
@@ -115,14 +158,37 @@ class RegistrationService:
             raise first_error
         raise AppError(404, "JOURNAL_ENDPOINT_NOT_FOUND", "期刊入口不存在")
 
-    def create_task(self, payload: RegistrationTaskCreate) -> RegistrationTask:
+    def _reject_conflicting_task(self, payload: RegistrationTaskCreate, portal_id: str) -> None:
+        conflict = self.db.scalar(
+            select(RegistrationTask.id).where(
+                RegistrationTask.author_id == str(payload.author_id),
+                RegistrationTask.portal_id == portal_id,
+                RegistrationTask.blocking_scope == "BLOCKED",
+            )
+        )
+        if conflict is not None:
+            raise AppError(
+                409,
+                "REGISTRATION_TASK_CONFLICT",
+                "同一作者和投稿入口已有需完成或人工核查的注册任务",
+            )
+
+    def _create_task(
+        self, payload: RegistrationTaskCreate, target_id: str
+    ) -> tuple[RegistrationTask, bool]:
         self._require_consent(str(payload.author_id), str(payload.authorization_id))
         existing = self.repository.task_by_idempotency(payload.idempotency_key)
         if existing is not None:
-            return self._reuse_existing(existing, payload)
+            return self._reuse_existing(existing, payload), True
 
         admission = self._admit_new_target(payload)
+        # The portal lock serializes scope checks; recheck idempotency after waiting.
+        existing = self.repository.task_by_idempotency(payload.idempotency_key)
+        if existing is not None:
+            return self._reuse_existing(existing, payload), True
+        self._reject_conflicting_task(payload, admission.portal.id)
         task = RegistrationTask(
+            id=target_id,
             author_id=str(payload.author_id),
             publisher_id=str(payload.publisher_id),
             journal_id=str(payload.journal_id),
@@ -138,14 +204,39 @@ class RegistrationService:
         )
         self.db.add(task)
         try:
-            self.db.commit()
+            self.db.flush()
         except IntegrityError:
             self.db.rollback()
             existing = self.repository.task_by_idempotency(payload.idempotency_key)
-            if existing is None:
-                raise
-            return self._reuse_existing(existing, payload)
-        return task
+            if existing is not None:
+                return self._reuse_existing(existing, payload), True
+            self._reject_conflicting_task(payload, admission.portal.id)
+            raise
+        return task, False
+
+    def create_task(self, payload: RegistrationTaskCreate) -> RegistrationTask:
+        target_id = str(uuid4())
+        try:
+            task, reused = self._create_task(payload, target_id)
+            self._audit(
+                action="registration.task.create",
+                target_id=task.id,
+                author_id=task.author_id,
+                result="success",
+                after={"task_status": task.task_status, "reused": reused},
+            )
+            self.db.commit()
+            return task
+        except AppError as exc:
+            self.db.rollback()
+            self._audit(
+                action="registration.task.create",
+                target_id=target_id,
+                result="failure",
+                error=exc,
+            )
+            self.db.commit()
+            raise
 
     def get_task(self, task_id: str) -> RegistrationTask:
         task = self.db.get(RegistrationTask, str(task_id))
@@ -242,18 +333,67 @@ class RegistrationService:
     def cancel_task(
         self, task_id: str, *, reason: str = "用户取消"
     ) -> RegistrationTask:
-        task = self._task_for_update(task_id)
-        self.workflow.cancel(task, actor_id=self.user.id, reason=reason)
-        self.db.commit()
-        return task
+        try:
+            task = self._task_for_update(task_id)
+            before = {"task_status": task.task_status, "retryable": task.retryable}
+            self.workflow.cancel(task, actor_id=self.user.id, reason=reason)
+            self._audit(
+                action="registration.task.cancel",
+                target_id=task.id,
+                author_id=task.author_id,
+                result="success",
+                before=before,
+                after={
+                    "task_status": task.task_status,
+                    "current_step": task.current_step,
+                    "retryable": task.retryable,
+                },
+            )
+            self.db.commit()
+            return task
+        except AppError as exc:
+            self.db.rollback()
+            failed_task = self.db.get(RegistrationTask, str(task_id))
+            self._audit(
+                action="registration.task.cancel",
+                target_id=str(task_id),
+                author_id=failed_task.author_id if failed_task else None,
+                result="failure",
+                error=exc,
+            )
+            self.db.commit()
+            raise
 
     def retry_task(
         self, task_id: str, *, reason: str = "重新执行"
     ) -> RegistrationTask:
-        task = self._task_for_update(task_id)
-        retryable_failure = task.task_status == "FAILED" and task.retryable
-        if task.task_status not in {"CANCELLED", "REGISTERED"} and not retryable_failure:
-            raise AppError(409, "INVALID_TASK_STATE", "当前任务状态不允许重试")
-        self.workflow.restart(task, actor_id=self.user.id, reason=reason)
-        self.db.commit()
-        return task
+        try:
+            task = self._task_for_update(task_id)
+            before = {"task_status": task.task_status, "retryable": task.retryable}
+            self.workflow.restart(task, actor_id=self.user.id, reason=reason)
+            self._audit(
+                action="registration.task.retry",
+                target_id=task.id,
+                author_id=task.author_id,
+                result="success",
+                before=before,
+                after={
+                    "task_status": task.task_status,
+                    "current_step": task.current_step,
+                    "retryable": task.retryable,
+                },
+            )
+            self.db.commit()
+            return task
+        except AppError as exc:
+            self.db.rollback()
+            failed_task = self.db.get(RegistrationTask, str(task_id))
+            self._audit(
+                action="registration.task.retry",
+                target_id=str(task_id),
+                author_id=failed_task.author_id if failed_task else None,
+                result="failure",
+                error=exc,
+            )
+            self.db.commit()
+            raise

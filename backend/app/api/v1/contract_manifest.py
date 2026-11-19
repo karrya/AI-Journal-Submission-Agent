@@ -29,6 +29,29 @@ CONTRACTS: tuple[RouteContract, ...] = (
     RouteContract(
         "GET", "/journals/{journal_id}/submission-portals", "SubmissionPortalListResponse"
     ),
+    RouteContract("GET", "/registration/publishers", "PublisherSupportResponse"),
+    RouteContract(
+        "GET", "/registration/publishers/{publisher_id}/journals", "JournalOptionsResponse"
+    ),
+    RouteContract(
+        "PUT", "/registration/publishers/{publisher_id}/support", "PublisherSupportResponse"
+    ),
+    RouteContract("GET", "/registration/platform-adapters", "PlatformAdapterResponse"),
+    RouteContract("POST", "/registration/tasks", "RegistrationTaskResponse"),
+    RouteContract("GET", "/registration/tasks", "RegistrationTaskPage"),
+    RouteContract("GET", "/registration/tasks/{task_id}", "RegistrationTaskResponse"),
+    RouteContract(
+        "POST", "/registration/tasks/{task_id}/cancel", "RegistrationTaskResponse"
+    ),
+    RouteContract(
+        "POST", "/registration/tasks/{task_id}/retry", "RegistrationTaskResponse"
+    ),
+    RouteContract(
+        "PATCH",
+        "/registration/submission-portals/{portal_id}",
+        "SubmissionPortalResponse",
+    ),
+    RouteContract("GET", "/publisher-accounts", "PublisherAccountResponse"),
     RouteContract("GET", "/users", "UserPage"),
     RouteContract("POST", "/users", "ManagedUserResponse"),
     RouteContract("GET", "/users/{user_id}", "ManagedUserResponse"),

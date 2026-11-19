@@ -5,7 +5,18 @@ import pytest
 from pydantic import ValidationError
 
 from app.api.v1.contract_manifest import CONTRACTS
-from app.schemas import audit, auth, authors, common, files, identification, journals, manuscripts, users
+from app.schemas import (
+    audit,
+    auth,
+    authors,
+    common,
+    files,
+    identification,
+    journals,
+    manuscripts,
+    registration,
+    users,
+)
 from app.schemas.authors import (
     AuthorizationCreate,
     AuthorizationResponse,
@@ -35,6 +46,21 @@ EXPECTED_ROUTES = {
     ("POST", "/tasks/{task_id}/cancel", "TaskResponse"),
     ("POST", "/tasks/{task_id}/confirm-candidate", "TaskResponse"),
     ("GET", "/journals/{journal_id}/submission-portals", "SubmissionPortalListResponse"),
+    ("GET", "/registration/publishers", "PublisherSupportResponse"),
+    ("GET", "/registration/publishers/{publisher_id}/journals", "JournalOptionsResponse"),
+    ("PUT", "/registration/publishers/{publisher_id}/support", "PublisherSupportResponse"),
+    ("GET", "/registration/platform-adapters", "PlatformAdapterResponse"),
+    ("POST", "/registration/tasks", "RegistrationTaskResponse"),
+    ("GET", "/registration/tasks", "RegistrationTaskPage"),
+    ("GET", "/registration/tasks/{task_id}", "RegistrationTaskResponse"),
+    ("POST", "/registration/tasks/{task_id}/cancel", "RegistrationTaskResponse"),
+    ("POST", "/registration/tasks/{task_id}/retry", "RegistrationTaskResponse"),
+    (
+        "PATCH",
+        "/registration/submission-portals/{portal_id}",
+        "SubmissionPortalResponse",
+    ),
+    ("GET", "/publisher-accounts", "PublisherAccountResponse"),
     ("GET", "/users", "UserPage"),
     ("POST", "/users", "ManagedUserResponse"),
     ("GET", "/users/{user_id}", "ManagedUserResponse"),
@@ -152,7 +178,18 @@ def test_manifest_matches_the_complete_approved_route_contract():
 
 
 def test_manifest_response_names_resolve_to_schema_exports():
-    modules = (audit, auth, authors, common, files, identification, journals, manuscripts, users)
+    modules = (
+        audit,
+        auth,
+        authors,
+        common,
+        files,
+        identification,
+        journals,
+        manuscripts,
+        registration,
+        users,
+    )
     exported_names = {
         name
         for module in modules

@@ -20,6 +20,7 @@ from app.api.v1 import (
     journals,
     manuscripts,
     readiness,
+    registration,
     users,
 )
 from app.api.v1.deps import first_password_gate, get_request_id
@@ -47,6 +48,17 @@ _OPENAPI_SUMMARIES = {
     "cancel_task": "取消识别任务",
     "confirm_task_candidate": "确认网络识别候选",
     "list_submission_portals": "获取期刊投稿入口与证据",
+    "list_registration_publishers": "获取注册出版社支持列表",
+    "list_registration_journals": "获取出版社可注册期刊",
+    "configure_registration_publisher": "配置出版社注册支持",
+    "list_registration_adapters": "获取注册平台适配器",
+    "create_registration_task": "创建注册任务",
+    "list_registration_tasks": "获取注册任务列表",
+    "get_registration_task": "获取注册任务详情",
+    "cancel_registration_task": "取消注册任务",
+    "retry_registration_task": "重试注册任务",
+    "update_registration_portal": "配置注册入口适配器与状态",
+    "list_publisher_accounts": "获取出版社账号列表",
     "get_task": "查询识别任务",
     "list_users": "获取用户列表",
     "create_user": "创建用户",
@@ -119,6 +131,7 @@ _OPENAPI_TAGS = (
     {"name": "files", "description": "稿件文件上传、下载和完整性管理。"},
     {"name": "authorizations", "description": "作者数据访问授权管理。"},
     {"name": "journals", "description": "出版商、期刊平台和期刊资料管理。"},
+    {"name": "registration", "description": "注册目标、任务、出版社账号和受控配置管理。"},
     {"name": "dashboard", "description": "个人仪表盘统计与近期操作。"},
     {"name": "audit", "description": "操作审计日志查询。"},
     {"name": "health", "description": "服务健康与数据库就绪检查。"},
@@ -321,6 +334,30 @@ _OPENAPI_FIELD_TITLES = {
     "version_id": "版本 ID",
     "version_number": "版本号",
     "website_url": "网站 URL",
+    "account_email": "出版社账号邮箱",
+    "account_namespace": "出版社账号命名空间",
+    "account_status": "出版社账号状态",
+    "adapter_code": "适配器代码",
+    "adapter_name": "适配器名称",
+    "adapter_version": "适配器版本",
+    "allowed_domains": "允许的域名列表",
+    "capability_config": "适配器能力配置",
+    "current_step": "当前注册步骤",
+    "disabled_reason": "停用原因",
+    "email_verified_at": "邮箱验证时间",
+    "last_checked_at": "最近检查时间",
+    "last_verified_at": "最近验收时间",
+    "official_domains": "官方域名列表",
+    "platform_account_id": "平台账号 ID",
+    "platform_adapter_id": "平台适配器 ID",
+    "platform_type": "平台类型",
+    "portal_id": "投稿入口 ID",
+    "publisher_code": "出版社代码",
+    "registered_at": "注册完成时间",
+    "support_level": "支持级别",
+    "support_status": "支持状态",
+    "task_status": "注册任务状态",
+    "verification_notes": "验收说明",
 }
 _OPENAPI_COMPONENT_TITLES = {
     "AlternateName": "作者别名",
@@ -405,6 +442,15 @@ _OPENAPI_COMPONENT_TITLES = {
     "PublisherCreate": "出版商创建请求",
     "PublisherResponse": "出版商响应",
     "PublisherUpdate": "出版商更新请求",
+    "PublisherSupportConfig": "出版社注册支持配置请求",
+    "PublisherSupportResponse": "出版社注册支持响应",
+    "PlatformAdapterResponse": "平台适配器响应",
+    "PublisherAccountResponse": "出版社账号响应",
+    "RegistrationPortalUpdate": "注册入口配置更新请求",
+    "RegistrationTaskCreate": "注册任务创建请求",
+    "RegistrationTaskResponse": "注册任务响应",
+    "Page_PublisherAccountResponse_": "出版社账号分页响应",
+    "Page_RegistrationTaskResponse_": "注册任务分页响应",
     "RecentOperation": "近期操作",
     "UserResponse": "用户响应",
     "UserCreate": "用户创建请求",
@@ -498,6 +544,7 @@ app.include_router(manuscripts.router)
 app.include_router(files.router)
 app.include_router(authorizations.router)
 app.include_router(journals.router)
+app.include_router(registration.router)
 app.include_router(identification.router)
 app.include_router(dashboard.router)
 app.include_router(audit.router)

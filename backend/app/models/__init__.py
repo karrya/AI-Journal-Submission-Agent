@@ -24,6 +24,14 @@ from app.models.journals import (
     PublisherAlias,
 )
 from app.models.manuscripts import Manuscript, ManuscriptAuthor, ManuscriptVersion
+from app.models.registration import (
+    EmailVerificationRecord,
+    PlatformAdapter,
+    PublisherAccount,
+    PublisherRegistrationSupport,
+    RegistrationConfirmation,
+    RegistrationTask,
+)
 
 __all__ = [
     "Author",
@@ -33,6 +41,7 @@ __all__ = [
     "AuthSession",
     "Base",
     "DiscoveryTask",
+    "EmailVerificationRecord",
     "FileFamily",
     "Institution",
     "Journal",
@@ -47,8 +56,13 @@ __all__ = [
     "ManuscriptFile",
     "ManuscriptVersion",
     "OperationLog",
+    "PlatformAdapter",
     "Publisher",
+    "PublisherAccount",
     "PublisherAlias",
+    "PublisherRegistrationSupport",
+    "RegistrationConfirmation",
+    "RegistrationTask",
     "Role",
     "User",
     "UserRole",

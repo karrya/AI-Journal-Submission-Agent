@@ -55,6 +55,8 @@ class JournalSubmissionPortal(UUIDPrimaryKeyMixin, CreatedUpdatedByMixin, Base):
     __tablename__ = "journal_submission_portals"
     __table_args__ = (
         Index("ix_submission_portal_journal", "journal_id", "created_at"),
+        Index("idx_portal_status", "support_status", "verification_status"),
+        Index("idx_portal_host", "normalized_host"),
         MYSQL_TABLE_OPTIONS,
     )
 
@@ -72,6 +74,23 @@ class JournalSubmissionPortal(UUIDPrimaryKeyMixin, CreatedUpdatedByMixin, Base):
     platform_code: Mapped[str] = mapped_column(VARCHAR(50), default="UNKNOWN", nullable=False)
     confidence: Mapped[float] = mapped_column(Float, default=0, nullable=False)
     evidence_summary: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    normalized_host: Mapped[str | None] = mapped_column(VARCHAR(255), nullable=True)
+    platform_adapter_id: Mapped[str | None] = mapped_column(
+        CHAR(36), ForeignKey("platform_adapters.id", ondelete="RESTRICT"), nullable=True
+    )
+    support_status: Mapped[str] = mapped_column(
+        VARCHAR(32), default="TESTING", nullable=False
+    )
+    verified_by: Mapped[str | None] = mapped_column(
+        CHAR(36), ForeignKey("users.id", ondelete="RESTRICT"), nullable=True
+    )
+    verification_evidence_ref: Mapped[str | None] = mapped_column(
+        VARCHAR(255), nullable=True
+    )
+    last_checked_at: Mapped[datetime | None] = mapped_column(
+        DATETIME(fsp=6), nullable=True
+    )
+    disabled_reason: Mapped[str | None] = mapped_column(VARCHAR(1000), nullable=True)
 
 
 class JournalSourceSnapshot(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):

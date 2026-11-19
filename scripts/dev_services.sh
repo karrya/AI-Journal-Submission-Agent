@@ -5,8 +5,10 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DOMAIN="gui/$(id -u)"
 BACKEND_LABEL="com.academic-submission-agent.backend"
 WORKER_LABEL="com.academic-submission-agent.worker"
+REGISTRATION_WORKER_LABEL="com.academic-submission-agent.registration-worker"
 BACKEND_PLIST="$HOME/Library/LaunchAgents/${BACKEND_LABEL}.plist"
 WORKER_PLIST="$HOME/Library/LaunchAgents/${WORKER_LABEL}.plist"
+REGISTRATION_WORKER_PLIST="$HOME/Library/LaunchAgents/${REGISTRATION_WORKER_LABEL}.plist"
 ACTION="${1:-start}"
 
 create_plists() {
@@ -21,6 +23,7 @@ launch_agents = Path.home() / "Library" / "LaunchAgents"
 services = {
     "backend": root / "scripts" / "dev_backend.sh",
     "worker": root / "scripts" / "dev_worker.sh",
+    "registration-worker": root / "scripts" / "dev_registration_worker.sh",
 }
 for name, script in services.items():
     label = f"com.academic-submission-agent.{name}"
@@ -66,7 +69,7 @@ stop_duplicate_backend() {
 start_services() {
     stop_duplicate_backend
     create_plists
-    for item in "$BACKEND_LABEL:$BACKEND_PLIST" "$WORKER_LABEL:$WORKER_PLIST"; do
+    for item in "$BACKEND_LABEL:$BACKEND_PLIST" "$WORKER_LABEL:$WORKER_PLIST" "$REGISTRATION_WORKER_LABEL:$REGISTRATION_WORKER_PLIST"; do
         label="${item%%:*}"
         plist="${item#*:}"
         if launchctl print "$DOMAIN/$label" >/dev/null 2>&1; then
@@ -89,13 +92,13 @@ start_services() {
 }
 
 stop_services() {
-    for label in "$BACKEND_LABEL" "$WORKER_LABEL"; do
+    for label in "$BACKEND_LABEL" "$WORKER_LABEL" "$REGISTRATION_WORKER_LABEL"; do
         launchctl bootout "$DOMAIN/$label" 2>/dev/null || true
     done
 }
 
 status_services() {
-    for label in "$BACKEND_LABEL" "$WORKER_LABEL"; do
+    for label in "$BACKEND_LABEL" "$WORKER_LABEL" "$REGISTRATION_WORKER_LABEL"; do
         printf '\n=== %s ===\n' "$label"
         launchctl print "$DOMAIN/$label" 2>/dev/null || printf '未安装或未运行\n'
     done
@@ -117,7 +120,7 @@ case "${1:-start}" in
         ;;
     uninstall)
         stop_services
-        rm -f "$BACKEND_PLIST" "$WORKER_PLIST"
+        rm -f "$BACKEND_PLIST" "$WORKER_PLIST" "$REGISTRATION_WORKER_PLIST"
         ;;
     *)
         printf '用法：%s [start|install|restart|stop|status|uninstall]\n' "$0" >&2

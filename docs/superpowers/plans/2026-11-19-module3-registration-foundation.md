@@ -424,9 +424,27 @@ class RegistrationWorkflowService:
         task.current_step = reason
         task.last_activity_at = utc_now()
         return task
+
+    def cancel(self, task, *, actor_id, reason="用户取消"):
+        task.task_status = "CANCELLED"
+        task.cancel_requested = True
+        task.current_step = reason
+        task.last_activity_at = utc_now()
+        return task
+
+    def restart(self, task, *, actor_id, reason="重新执行"):
+        task.task_status = "PENDING"
+        task.cancel_requested = False
+        task.retryable = False
+        task.worker_id = None
+        task.lease_expires_at = None
+        task.available_at = utc_now()
+        task.current_step = reason
+        task.last_activity_at = utc_now()
+        return task
 ```
 
-创建任务时校验授权和准入，保存 `created_by`、脱敏 `registration_url` 来源引用、平台和适配器版本，返回 `PENDING`。`SUBMITTING`、`SUBMISSION_UNKNOWN` 和 `READY_TO_SUBMIT` 的状态迁移由独立方法控制，不能让前端直接指定状态。取消只停止后续动作，不能删除外部已创建账号。
+创建任务时校验授权和准入，保存 `created_by`、脱敏 `registration_url` 来源引用、平台和适配器版本，返回 `PENDING`。`SUBMITTING`、`SUBMISSION_UNKNOWN` 和 `READY_TO_SUBMIT` 的状态迁移由独立方法控制，不能让前端直接指定状态。取消与重试必须分别调用 `WorkflowService.cancel()` 和 `WorkflowService.restart()`，不得在任务 Service 中直接修改状态。取消只停止后续动作，不能删除外部已创建账号。
 
 - [ ] **Step 4: 验证权限、幂等、取消、重试和非法迁移**
 

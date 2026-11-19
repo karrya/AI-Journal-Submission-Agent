@@ -303,6 +303,138 @@ describe('RegistrationView', () => {
     expect(wrapper.find('[data-test="task-t1"]').exists()).toBe(true)
   })
 
+  it('reuses the same idempotency key after a lost create response', async () => {
+    let attempts = 0
+    adapter.mockImplementation(async (config) => {
+      if (config.method === 'post' && config.url === '/registration/tasks') {
+        attempts += 1
+        if (attempts === 1) throw new Error('response lost after server commit')
+        return success(config, { ...task, id: 'created-after-retry' }, 202)
+      }
+      if (config.url === '/registration/publishers') return success(config, { items: [supportedPublisher] })
+      if (config.url === '/registration/platform-adapters') return success(config, { items: [supportedPlatform] })
+      if (config.url === '/registration/publishers/p1/journals') return success(config, { items: [journal] })
+      if (config.url === '/registration/tasks') return success(config, page([]))
+      if (config.url === '/publisher-accounts') return success(config, page([]))
+      if (config.url === '/author-authorizations/options') return success(config, { authors: [{ id: 'a1', display_name: 'Author One' }], users: [] })
+      if (config.url === '/author-authorizations') return success(config, page([authorization]))
+      if (config.url === '/authors/a1/emails') return success(config, page([email]))
+      throw new Error(`Unexpected request: ${config.method} ${config.url}`)
+    })
+    const wrapper = mountView()
+    await flushPromises()
+    await selectSupportedTarget(wrapper)
+
+    await wrapper.get('[data-test="create-registration-task"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[data-test="task-error"]').text()).toContain('无法创建注册任务')
+    await wrapper.get('[data-test="create-registration-task"]').trigger('click')
+    await flushPromises()
+
+    const payloads = adapter.mock.calls
+      .filter(([config]) => config.method === 'post' && config.url === '/registration/tasks')
+      .map(([config]) => JSON.parse(String(config.data)) as { idempotency_key: string })
+    expect(payloads).toHaveLength(2)
+    expect(payloads[1].idempotency_key).toBe(payloads[0].idempotency_key)
+    expect(wrapper.text()).toContain('created-after-retry')
+  })
+
+  it('keeps only the latest target journals and clears loading when selection becomes empty', async () => {
+    const secondPublisher = { ...supportedPublisher, id: 'support-2', publisher_id: 'p2', display_name: 'Second Publisher' }
+    const secondJournal = { ...journal, id: 'j2', publisher_id: 'p2', name: 'Latest Journal' }
+    const pending = new Map<string, (response: AxiosResponse) => void>()
+    adapter.mockImplementation(async (config) => {
+      if (config.url === '/registration/publishers') return success(config, { items: [supportedPublisher, secondPublisher] })
+      if (config.url === '/registration/platform-adapters') return success(config, { items: [supportedPlatform] })
+      if (config.url?.match(/^\/registration\/publishers\/p[12]\/journals$/)) {
+        return new Promise<AxiosResponse>((resolve) => { pending.set(config.url as string, resolve) })
+      }
+      if (config.url === '/registration/tasks') return success(config, page([]))
+      if (config.url === '/publisher-accounts') return success(config, page([]))
+      if (config.url === '/author-authorizations/options') return success(config, { authors: [], users: [] })
+      throw new Error(`Unexpected request: ${config.method} ${config.url}`)
+    })
+    const wrapper = mountView()
+    await flushPromises()
+    const publisherSelect = wrapper.get('[data-test="registration-publisher"]')
+    const journalSelect = wrapper.get('[data-test="registration-journal"]')
+
+    await publisherSelect.setValue('p1')
+    await publisherSelect.setValue('p2')
+    pending.get('/registration/publishers/p2/journals')?.(success({} as InternalAxiosRequestConfig, { items: [secondJournal] }))
+    await flushPromises()
+    expect(journalSelect.text()).toContain('Latest Journal')
+    pending.get('/registration/publishers/p1/journals')?.(success({} as InternalAxiosRequestConfig, { items: [journal] }))
+    await flushPromises()
+    expect(journalSelect.text()).toContain('Latest Journal')
+    expect(journalSelect.text()).not.toContain('Journal of Tests')
+    expect((journalSelect.element as HTMLSelectElement).disabled).toBe(false)
+
+    await publisherSelect.setValue('p1')
+    expect((journalSelect.element as HTMLSelectElement).disabled).toBe(true)
+    await publisherSelect.setValue('')
+    expect(journalSelect.text()).toContain('请选择期刊')
+    expect(journalSelect.text()).not.toContain('正在加载期刊')
+    pending.get('/registration/publishers/p1/journals')?.(success({} as InternalAxiosRequestConfig, { items: [journal] }))
+    await flushPromises()
+    expect(journalSelect.text()).not.toContain('Journal of Tests')
+  })
+
+  it('keeps only the latest filter-journal response during out-of-order completion', async () => {
+    const secondPublisher = { ...supportedPublisher, id: 'support-2', publisher_id: 'p2', display_name: 'Second Publisher' }
+    const secondJournal = { ...journal, id: 'j2', publisher_id: 'p2', name: 'Latest Filter Journal' }
+    const pending = new Map<string, (response: AxiosResponse) => void>()
+    adapter.mockImplementation(async (config) => {
+      if (config.url === '/registration/publishers') return success(config, { items: [supportedPublisher, secondPublisher] })
+      if (config.url === '/registration/platform-adapters') return success(config, { items: [supportedPlatform] })
+      if (config.url?.match(/^\/registration\/publishers\/p[12]\/journals$/)) {
+        return new Promise<AxiosResponse>((resolve) => { pending.set(config.url as string, resolve) })
+      }
+      if (config.url === '/registration/tasks') return success(config, page([]))
+      if (config.url === '/publisher-accounts') return success(config, page([]))
+      if (config.url === '/author-authorizations/options') return success(config, { authors: [], users: [] })
+      throw new Error(`Unexpected request: ${config.method} ${config.url}`)
+    })
+    const wrapper = mountView()
+    await flushPromises()
+    const publisherFilter = wrapper.get('[data-test="task-publisher-filter"]')
+    const journalFilter = wrapper.get('[data-test="task-journal-filter"]')
+
+    await publisherFilter.setValue('p1')
+    await publisherFilter.setValue('p2')
+    pending.get('/registration/publishers/p2/journals')?.(success({} as InternalAxiosRequestConfig, { items: [secondJournal] }))
+    await flushPromises()
+    pending.get('/registration/publishers/p1/journals')?.(success({} as InternalAxiosRequestConfig, { items: [journal] }))
+    await flushPromises()
+
+    expect(journalFilter.text()).toContain('Latest Filter Journal')
+    expect(journalFilter.text()).not.toContain('Journal of Tests')
+    expect((journalFilter.element as HTMLSelectElement).disabled).toBe(false)
+  })
+
+  it.each(['FAILED', 'CANCELLED', 'EXPIRED'])('marks every workflow stage unknown for %s without inferring history', async (status) => {
+    const terminalTask = { ...task, task_status: status, current_step: '流程终止' }
+    adapter.mockImplementation(async (config) => {
+      if (config.url === '/registration/publishers') return success(config, { items: [supportedPublisher] })
+      if (config.url === '/registration/platform-adapters') return success(config, { items: [supportedPlatform] })
+      if (config.url === '/registration/tasks') return success(config, page([terminalTask]))
+      if (config.url === '/publisher-accounts') return success(config, page([]))
+      if (config.url === '/author-authorizations/options') return success(config, { authors: [], users: [] })
+      throw new Error(`Unexpected request: ${config.method} ${config.url}`)
+    })
+    const wrapper = mountView()
+    await flushPromises()
+
+    const steps = wrapper.get('[data-test="registration-workflow"]').findAll('li')
+    expect(steps).toHaveLength(5)
+    steps.forEach((step) => {
+      expect(step.text()).toContain('阶段未知')
+      expect(step.text()).not.toContain('已完成')
+      expect(step.attributes('aria-current')).toBeUndefined()
+    })
+    expect(wrapper.get('[data-test="selected-task-status"]').text()).toContain(status === 'FAILED' ? '执行失败' : status === 'CANCELLED' ? '已取消' : '已过期')
+  })
+
   it('supports an Escape-dismissible evidence drawer and associated labels on a narrow viewport', async () => {
     window.innerWidth = 390
     window.dispatchEvent(new Event('resize'))
@@ -316,11 +448,31 @@ describe('RegistrationView', () => {
       expect(wrapper.find(`label[for="${id}"]`).exists()).toBe(true)
     })
     await wrapper.get('[data-test="open-evidence-t1"]').trigger('click')
+    const content = wrapper.get('[data-test="registration-content"]')
     const drawer = wrapper.get('[data-test="evidence-drawer"]')
+    expect(content.attributes('inert')).toBeDefined()
     expect(drawer.attributes('role')).toBe('dialog')
     expect(drawer.attributes('aria-modal')).toBe('true')
+
+    const closeButtons = drawer.findAll('button')
+    expect(closeButtons).toHaveLength(2)
+    const firstButton = closeButtons[0].element as HTMLButtonElement
+    const lastButton = closeButtons[1].element as HTMLButtonElement
+    for (let iteration = 0; iteration < 3; iteration += 1) {
+      lastButton.focus()
+      await drawer.trigger('keydown', { key: 'Tab' })
+      expect(document.activeElement).toBe(firstButton)
+    }
+    for (let iteration = 0; iteration < 3; iteration += 1) {
+      firstButton.focus()
+      await drawer.trigger('keydown', { key: 'Tab', shiftKey: true })
+      expect(document.activeElement).toBe(lastButton)
+    }
+
     await drawer.trigger('keydown.esc')
     expect(wrapper.find('[data-test="evidence-drawer"]').exists()).toBe(false)
+    expect(wrapper.get('[data-test="registration-content"]').attributes('inert')).toBeUndefined()
+    expect(document.activeElement).toBe(wrapper.get('[data-test="open-evidence-t1"]').element)
     expect(wrapper.get('[data-test="open-evidence-t1"]').attributes('type')).toBe('button')
   })
 })

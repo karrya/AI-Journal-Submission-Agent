@@ -93,9 +93,12 @@ const cancelTargetId = ref<string | null>(null)
 const cancelConfirmed = ref(false)
 const evidenceTaskId = ref<string | null>(null)
 const evidenceCloseButton = ref<HTMLButtonElement | null>(null)
+const evidenceDrawer = ref<HTMLElement | null>(null)
 let taskLoadSequence = 0
 let journalLoadSequence = 0
+let filterJournalLoadSequence = 0
 let authorDataSequence = 0
+let createAttempt: { signature: string; key: string } | null = null
 
 const selectedTask = computed(() => tasks.value.find((item) => item.id === selectedTaskId.value) ?? null)
 const evidenceTask = computed(() => tasks.value.find((item) => item.id === evidenceTaskId.value) ?? null)
@@ -250,7 +253,10 @@ async function onPublisherChange(): Promise<void> {
   target.journal_id = ''
   journals.value = []
   authorDataError.value = ''
-  if (!target.publisher_id || selectedPublisher.value?.support_status !== 'SUPPORTED') return
+  if (!target.publisher_id || selectedPublisher.value?.support_status !== 'SUPPORTED') {
+    journalsLoading.value = false
+    return
+  }
   journalsLoading.value = true
   try {
     const items = await getRegistrationJournals(target.publisher_id)
@@ -265,16 +271,23 @@ async function onPublisherChange(): Promise<void> {
 }
 
 async function onFilterPublisherChange(): Promise<void> {
+  const sequence = ++filterJournalLoadSequence
   filters.journal_id = ''
   filterJournals.value = []
-  if (!filters.publisher_id) return
+  if (!filters.publisher_id) {
+    filterJournalsLoading.value = false
+    return
+  }
   filterJournalsLoading.value = true
   try {
-    filterJournals.value = await getRegistrationJournals(filters.publisher_id)
+    const items = await getRegistrationJournals(filters.publisher_id)
+    if (sequence === filterJournalLoadSequence) filterJournals.value = items
   } catch (error) {
-    taskError.value = safeError(error, '无法加载筛选期刊，现有任务已保留。')
+    if (sequence === filterJournalLoadSequence) {
+      taskError.value = safeError(error, '无法加载筛选期刊，现有任务已保留。')
+    }
   } finally {
-    filterJournalsLoading.value = false
+    if (sequence === filterJournalLoadSequence) filterJournalsLoading.value = false
   }
 }
 
@@ -351,14 +364,22 @@ async function submitRegistrationTask(): Promise<void> {
   actionMessage.value = ''
   taskError.value = ''
   try {
-    const created = await createRegistrationTask({
+    const confirmedPayload = {
       author_id: target.author_id,
       publisher_id: target.publisher_id,
       journal_id: target.journal_id,
       authorization_id: target.authorization_id,
       platform_code: target.platform_code,
-      idempotency_key: idempotencyKey(),
+    }
+    const signature = JSON.stringify(confirmedPayload)
+    if (!createAttempt || createAttempt.signature !== signature) {
+      createAttempt = { signature, key: idempotencyKey() }
+    }
+    const created = await createRegistrationTask({
+      ...confirmedPayload,
+      idempotency_key: createAttempt.key,
     })
+    createAttempt = null
     tasks.value = [created, ...tasks.value.filter((item) => item.id !== created.id)]
     total.value += 1
     selectedTaskId.value = created.id
@@ -443,13 +464,39 @@ async function closeEvidence(): Promise<void> {
   }
 }
 
+function trapEvidenceFocus(event: KeyboardEvent): void {
+  if (event.key !== 'Tab' || !evidenceDrawer.value) return
+  const drawer = evidenceDrawer.value
+  const focusable = Array.from(drawer.querySelectorAll<HTMLElement>(
+    'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+  ))
+  if (focusable.length === 0) {
+    event.preventDefault()
+    drawer.focus()
+    return
+  }
+  const first = focusable[0]
+  const last = focusable[focusable.length - 1]
+  const active = document.activeElement
+  if (event.shiftKey && (active === first || !drawer.contains(active))) {
+    event.preventDefault()
+    last.focus()
+  } else if (!event.shiftKey && (active === last || !drawer.contains(active))) {
+    event.preventDefault()
+    first.focus()
+  }
+}
+
 function workflowStepState(index: number): { className: string; label: string; marker: string } {
   const item = selectedTask.value
   if (!item) return { className: 'pending', label: '待选择任务', marker: '○' }
   if (item.task_status === 'REGISTERED') return { className: 'complete', label: '已完成', marker: '✓' }
+  if (['FAILED', 'CANCELLED', 'EXPIRED'].includes(item.task_status)) {
+    return { className: 'unknown', label: '阶段未知 · 流程终止', marker: '?' }
+  }
   let currentIndex = 0
   if (['OPENING_PAGE', 'DETECTING_FORM', 'FILLING_FORM'].includes(item.task_status)) currentIndex = 1
-  else if (['WAITING_CAPTCHA', 'READY_TO_SUBMIT', 'SUBMITTING', 'SUBMITTED', 'SUBMISSION_UNKNOWN', 'NEEDS_MANUAL_REVIEW', 'FAILED', 'CANCELLED', 'EXPIRED'].includes(item.task_status)) currentIndex = 2
+  else if (['WAITING_CAPTCHA', 'READY_TO_SUBMIT', 'SUBMITTING', 'SUBMITTED', 'SUBMISSION_UNKNOWN', 'NEEDS_MANUAL_REVIEW'].includes(item.task_status)) currentIndex = 2
   else if (['WAITING_EMAIL', 'WAITING_EMAIL_CONFIRM', 'VERIFYING_EMAIL'].includes(item.task_status)) currentIndex = 3
   if (index < currentIndex) return { className: 'complete', label: '已完成', marker: '✓' }
   if (index === currentIndex) return { className: 'current', label: '当前阶段', marker: '●' }
@@ -481,6 +528,7 @@ onMounted(() => {
 
 <template>
   <section class="registration-page" aria-labelledby="registration-title">
+    <div class="registration-content" data-test="registration-content" :inert="evidenceTask ? true : undefined">
     <header class="registration-header">
       <div>
         <p class="eyebrow">REGISTRATION OPERATIONS</p>
@@ -709,13 +757,15 @@ onMounted(() => {
         </table>
       </div>
     </section>
+    </div>
 
     <div v-if="evidenceTask" class="drawer-backdrop">
-      <aside class="evidence-drawer" data-test="evidence-drawer" role="dialog" aria-modal="true" aria-labelledby="evidence-title" tabindex="-1" @keydown.esc="closeEvidence">
+      <aside ref="evidenceDrawer" class="evidence-drawer" data-test="evidence-drawer" role="dialog" aria-modal="true" aria-labelledby="evidence-title" tabindex="-1" @keydown="trapEvidenceFocus" @keydown.esc="closeEvidence">
         <div class="drawer-heading"><div><p class="section-kicker">来源证据</p><h2 id="evidence-title">任务 {{ evidenceTask.id }}</h2></div><button ref="evidenceCloseButton" type="button" class="drawer-close" aria-label="关闭证据抽屉" @click="closeEvidence">关闭</button></div>
         <p>证据抽屉只展示安全来源摘要，不展示完整验证链接或任何凭据。</p>
         <div class="empty-state"><strong>暂无可展示的来源证据</strong><p>当前注册任务接口未提供安全证据摘要。不会将任务字段拼造为来源或证据。</p></div>
         <dl class="evidence-context"><div><dt>目标平台</dt><dd>{{ platformName(evidenceTask.platform_code) }}</dd></div><div><dt>当前状态</dt><dd>{{ taskStatusLabel(evidenceTask.task_status) }}</dd></div></dl>
+        <button type="button" class="secondary-button drawer-bottom-close" @click="closeEvidence">关闭证据抽屉</button>
       </aside>
     </div>
   </section>
@@ -796,6 +846,7 @@ button:disabled { cursor: not-allowed; opacity: .58; }
 .workflow-steps li { display: flex; flex-direction: column; align-items: center; gap: 5px; min-width: 0; padding: 10px 3px; text-align: center; border-bottom: 2px solid #d7dee8; }
 .workflow-steps li.complete { border-color: #52816d; }
 .workflow-steps li.current { background: #f0f5fc; border-color: #346bb9; }
+.workflow-steps li.unknown { border-bottom-style: dashed; }
 .workflow-steps strong { font-size: 12px; }
 .workflow-steps small { color: var(--ink-secondary); font-size: 10px; }
 .step-marker { font-size: 17px; }
@@ -830,6 +881,7 @@ th { color: #40506a; background: var(--surface-soft); }
 .evidence-drawer { position: absolute; inset: 0 0 0 auto; width: min(440px, 100%); padding: 26px; overflow-y: auto; background: #fff; border-left: 1px solid #cbd4e1; box-shadow: -10px 0 28px rgb(20 30 50 / 12%); }
 .drawer-heading { display: flex; justify-content: space-between; gap: 16px; }
 .evidence-context { display: grid; gap: 14px; margin-top: 20px; }
+.drawer-bottom-close { width: 100%; margin-top: 20px; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 @media (max-width: 1180px) {
   .target-grid, .manual-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

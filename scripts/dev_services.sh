@@ -97,6 +97,20 @@ stop_services() {
     done
 }
 
+wait_for_removal() {
+    for label in "$BACKEND_LABEL" "$WORKER_LABEL" "$REGISTRATION_WORKER_LABEL"; do
+        attempt=0
+        while launchctl print "$DOMAIN/$label" >/dev/null 2>&1; do
+            attempt=$((attempt + 1))
+            if (( attempt >= 10 )); then
+                printf '服务卸载超时：%s；请检查 launchd 状态后重试。\n' "$label" >&2
+                return 1
+            fi
+            sleep 1
+        done
+    done
+}
+
 status_services() {
     for label in "$BACKEND_LABEL" "$WORKER_LABEL" "$REGISTRATION_WORKER_LABEL"; do
         printf '\n=== %s ===\n' "$label"
@@ -107,6 +121,7 @@ status_services() {
 case "${1:-start}" in
     restart)
         stop_services
+        wait_for_removal
         start_services
         ;;
     start|install)

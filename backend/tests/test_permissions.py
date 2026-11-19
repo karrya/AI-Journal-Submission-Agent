@@ -28,6 +28,9 @@ def test_exact_v01_permission_codes():
         "author:phone:read",
         "author:address:read",
         "author:profile:update",
+        "account:register",
+        "email:verification:read",
+        "credential:use",
     }
 
 

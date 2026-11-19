@@ -127,7 +127,13 @@ class AuthorizationRepository:
         )
 
     def any_active(
-        self, *, user_id: str, author_id: str, permission: str, now_utc: datetime
+        self,
+        *,
+        user_id: str,
+        author_id: str,
+        permission: str,
+        now_utc: datetime,
+        authorization_id: str | None = None,
     ) -> bool:
         statement = (
             select(AuthorAuthorization.id)
@@ -141,9 +147,10 @@ class AuthorizationRepository:
                 )
                 == 1,
             )
-            .limit(1)
         )
-        return self.db.scalar(statement) is not None
+        if authorization_id is not None:
+            statement = statement.where(AuthorAuthorization.id == authorization_id)
+        return self.db.scalar(statement.limit(1)) is not None
 
     def any_current(self, *, user_id: str, author_id: str, now_utc: datetime) -> bool:
         statement = (

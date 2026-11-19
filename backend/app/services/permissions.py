@@ -26,6 +26,9 @@ class Permission(str, Enum):
     AUTHOR_PHONE_READ = "author:phone:read"
     AUTHOR_ADDRESS_READ = "author:address:read"
     AUTHOR_PROFILE_UPDATE = "author:profile:update"
+    ACCOUNT_REGISTER = "account:register"
+    EMAIL_VERIFICATION_READ = "email:verification:read"
+    CREDENTIAL_USE = "credential:use"
 
 
 _READ_PERMISSIONS = frozenset(

@@ -154,6 +154,35 @@ def test_cancelled_submission_marker_still_blocks_a_replacement_task(
     assert db_session.scalar(select(func.count(RegistrationTask.id))) == 1
 
 
+def test_retry_after_replacement_returns_conflict_and_preserves_failure_audit(
+    db_session, operator, approved_input, task
+):
+    task.task_status = "CANCELLED"
+    task.cancel_requested = True
+    db_session.commit()
+    service = RegistrationService(db_session, operator, "request-replacement")
+    replacement = service.create_task(
+        approved_input.model_copy(update={"idempotency_key": "replacement-after-cancel"})
+    )
+    assert replacement.id != task.id
+
+    with pytest.raises(AppError) as caught:
+        service.retry_task(task.id)
+    assert caught.value.status_code == 409
+    assert caught.value.code == "REGISTRATION_TASK_CONFLICT"
+    db_session.expire_all()
+    assert db_session.get(RegistrationTask, task.id).task_status == "CANCELLED"
+    failure = db_session.scalar(
+        select(OperationLog).where(
+            OperationLog.action == "registration.task.retry",
+            OperationLog.target_id == task.id,
+            OperationLog.result == "failure",
+        )
+    )
+    assert failure is not None
+    assert failure.error_code == "REGISTRATION_TASK_CONFLICT"
+
+
 def test_concurrent_different_keys_have_one_database_enforced_winner(
     db_engine, db_session, registration_records, approved_input
 ):

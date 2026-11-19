@@ -173,6 +173,27 @@ class RegistrationService:
                 "同一作者和投稿入口已有需完成或人工核查的注册任务",
             )
 
+    def _reject_replacement_task(self, task: RegistrationTask) -> None:
+        self.db.scalar(
+            select(JournalSubmissionPortal.id)
+            .where(JournalSubmissionPortal.id == task.portal_id)
+            .with_for_update()
+        )
+        conflict = self.db.scalar(
+            select(RegistrationTask.id).where(
+                RegistrationTask.author_id == task.author_id,
+                RegistrationTask.portal_id == task.portal_id,
+                RegistrationTask.blocking_scope == "BLOCKED",
+                RegistrationTask.id != task.id,
+            )
+        )
+        if conflict is not None:
+            raise AppError(
+                409,
+                "REGISTRATION_TASK_CONFLICT",
+                "同一作者和投稿入口已有替代任务，不能重试旧任务",
+            )
+
     def _create_task(
         self, payload: RegistrationTaskCreate, target_id: str
     ) -> tuple[RegistrationTask, bool]:
@@ -369,6 +390,7 @@ class RegistrationService:
     ) -> RegistrationTask:
         try:
             task = self._task_for_update(task_id)
+            self._reject_replacement_task(task)
             before = {"task_status": task.task_status, "retryable": task.retryable}
             self.workflow.restart(task, actor_id=self.user.id, reason=reason)
             self._audit(
@@ -397,3 +419,22 @@ class RegistrationService:
             )
             self.db.commit()
             raise
+        except IntegrityError as exc:
+            self.db.rollback()
+            if "uk_registration_blocking_scope" not in str(exc):
+                raise
+            failed_task = self.db.get(RegistrationTask, str(task_id))
+            conflict = AppError(
+                409,
+                "REGISTRATION_TASK_CONFLICT",
+                "同一作者和投稿入口已有替代任务，不能重试旧任务",
+            )
+            self._audit(
+                action="registration.task.retry",
+                target_id=str(task_id),
+                author_id=failed_task.author_id if failed_task else None,
+                result="failure",
+                error=conflict,
+            )
+            self.db.commit()
+            raise conflict from exc

@@ -23,6 +23,12 @@ CONTRACTS: tuple[RouteContract, ...] = (
     RouteContract("POST", "/journals/identify", "IdentifyResponse"),
     RouteContract("POST", "/journals/{journal_id}/confirm-identity", "JournalCandidate"),
     RouteContract("GET", "/tasks/{task_id}", "TaskResponse"),
+    RouteContract("POST", "/tasks/{task_id}/retry", "TaskResponse"),
+    RouteContract("POST", "/tasks/{task_id}/cancel", "TaskResponse"),
+    RouteContract("POST", "/tasks/{task_id}/confirm-candidate", "TaskResponse"),
+    RouteContract(
+        "GET", "/journals/{journal_id}/submission-portals", "SubmissionPortalListResponse"
+    ),
     RouteContract("GET", "/users", "UserPage"),
     RouteContract("POST", "/users", "ManagedUserResponse"),
     RouteContract("GET", "/users/{user_id}", "ManagedUserResponse"),

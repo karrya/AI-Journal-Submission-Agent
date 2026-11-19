@@ -39,6 +39,9 @@ EXPECTED_TABLES = {
     "publisher_aliases",
     "journal_aliases",
     "journal_identifiers",
+    "journal_submission_portals",
+    "journal_source_snapshots",
+    "journal_discovery_logs",
     "discovery_tasks",
 }
 
@@ -55,6 +58,9 @@ NEW_MODELS = {
     "PublisherAlias",
     "JournalAlias",
     "JournalIdentifier",
+    "JournalSubmissionPortal",
+    "JournalSourceSnapshot",
+    "JournalDiscoveryLog",
     "DiscoveryTask",
 }
 
@@ -239,11 +245,31 @@ EXPECTED_NEW_COLUMNS = {
         "checkpoint",
         "last_error_code",
         "last_error_message",
+        "stage",
+        "worker_id",
+        "lease_expires_at",
+        "available_at",
+        "retryable",
+        "cancel_requested",
         "created_by",
         "created_at",
         "started_at",
         "completed_at",
         "updated_at",
+    },
+    "journal_submission_portals": {
+        "id", "journal_id", "task_id", "original_url", "final_url",
+        "redirect_chain", "verification_status", "access_status", "platform_code",
+        "confidence", "evidence_summary", "created_at", "updated_at", "created_by",
+    },
+    "journal_source_snapshots": {
+        "id", "task_id", "journal_id", "source_type", "original_url", "final_url",
+        "http_status", "title", "text_excerpt", "content_sha256", "storage_path",
+        "parser_version", "fetched_at", "created_at",
+    },
+    "journal_discovery_logs": {
+        "id", "task_id", "journal_id", "actor_user_id", "event_type", "message",
+        "details", "created_at",
     },
     "operation_logs": {
         "id",
@@ -393,7 +419,7 @@ def test_column_types_json_and_immutable_timestamps_match_the_contract():
         assert table.dialect_options["mysql"]["engine"] == "InnoDB"
         assert table.dialect_options["mysql"]["charset"] == "utf8mb4"
         for column in table.columns:
-            if column.primary_key or column.name.endswith("_id"):
+            if column.primary_key or (column.name.endswith("_id") and column.name != "worker_id"):
                 assert isinstance(column.type, CHAR)
                 assert column.type.length == 36
             if column.name.endswith("_at"):
@@ -410,6 +436,9 @@ def test_column_types_json_and_immutable_timestamps_match_the_contract():
         ("operation_logs", "after_summary"),
         ("discovery_tasks", "payload"),
         ("discovery_tasks", "checkpoint"),
+        ("journal_submission_portals", "redirect_chain"),
+        ("journal_submission_portals", "evidence_summary"),
+        ("journal_discovery_logs", "details"),
     }
     actual_json_columns = {
         (table_name, column.name)
@@ -418,6 +447,9 @@ def test_column_types_json_and_immutable_timestamps_match_the_contract():
         if isinstance(column.type, JSON)
     }
     assert actual_json_columns == json_columns
+    worker_id = Base.metadata.tables["discovery_tasks"].c.worker_id
+    assert isinstance(worker_id.type, VARCHAR)
+    assert worker_id.type.length == 64
 
     files = Base.metadata.tables["manuscript_files"]
     assert isinstance(files.c.size_bytes.type, BIGINT)
@@ -585,7 +617,7 @@ def test_mig_01_empty_upgrade_head_is_cleanly_repeatable(db_engine):
             name: inspect(db_engine).get_table_options(name) for name in EXPECTED_TABLES
         } == first_options
         with db_engine.connect() as connection:
-            assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0005"
+            assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0006"
             assert connection.scalar(text("SELECT COUNT(*) FROM alembic_version")) == 1
     finally:
         command.upgrade(config, "head")
@@ -699,7 +731,7 @@ def test_invalid_legacy_issn_aborts_before_any_ddl(db_engine, db_session):
     db_session.commit()
     command.upgrade(Config(str(BACKEND_DIR / "alembic.ini")), "head")
     with db_engine.connect() as connection:
-        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0005"
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0006"
     if previous_url is None:
         os.environ.pop("ALEMBIC_DATABASE_URL", None)
     else:

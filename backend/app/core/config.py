@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     session_cookie_secure: bool | None = None
     max_upload_bytes: int = Field(default=100 * 1024 * 1024, le=500 * 1024 * 1024)
     storage_root: str = str(PROJECT_ROOT / "storage")
+    kimi_api_key: str | None = None
+    kimi_base_url: str = "https://api.moonshot.ai/v1"
+    kimi_model: str = "kimi-k3.1-pro"
+    discovery_poll_interval: float = Field(default=1.0, gt=0, le=60)
 
 
 @lru_cache

@@ -4777,7 +4777,7 @@
         "tags": [
           "identification"
         ],
-        "summary": "识别期刊并生成候选",
+        "summary": "创建期刊网络识别任务",
         "operationId": "identify_journal_api_v1_journals_identify_post",
         "parameters": [
           {
@@ -4824,8 +4824,8 @@
           }
         },
         "responses": {
-          "200": {
-            "description": "请求成功",
+          "202": {
+            "description": "已接受处理",
             "content": {
               "application/json": {
                 "schema": {
@@ -4835,14 +4835,14 @@
             }
           },
           "422": {
-            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "description": "请求参数校验失败"
           }
         }
       }
@@ -4920,14 +4920,14 @@
             }
           },
           "422": {
-            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "description": "请求参数校验失败"
           }
         }
       }
@@ -4963,14 +4963,292 @@
             }
           },
           "422": {
-            "description": "请求参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "请求参数校验失败"
+          }
+        }
+      }
+    },
+    "/api/v1/tasks/{task_id}/retry": {
+      "post": {
+        "tags": [
+          "identification"
+        ],
+        "summary": "重试失败的识别任务",
+        "operationId": "retry_task_api_v1_tasks__task_id__retry_post",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "任务 ID"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "请求来源"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "CSRF 防护令牌"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskResponse"
                 }
               }
             }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "请求参数校验失败"
+          }
+        }
+      }
+    },
+    "/api/v1/tasks/{task_id}/cancel": {
+      "post": {
+        "tags": [
+          "identification"
+        ],
+        "summary": "取消识别任务",
+        "operationId": "cancel_task_api_v1_tasks__task_id__cancel_post",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "任务 ID"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "请求来源"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "CSRF 防护令牌"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "请求参数校验失败"
+          }
+        }
+      }
+    },
+    "/api/v1/tasks/{task_id}/confirm-candidate": {
+      "post": {
+        "tags": [
+          "identification"
+        ],
+        "summary": "确认网络识别候选",
+        "operationId": "confirm_task_candidate_api_v1_tasks__task_id__confirm_candidate_post",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "任务 ID"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "请求来源"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "CSRF 防护令牌"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmCandidateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "请求参数校验失败"
+          }
+        }
+      }
+    },
+    "/api/v1/journals/{journal_id}/submission-portals": {
+      "get": {
+        "tags": [
+          "identification"
+        ],
+        "summary": "获取期刊投稿入口与证据",
+        "operationId": "list_submission_portals_api_v1_journals__journal_id__submission_portals_get",
+        "parameters": [
+          {
+            "name": "journal_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "期刊 ID"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmissionPortalListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "请求参数校验失败"
           }
         }
       }
@@ -7133,6 +7411,34 @@
         ],
         "title": "修改密码请求"
       },
+      "ConfirmCandidateRequest": {
+        "properties": {
+          "candidate_key": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "候选键"
+          },
+          "confirmation_note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "确认说明"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "candidate_key"
+        ],
+        "title": "任务候选确认请求"
+      },
       "ConfirmIdentityRequest": {
         "properties": {
           "expected_updated_at": {
@@ -7215,6 +7521,226 @@
           "recent_operations"
         ],
         "title": "仪表盘摘要"
+      },
+      "DiscoveryCandidate": {
+        "properties": {
+          "candidate_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "候选键"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "资源 ID"
+          },
+          "publisher_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "出版商 ID"
+          },
+          "name": {
+            "type": "string",
+            "title": "名称"
+          },
+          "publisher_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "出版社名称"
+          },
+          "issn": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "ISSN（国际标准连续出版物号）"
+          },
+          "eissn": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "eISSN（电子国际标准连续出版物号）"
+          },
+          "website_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "网站 URL"
+          },
+          "author_guidelines_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "作者指南 URL"
+          },
+          "submission_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "投稿 URL"
+          },
+          "platform_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "平台代码"
+          },
+          "platform_confidence": {
+            "type": "number",
+            "title": "平台识别置信度",
+            "default": 0
+          },
+          "portal_original_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "入口原始 URL"
+          },
+          "portal_verification_status": {
+            "type": "string",
+            "title": "入口验证状态",
+            "default": "UNVERIFIED"
+          },
+          "portal_access_status": {
+            "type": "string",
+            "title": "入口访问状态",
+            "default": "UNKNOWN"
+          },
+          "redirect_chain": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "重定向链"
+          },
+          "identity_status": {
+            "type": "string",
+            "title": "身份状态"
+          },
+          "match_reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "匹配原因"
+          },
+          "conflict_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "冲突原因"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "更新时间"
+          },
+          "verified_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "核验时间"
+          },
+          "sources": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "来源列表"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceSummary"
+            },
+            "type": "array",
+            "title": "证据列表"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "identity_status"
+        ],
+        "title": "网络识别候选"
       },
       "EmailBindingConfirmation": {
         "properties": {
@@ -7486,6 +8012,58 @@
         ],
         "title": "错误响应"
       },
+      "EvidenceSummary": {
+        "properties": {
+          "source_type": {
+            "type": "string",
+            "title": "来源类型"
+          },
+          "url": {
+            "type": "string",
+            "title": "来源 URL"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "标题"
+          },
+          "http_status": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "HTTP 状态码"
+          },
+          "content_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "内容 SHA-256"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source_type",
+          "url"
+        ],
+        "title": "来源证据摘要"
+      },
       "FileResponse": {
         "properties": {
           "id": {
@@ -7742,9 +8320,21 @@
             "type": "string",
             "title": "状态"
           },
+          "journal_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "期刊 ID"
+          },
           "candidates": {
             "items": {
-              "$ref": "#/components/schemas/JournalCandidate"
+              "$ref": "#/components/schemas/DiscoveryCandidate"
             },
             "type": "array",
             "title": "候选列表"
@@ -11122,6 +11712,90 @@
         ],
         "title": "近期操作"
       },
+      "SubmissionPortalListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SubmissionPortalResponse"
+            },
+            "type": "array",
+            "title": "记录列表"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "投稿入口列表响应"
+      },
+      "SubmissionPortalResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "资源 ID"
+          },
+          "journal_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "期刊 ID"
+          },
+          "original_url": {
+            "type": "string",
+            "title": "原始 URL"
+          },
+          "final_url": {
+            "type": "string",
+            "title": "最终 URL"
+          },
+          "redirect_chain": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "重定向链"
+          },
+          "verification_status": {
+            "type": "string",
+            "title": "验证状态"
+          },
+          "access_status": {
+            "type": "string",
+            "title": "访问状态"
+          },
+          "platform_code": {
+            "type": "string",
+            "title": "平台代码"
+          },
+          "confidence": {
+            "type": "number",
+            "title": "置信度"
+          },
+          "evidence_summary": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceSummary"
+            },
+            "type": "array",
+            "title": "证据摘要"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "journal_id",
+          "original_url",
+          "final_url",
+          "redirect_chain",
+          "verification_status",
+          "access_status",
+          "platform_code",
+          "confidence",
+          "evidence_summary"
+        ],
+        "title": "投稿入口响应"
+      },
       "TaskResponse": {
         "properties": {
           "task_id": {
@@ -11154,9 +11828,44 @@
             ],
             "title": "消息"
           },
+          "stage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "当前阶段"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "警告列表"
+          },
+          "retryable": {
+            "type": "boolean",
+            "title": "是否可重试",
+            "default": false
+          },
+          "journal_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "期刊 ID"
+          },
           "candidates": {
             "items": {
-              "$ref": "#/components/schemas/JournalCandidate"
+              "$ref": "#/components/schemas/DiscoveryCandidate"
             },
             "type": "array",
             "title": "候选列表"
@@ -11169,8 +11878,7 @@
           "task_type",
           "status",
           "progress",
-          "message",
-          "candidates"
+          "message"
         ],
         "title": "识别任务响应"
       },

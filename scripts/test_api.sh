@@ -123,6 +123,13 @@ try:
     if "manuscripts" in table_names:
         session.execute(text("UPDATE manuscripts SET current_version_id = NULL"))
     for table in (
+        "journal_discovery_logs",
+        "journal_source_snapshots",
+        "journal_submission_portals",
+        "discovery_tasks",
+        "journal_identifiers",
+        "journal_aliases",
+        "publisher_aliases",
         "operation_logs",
         "manuscript_files",
         "file_families",

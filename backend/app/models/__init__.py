@@ -8,7 +8,12 @@ from app.models.authors import (
     Institution,
 )
 from app.models.base import Base, new_uuid, utc_now
-from app.models.discovery import DiscoveryTask
+from app.models.discovery import (
+    DiscoveryTask,
+    JournalDiscoveryLog,
+    JournalSourceSnapshot,
+    JournalSubmissionPortal,
+)
 from app.models.files import FileFamily, ManuscriptFile
 from app.models.journals import (
     Journal,
@@ -32,7 +37,10 @@ __all__ = [
     "Institution",
     "Journal",
     "JournalAlias",
+    "JournalDiscoveryLog",
     "JournalIdentifier",
+    "JournalSourceSnapshot",
+    "JournalSubmissionPortal",
     "JournalPlatform",
     "Manuscript",
     "ManuscriptAuthor",

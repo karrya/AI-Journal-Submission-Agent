@@ -14,13 +14,16 @@ from app.models import (
     Journal,
     JournalAlias,
     JournalIdentifier,
+    JournalSubmissionPortal,
     Publisher,
     PublisherAlias,
     utc_now,
 )
 from app.repositories.identification import IdentificationRepository
 from app.schemas.identification import (
+    ConfirmCandidateRequest,
     ConfirmIdentityRequest,
+    DiscoveryCandidate,
     IdentifyRequest,
     IdentifyResponse,
     JournalCandidate,
@@ -31,6 +34,8 @@ from app.schemas.identification import (
     PublisherOption,
     PublisherOptionsResponse,
     PublisherSearchResponse,
+    SubmissionPortalListResponse,
+    SubmissionPortalResponse,
     TaskResponse,
     normalize_domain,
 )
@@ -441,6 +446,22 @@ class JournalIdentificationService(DomainService):
             items=candidates, page=page, page_size=page_size, total=total
         )
 
+    def _task_response(self, task: DiscoveryTask) -> TaskResponse:
+        checkpoint = task.checkpoint or {}
+        response = checkpoint.get("response", {})
+        return TaskResponse(
+            task_id=UUID(task.id),
+            task_type=task.task_type,
+            status=task.status,
+            progress=task.progress,
+            message=task.last_error_message,
+            stage=task.stage,
+            warnings=checkpoint.get("warnings", []),
+            retryable=task.retryable,
+            journal_id=UUID(task.journal_id) if task.journal_id else None,
+            candidates=response.get("candidates", []),
+        )
+
     def get_task(self, task_id: str) -> TaskResponse:
         self._require_reader()
         task = self.db.get(DiscoveryTask, task_id)
@@ -454,15 +475,231 @@ class JournalIdentificationService(DomainService):
                 Permission.MANUSCRIPT_READ,
                 request_id=self.request_id,
             )
-        checkpoint = task.checkpoint or {}
-        response = checkpoint.get("response", {})
-        return TaskResponse(
-            task_id=UUID(task.id),
-            task_type=task.task_type,
-            status=task.status,
-            progress=task.progress,
-            message=task.last_error_message,
-            candidates=response.get("candidates", []),
+        return self._task_response(task)
+
+    def _identify_response_from_task(self, task: DiscoveryTask) -> IdentifyResponse:
+        response = dict((task.checkpoint or {}).get("response", {}))
+        response["task_id"] = task.id
+        response["status"] = task.status
+        response["journal_id"] = task.journal_id
+        response.setdefault("candidates", [])
+        return IdentifyResponse.model_validate(response)
+
+    def create_network_task(self, payload: IdentifyRequest) -> IdentifyResponse:
+        self._require_admin()
+        normalized_issn = self._identifier(payload.issn)
+        normalized_eissn = self._identifier(payload.eissn)
+        canonical_values = {
+            "publisher_name": normalize_comparison(payload.publisher_name or ""),
+            "journal_name": normalize_comparison(payload.journal_name),
+            "issn": normalized_issn,
+            "eissn": normalized_eissn,
+            "website_url": _domain(payload.website_url),
+            "article_type": payload.article_type,
+        }
+        canonical = json.dumps(canonical_values, sort_keys=True, ensure_ascii=False)
+        key = hashlib.sha256(f"journal.identify:{canonical}".encode()).hexdigest()
+        existing = self.db.scalar(
+            select(DiscoveryTask).where(
+                DiscoveryTask.task_type == "journal.identify",
+                DiscoveryTask.idempotency_key == key,
+            )
+        )
+        if existing:
+            if existing.status == "CANCELLED":
+                self.retry_task(str(existing.id))
+            return self._identify_response_from_task(existing)
+        task = DiscoveryTask(
+            task_type="journal.identify",
+            idempotency_key=key,
+            payload={
+                **canonical_values,
+                "input_journal_name": payload.journal_name.strip(),
+                "input_publisher_name": (payload.publisher_name or "").strip(),
+                "input_website_url": payload.website_url,
+            },
+            status="PENDING",
+            progress=0,
+            created_by=self.user.id,
+            available_at=utc_now(),
+        )
+        self.db.add(task)
+        try:
+            self.db.flush()
+        except IntegrityError:
+            self.db.rollback()
+            existing = self.db.scalar(
+                select(DiscoveryTask).where(
+                    DiscoveryTask.task_type == "journal.identify",
+                    DiscoveryTask.idempotency_key == key,
+                )
+            )
+            if existing is None:
+                raise AppError(409, "CONCURRENT_IDENTIFICATION", "识别任务正在处理中") from None
+            return self._identify_response_from_task(existing)
+        response = IdentifyResponse(task_id=UUID(task.id), status="PENDING", candidates=[])
+        task.checkpoint = {"response": response.model_dump(mode="json"), "warnings": []}
+        self._business_audit(
+            action="journal.identify.schedule",
+            target_type="discovery_task",
+            target_id=task.id,
+            after={"status": "PENDING"},
+        )
+        self._commit()
+        return response
+
+    def retry_task(self, task_id: str) -> TaskResponse:
+        self._require_admin()
+        task = self.db.scalar(
+            select(DiscoveryTask).where(DiscoveryTask.id == task_id).with_for_update()
+        )
+        if task is None:
+            raise AppError(404, "RESOURCE_NOT_FOUND", "资源不存在")
+        retryable_failure = task.status == "FAILED" and task.retryable
+        completed = task.status == "SUCCEEDED"
+        cancelled = task.status == "CANCELLED"
+        if not (retryable_failure or completed or cancelled):
+            raise AppError(409, "INVALID_TASK_STATE", "当前任务状态不允许重试")
+        task.status = "PENDING"
+        previous_journal_id = task.journal_id
+        task.journal_id = None
+        task.progress = 0
+        task.stage = None
+        task.retryable = False
+        task.cancel_requested = False
+        task.available_at = utc_now()
+        task.lease_expires_at = None
+        task.worker_id = None
+        task.started_at = None
+        task.completed_at = None
+        task.last_error_code = None
+        task.last_error_message = None
+        task.attempt_count = 0
+        response = IdentifyResponse(task_id=UUID(task.id), status="PENDING", candidates=[])
+        task.checkpoint = {"response": response.model_dump(mode="json"), "warnings": []}
+        self._business_audit(
+            action="journal.identify.retry",
+            target_type="discovery_task",
+            target_id=task.id,
+            after={"status": "PENDING", "previous_journal_id": previous_journal_id},
+        )
+        self._commit()
+        return self.get_task(task_id)
+
+    def cancel_task(self, task_id: str) -> TaskResponse:
+        self._require_admin()
+        task = self.db.scalar(
+            select(DiscoveryTask).where(DiscoveryTask.id == task_id).with_for_update()
+        )
+        if task is None:
+            raise AppError(404, "RESOURCE_NOT_FOUND", "资源不存在")
+        if task.status == "CANCELLED":
+            return self.get_task(task_id)
+        if task.status not in {"PENDING", "PROCESSING"}:
+            raise AppError(409, "INVALID_TASK_STATE", "当前任务状态不允许取消")
+        if task.status == "PENDING":
+            task.status = "CANCELLED"
+            task.completed_at = utc_now()
+        else:
+            task.cancel_requested = True
+        self._business_audit(
+            action="journal.identify.cancel",
+            target_type="discovery_task",
+            target_id=task.id,
+            after={"status": task.status, "cancel_requested": task.cancel_requested},
+        )
+        self._commit()
+        return self.get_task(task_id)
+
+    def confirm_task_candidate(
+        self,
+        task_id: str,
+        payload: ConfirmCandidateRequest,
+    ) -> TaskResponse:
+        self._require_admin()
+        task = self.db.scalar(
+            select(DiscoveryTask).where(DiscoveryTask.id == task_id).with_for_update()
+        )
+        if task is None:
+            raise AppError(404, "RESOURCE_NOT_FOUND", "资源不存在")
+        if task.status != "SUCCEEDED" or task.journal_id:
+            raise AppError(409, "INVALID_TASK_STATE", "当前任务状态不允许确认候选")
+        response = dict((task.checkpoint or {}).get("response", {}))
+        raw_candidates = response.get("candidates", [])
+        selected = next(
+            (
+                item for item in raw_candidates
+                if item.get("candidate_key") == payload.candidate_key
+            ),
+            None,
+        )
+        if selected is None:
+            raise AppError(404, "RESOURCE_NOT_FOUND", "候选不存在")
+        candidate = DiscoveryCandidate.model_validate(selected)
+        if candidate.identity_status not in {"NEEDS_CONFIRMATION", "UNKNOWN"}:
+            raise AppError(409, "INVALID_IDENTITY_STATE", "当前候选状态不允许确认")
+        if not candidate.publisher_name:
+            raise AppError(422, "VALIDATION_ERROR", "候选缺少出版社信息")
+        from app.services.network_identification import NetworkIdentificationService
+
+        candidate.identity_status = "VERIFIED"
+        candidate.conflict_reason = None
+        journal = NetworkIdentificationService(self.db)._persist_candidate(task, candidate)
+        if journal is None:
+            self.db.rollback()
+            raise AppError(409, "IDENTITY_CONFLICT", "标识与现有期刊名称不一致")
+        response["candidates"] = [
+            candidate.model_dump(mode="json")
+            if item.get("candidate_key") == payload.candidate_key
+            else item
+            for item in raw_candidates
+        ]
+        checkpoint = dict(task.checkpoint or {})
+        checkpoint["response"] = response
+        note = (payload.confirmation_note or "").strip()
+        if note:
+            checkpoint["confirmation_note"] = note[:200]
+        task.checkpoint = checkpoint
+        after = {"identity_status": "VERIFIED", "candidate_key": payload.candidate_key}
+        if note:
+            after["confirmation_note"] = note[:200]
+        self._business_audit(
+            action="journal.identity.confirm_candidate",
+            target_type="journal",
+            target_id=journal.id,
+            after=after,
+        )
+        self._commit()
+        return self.get_task(task_id)
+
+    def list_submission_portals(self, journal_id: str) -> SubmissionPortalListResponse:
+        self._require_reader()
+        journal = self.db.scalar(
+            select(Journal).where(Journal.id == journal_id, Journal.deleted_at.is_(None))
+        )
+        if journal is None:
+            raise AppError(404, "RESOURCE_NOT_FOUND", "资源不存在")
+        records = self.db.scalars(
+            select(JournalSubmissionPortal)
+            .where(JournalSubmissionPortal.journal_id == journal_id)
+            .order_by(JournalSubmissionPortal.created_at.desc())
+        ).all()
+        return SubmissionPortalListResponse(
+            items=[
+                SubmissionPortalResponse(
+                    id=UUID(record.id),
+                    journal_id=UUID(record.journal_id),
+                    original_url=record.original_url,
+                    final_url=record.final_url,
+                    redirect_chain=record.redirect_chain,
+                    verification_status=record.verification_status,
+                    access_status=record.access_status,
+                    platform_code=record.platform_code,
+                    confidence=record.confidence,
+                    evidence_summary=record.evidence_summary,
+                )
+                for record in records
+            ]
         )
 
     def _persist_candidate_states(self, candidates: list[JournalCandidate]) -> None:
@@ -605,7 +842,7 @@ class JournalIdentificationService(DomainService):
             )
         )
         if existing:
-            return IdentifyResponse.model_validate((existing.checkpoint or {})["response"])
+            return self._identify_response_from_task(existing)
         try:
             candidates, _ = self._candidates(
                 name=payload.journal_name,
@@ -648,7 +885,12 @@ class JournalIdentificationService(DomainService):
             task.progress = 100
             self._persist_candidate_states(candidates)
             response = IdentifyResponse(
-                task_id=UUID(task.id), status=task.status, candidates=candidates
+                task_id=UUID(task.id),
+                status=task.status,
+                candidates=[
+                    DiscoveryCandidate.model_validate(candidate.model_dump())
+                    for candidate in candidates
+                ],
             )
             task.checkpoint = {"response": response.model_dump(mode="json")}
             self.db.flush()

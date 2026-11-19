@@ -26,7 +26,7 @@ cd ..
 
 `create_admin.py` 读取初始密码时不会回显，并要求首次登录时修改密码。不要将初始化或管理员创建纳入日常启动流程。
 
-在两个独立终端中启动开发进程：
+在两个独立终端中启动开发进程；使用自动化网络识别时，再在第三个终端启动独立 Worker：
 
 ```bash
 cd "/Users/didi/PycharmProjects/AI Journal Submission Agent"
@@ -37,6 +37,13 @@ bash scripts/dev_backend.sh
 cd "/Users/didi/PycharmProjects/AI Journal Submission Agent"
 bash scripts/dev_frontend.sh
 ```
+
+```bash
+cd "/Users/didi/PycharmProjects/AI Journal Submission Agent"
+bash scripts/dev_worker.sh
+```
+
+网络识别的 Provider、Kimi、Chromium 和证据配置见[自动化期刊网络识别](docs/network-discovery.md)。需要长期运行时，可改用 `bash scripts/dev_services.sh start` 由 macOS launchd 托管后端和 Worker，避免 Claude 后台任务的运行时限。
 
 后端监听 `127.0.0.1:8000`；前端地址为 `http://127.0.0.1:5173`。默认 `ALLOWED_ORIGINS` 同时信任该地址和 `http://localhost:5173`，因此可在文档所列地址正常登录并执行受 CSRF 保护的密码修改。Vite 的 `/api` 代理保留浏览器源，并将请求转发至后端。健康检查地址为 `http://127.0.0.1:8000/api/v1/health`。
 
@@ -51,6 +58,7 @@ bash scripts/verify.sh
 
 ## 运维与发布证据
 
+- [自动化期刊网络识别](docs/network-discovery.md)：独立 Worker、开放数据、Kimi 搜索、官网与投稿入口证据、浏览器降级及安全边界。
 - [运维手册](docs/operations.md)：准确的 Homebrew 配置、初始化及凭据失步恢复、迁移、启动、测试、OpenAPI/Postman、存储核对、age 密钥、加密备份、隔离恢复和未知提交恢复。
 - [安全说明与矩阵](docs/security.md)：信任边界、角色行为、密钥处理、可执行安全检查及剩余限制。
 - [V0.1 验收记录](docs/acceptance-v0.1.md)：注明日期的全新安装、持久化/重启、真实浏览器、备份/恢复、测试/覆盖率及未解决限制的证据。

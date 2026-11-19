@@ -38,6 +38,62 @@ class JournalCandidate(OutputModel):
     verified_at: datetime | None
 
 
+class EvidenceSummary(OutputModel):
+    source_type: str
+    url: str
+    title: str | None = None
+    http_status: int | None = None
+    content_sha256: str | None = None
+
+
+class DiscoveryCandidate(OutputModel):
+    candidate_key: str | None = None
+    id: UUID | None = None
+    publisher_id: UUID | None = None
+    name: str
+    publisher_name: str | None = None
+    issn: str | None = None
+    eissn: str | None = None
+    website_url: str | None = None
+    author_guidelines_url: str | None = None
+    submission_url: str | None = None
+    platform_code: str | None = None
+    platform_confidence: float = 0
+    portal_original_url: str | None = None
+    portal_verification_status: str = "UNVERIFIED"
+    portal_access_status: str = "UNKNOWN"
+    redirect_chain: list[str] = Field(default_factory=list)
+    identity_status: str
+    match_reasons: list[str] = Field(default_factory=list)
+    conflict_reason: str | None = None
+    updated_at: datetime | None = None
+    verified_at: datetime | None = None
+    sources: list[str] = Field(default_factory=list)
+    evidence: list[EvidenceSummary] = Field(default_factory=list)
+
+
+class ConfirmCandidateRequest(InputModel):
+    candidate_key: str = Field(min_length=1, max_length=128)
+    confirmation_note: str | None = Field(default=None, max_length=2000)
+
+
+class SubmissionPortalResponse(OutputModel):
+    id: UUID
+    journal_id: UUID
+    original_url: str
+    final_url: str
+    redirect_chain: list[str]
+    verification_status: str
+    access_status: str
+    platform_code: str
+    confidence: float
+    evidence_summary: list[EvidenceSummary]
+
+
+class SubmissionPortalListResponse(OutputModel):
+    items: list[SubmissionPortalResponse]
+
+
 class IdentifyRequest(InputModel):
     publisher_name: str | None = Field(default=None, max_length=255)
     journal_name: str = Field(min_length=1, max_length=500)
@@ -63,7 +119,8 @@ class ConfirmIdentityRequest(InputModel):
 class IdentifyResponse(OutputModel):
     task_id: UUID
     status: str
-    candidates: list[JournalCandidate]
+    journal_id: UUID | None = None
+    candidates: list[DiscoveryCandidate]
 
 
 class JournalSearchResponse(OutputModel):
@@ -79,7 +136,11 @@ class TaskResponse(OutputModel):
     status: str
     progress: int = Field(ge=0, le=100)
     message: str | None
-    candidates: list[JournalCandidate]
+    stage: str | None = None
+    warnings: list[str] = Field(default_factory=list)
+    retryable: bool = False
+    journal_id: UUID | None = None
+    candidates: list[DiscoveryCandidate] = Field(default_factory=list)
 
 
 class PublisherOption(OutputModel):

@@ -15,6 +15,31 @@ export interface JournalCandidate {
   verified_at: string | null
 }
 
+export interface EvidenceSummary {
+  source_type: string
+  url: string
+  title?: string | null
+  http_status?: number | null
+  content_sha256?: string | null
+}
+
+export type DiscoveryCandidate = Partial<JournalCandidate> & {
+  candidate_key?: string
+  name: string
+  publisher_name?: string | null
+  identity_status: JournalCandidate['identity_status']
+  author_guidelines_url?: string | null
+  submission_url?: string | null
+  platform_code?: string | null
+  platform_confidence?: number
+  portal_original_url?: string | null
+  portal_verification_status?: string
+  portal_access_status?: string
+  redirect_chain?: string[]
+  sources?: string[]
+  evidence?: EvidenceSummary[]
+}
+
 export interface IdentifyRequest {
   publisher_name?: string
   journal_name: string
@@ -28,7 +53,8 @@ export interface IdentifyRequest {
 export interface IdentifyResponse {
   task_id: string
   status: string
-  candidates: JournalCandidate[]
+  journal_id?: string | null
+  candidates: DiscoveryCandidate[]
 }
 
 export interface DiscoveryTask {
@@ -37,7 +63,11 @@ export interface DiscoveryTask {
   status: string
   progress: number
   message: string | null
-  candidates: JournalCandidate[]
+  stage?: string | null
+  warnings?: string[]
+  retryable?: boolean
+  journal_id?: string | null
+  candidates: DiscoveryCandidate[]
 }
 
 export interface PublisherOption {
@@ -87,5 +117,27 @@ export async function confirmIdentity(
 
 export async function getDiscoveryTask(taskId: string): Promise<DiscoveryTask> {
   const response = await api.get<DiscoveryTask>(`/tasks/${taskId}`)
+  return response.data
+}
+
+export async function retryDiscoveryTask(taskId: string): Promise<DiscoveryTask> {
+  const response = await api.post<DiscoveryTask>(`/tasks/${taskId}/retry`)
+  return response.data
+}
+
+export async function cancelDiscoveryTask(taskId: string): Promise<DiscoveryTask> {
+  const response = await api.post<DiscoveryTask>(`/tasks/${taskId}/cancel`)
+  return response.data
+}
+
+export async function confirmTaskCandidate(
+  taskId: string,
+  candidateKey: string,
+  confirmationNote?: string,
+): Promise<DiscoveryTask> {
+  const response = await api.post<DiscoveryTask>(`/tasks/${taskId}/confirm-candidate`, {
+    candidate_key: candidateKey,
+    confirmation_note: confirmationNote ?? null,
+  })
   return response.data
 }

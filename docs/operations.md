@@ -93,15 +93,15 @@ session = SessionLocal()
 try:
     names = set(inspect(session.bind).get_table_names())
     application_tables = names - {"alembic_version"}
-    assert len(application_tables) == 18, sorted(application_tables)
+    assert len(application_tables) == 25, sorted(application_tables)
     assert "alembic_version" in names
-    print("18 application tables plus alembic_version; migration head verified")
+    print("25 application tables plus alembic_version; migration head verified")
 finally:
     session.close()
 PY
 ```
 
-模式包含 18 张应用表；`alembic_version` 用于迁移簿记，因此完全迁移的 MySQL 模式共含 19 张表。
+模式包含 25 张应用表；`alembic_version` 用于迁移簿记，因此完全迁移的 MySQL 模式共含 26 张表。
 
 ## 4. 隐藏输入创建管理员与首次登录
 
@@ -140,6 +140,18 @@ curl --fail --silent http://127.0.0.1:5173/ >/dev/null
 ```
 
 打开 `http://127.0.0.1:5173`。不要将任一开发监听器暴露到非回环接口。计划内持久化维护时，停止写入，运行经授权的 `brew services restart mysql@8.0`，重启两个脚本，然后在恢复工作前验证数据库记录及存储文件的 SHA-256（安全哈希算法 256 位）值。
+
+### 5.1 使用 launchd 长期运行后端和 Worker
+
+Claude 等工具的后台任务有运行时限，需要长期运行时使用 macOS 用户级 launchd：
+
+```bash
+bash scripts/dev_services.sh start
+bash scripts/dev_services.sh status
+bash scripts/dev_services.sh stop
+```
+
+`start` 会写入当前用户的 `~/Library/LaunchAgents` 并启用 `RunAtLoad` 与异常退出后的自动重启。日志位于 `storage/logs/`。`uninstall` 会停止服务并删除这两个专用 plist；不要删除其他服务配置。
 
 ## 6. 测试、覆盖率、OpenAPI 与 Postman/Newman
 

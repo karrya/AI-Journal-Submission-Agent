@@ -22,19 +22,21 @@ def test_search_and_identification_routes(client, admin_context):
             "issn": "0378-5955",
         },
     )
-    assert identified.status_code == 200, identified.text
+    assert identified.status_code == 202, identified.text
     task = client.get(f"/api/v1/tasks/{identified.json()['task_id']}")
     assert task.status_code == 200
-    assert task.json()["status"] == "SUCCEEDED"
+    assert task.json()["status"] == "PENDING"
 
 
-def test_confirm_identity_uses_candidate_timestamp(client, admin_context):
-    identified = client.post(
-        "/api/v1/journals/identify",
-        json={"publisher_name": "Publisher", "journal_name": "Candidate"},
+def test_confirm_identity_uses_candidate_timestamp(client, db_session, admin_context):
+    from app.services.identification import JournalIdentificationService
+
+    JournalIdentificationService(db_session, admin_context.user, "confirm-api").create_journal(
+        publisher_name="Publisher", name="Candidate", aliases=[]
     )
-    assert identified.status_code == 200, identified.text
-    candidate = identified.json()["candidates"][0]
+    found = client.get("/api/v1/journals/search", params={"name": "Candidate"})
+    assert found.status_code == 200
+    candidate = found.json()["items"][0]
     confirmed = client.post(
         f"/api/v1/journals/{candidate['id']}/confirm-identity",
         json={

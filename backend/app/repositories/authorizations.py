@@ -3,7 +3,7 @@
 import json
 from datetime import datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import ColumnElement, Select, func, select
 from sqlalchemy.orm import Session
 
 from app.models import Author, AuthorAuthorization, User
@@ -108,7 +108,7 @@ class AuthorizationRepository:
         return list(self.db.scalars(statement)), total or 0
 
     @staticmethod
-    def _active_subject_predicates(user_id: str, author_id: str):
+    def _active_subject_predicates(user_id: str, author_id: str | ColumnElement[str]):
         return (
             AuthorAuthorization.user_id == user_id,
             AuthorAuthorization.author_id == author_id,
@@ -126,6 +126,29 @@ class AuthorizationRepository:
             AuthorAuthorization.revoked_at.is_(None),
         )
 
+    @classmethod
+    def active_grant_query(
+        cls,
+        *,
+        user_id: str,
+        author_id: str | ColumnElement[str],
+        permission: str,
+        now_utc: datetime,
+    ) -> Select[tuple[str]]:
+        return (
+            select(AuthorAuthorization.id)
+            .join(User, User.id == AuthorAuthorization.user_id)
+            .join(Author, Author.id == AuthorAuthorization.author_id)
+            .where(
+                *cls._active_subject_predicates(user_id, author_id),
+                *cls._current_grant_predicates(now_utc),
+                func.json_contains(
+                    AuthorAuthorization.permissions, json.dumps(permission)
+                )
+                == 1,
+            )
+        )
+
     def any_active(
         self,
         *,
@@ -135,18 +158,11 @@ class AuthorizationRepository:
         now_utc: datetime,
         authorization_id: str | None = None,
     ) -> bool:
-        statement = (
-            select(AuthorAuthorization.id)
-            .join(User, User.id == AuthorAuthorization.user_id)
-            .join(Author, Author.id == AuthorAuthorization.author_id)
-            .where(
-                *self._active_subject_predicates(user_id, author_id),
-                *self._current_grant_predicates(now_utc),
-                func.json_contains(
-                    AuthorAuthorization.permissions, json.dumps(permission)
-                )
-                == 1,
-            )
+        statement = self.active_grant_query(
+            user_id=user_id,
+            author_id=author_id,
+            permission=permission,
+            now_utc=now_utc,
         )
         if authorization_id is not None:
             statement = statement.where(AuthorAuthorization.id == authorization_id)

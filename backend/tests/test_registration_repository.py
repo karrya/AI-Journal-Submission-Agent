@@ -19,6 +19,7 @@ from app.models import (
     RegistrationTask,
     utc_now,
 )
+from app.repositories.authorizations import AuthorizationRepository
 from app.repositories.registration import RegistrationRepository
 from app.schemas.registration import (
     PlatformAdapterResponse,
@@ -325,25 +326,58 @@ def test_account_page_uses_current_user_authorization(db_session, registration_r
     assert other_total == 0
 
 
-@pytest.mark.parametrize("state", ["expired", "revoked", "wrong_permission"])
-def test_account_page_excludes_inactive_or_unrelated_grants(
+@pytest.mark.parametrize(
+    "state",
+    [
+        "active",
+        "not_yet_active",
+        "expired",
+        "revoked",
+        "wrong_permission",
+        "disabled_user",
+        "deleted_user",
+        "inactive_author",
+        "deleted_author",
+    ],
+)
+def test_account_page_matches_task2_active_grant_semantics(
     db_session, registration_records, state
 ):
+    now = utc_now()
     grant = registration_records.grant
-    if state == "expired":
-        grant.valid_from = utc_now() - timedelta(hours=2)
-        grant.valid_to = utc_now() - timedelta(hours=1)
+    if state == "not_yet_active":
+        grant.valid_from = now + timedelta(hours=1)
+        grant.valid_to = now + timedelta(hours=2)
+    elif state == "expired":
+        grant.valid_from = now - timedelta(hours=2)
+        grant.valid_to = now - timedelta(hours=1)
     elif state == "revoked":
-        grant.revoked_at = utc_now()
-    else:
+        grant.revoked_at = now
+    elif state == "wrong_permission":
         grant.permissions = ["manuscript:read"]
+    elif state == "disabled_user":
+        registration_records.user.status = "disabled"
+    elif state == "deleted_user":
+        registration_records.user.deleted_at = now
+    elif state == "inactive_author":
+        registration_records.author.status = "disabled"
+    elif state == "deleted_author":
+        registration_records.author.deleted_at = now
     db_session.commit()
 
+    task2_allows = AuthorizationRepository(db_session).any_active(
+        user_id=registration_records.user.id,
+        author_id=registration_records.author.id,
+        permission="account:register",
+        now_utc=now,
+    )
     records, total = RegistrationRepository(db_session).account_page(
         registration_records.user.id, page=1, page_size=20
     )
-    assert records == []
-    assert total == 0
+
+    assert task2_allows is (state == "active")
+    assert (total == 1) is task2_allows
+    assert (len(records) == 1) is task2_allows
 
 
 @pytest.mark.parametrize("master_name", ["account", "author", "publisher", "journal"])

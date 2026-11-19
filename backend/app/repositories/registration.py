@@ -1,6 +1,5 @@
 """Persistence queries for registration targets, tasks, and accounts."""
 
-import json
 from collections.abc import Mapping
 
 from sqlalchemy import ColumnElement, func, select
@@ -8,7 +7,6 @@ from sqlalchemy.orm import Session
 
 from app.models import (
     Author,
-    AuthorAuthorization,
     Journal,
     JournalSubmissionPortal,
     PlatformAdapter,
@@ -16,9 +14,9 @@ from app.models import (
     PublisherAccount,
     PublisherRegistrationSupport,
     RegistrationTask,
-    User,
     utc_now,
 )
+from app.repositories.authorizations import AuthorizationRepository
 
 
 class RegistrationRepository:
@@ -109,33 +107,21 @@ class RegistrationRepository:
             raise ValueError("page_size must be less than or equal to 100")
         now = utc_now()
         authorized = (
-            select(AuthorAuthorization.id)
-            .join(User, User.id == AuthorAuthorization.user_id)
-            .where(
-                AuthorAuthorization.author_id == PublisherAccount.author_id,
-                AuthorAuthorization.user_id == user_id,
-                AuthorAuthorization.valid_from <= now,
-                AuthorAuthorization.valid_to > now,
-                AuthorAuthorization.revoked_at.is_(None),
-                func.json_contains(
-                    AuthorAuthorization.permissions, json.dumps("account:register")
-                )
-                == 1,
-                User.status == "active",
-                User.deleted_at.is_(None),
+            AuthorizationRepository.active_grant_query(
+                user_id=user_id,
+                author_id=PublisherAccount.author_id,
+                permission="account:register",
+                now_utc=now,
             )
             .correlate(PublisherAccount)
             .exists()
         )
         statement = (
             select(PublisherAccount)
-            .join(Author, Author.id == PublisherAccount.author_id)
             .join(Publisher, Publisher.id == PublisherAccount.publisher_id)
             .outerjoin(Journal, Journal.id == PublisherAccount.journal_id)
             .where(
                 PublisherAccount.deleted_at.is_(None),
-                Author.deleted_at.is_(None),
-                Author.status == "active",
                 Publisher.deleted_at.is_(None),
                 PublisherAccount.journal_id.is_(None) | Journal.deleted_at.is_(None),
                 authorized,

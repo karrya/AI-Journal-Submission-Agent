@@ -54,8 +54,7 @@ def mutable_columns(
     return columns
 
 
-def initialize_registration_support() -> None:
-    connection = op.get_bind()
+def initialize_registration_support(connection) -> None:
     for publisher_code, display_name, normalized_name in CANONICAL_PUBLISHERS:
         publisher_id = connection.scalar(
             sa.text("SELECT id FROM publishers WHERE normalized_name = :normalized_name"),
@@ -217,9 +216,9 @@ def upgrade() -> None:
         sa.Column("author_id", sa.CHAR(36), nullable=False),
         sa.Column("publisher_id", sa.CHAR(36), nullable=False),
         sa.Column("journal_id", sa.CHAR(36), nullable=True),
+        sa.Column("portal_id", sa.CHAR(36), nullable=False),
         sa.Column("authorization_id", sa.CHAR(36), nullable=False),
         sa.Column("platform_code", sa.VARCHAR(64), nullable=False),
-        sa.Column("registration_url", sa.TEXT(), nullable=False),
         sa.Column("adapter_code", sa.VARCHAR(64), nullable=True),
         sa.Column("adapter_version", sa.VARCHAR(32), nullable=True),
         sa.Column("task_status", sa.VARCHAR(40), nullable=False, server_default="PENDING"),
@@ -245,6 +244,9 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["author_id"], ["authors.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(["publisher_id"], ["publishers.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(["journal_id"], ["journals.id"], ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(
+            ["portal_id"], ["journal_submission_portals.id"], ondelete="RESTRICT"
+        ),
         sa.ForeignKeyConstraint(
             ["authorization_id"], ["author_authorizations.id"], ondelete="RESTRICT"
         ),
@@ -311,7 +313,7 @@ def upgrade() -> None:
         "registration_confirmations",
         ["task_id", "action_type", "created_at"],
     )
-    initialize_registration_support()
+    initialize_registration_support(op.get_bind())
 
 
 def downgrade() -> None:

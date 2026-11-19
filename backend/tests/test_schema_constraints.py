@@ -303,8 +303,8 @@ EXPECTED_NEW_COLUMNS = {
         "updated_at", "created_by", "deleted_at",
     },
     "registration_tasks": {
-        "id", "account_id", "author_id", "publisher_id", "journal_id",
-        "authorization_id", "platform_code", "registration_url", "adapter_code",
+        "id", "account_id", "author_id", "publisher_id", "journal_id", "portal_id",
+        "authorization_id", "platform_code", "adapter_code",
         "adapter_version", "task_status", "current_step", "retry_count", "worker_id",
         "lease_expires_at", "available_at", "last_heartbeat_at", "retryable",
         "cancel_requested", "last_external_action", "external_evidence_ref",

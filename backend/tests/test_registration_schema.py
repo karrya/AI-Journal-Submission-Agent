@@ -1,4 +1,5 @@
 import os
+import runpy
 
 import pytest
 from alembic import command
@@ -100,6 +101,29 @@ def test_registration_uniqueness_and_generated_column_match_the_contract():
     assert "registration_audit_logs" not in Base.metadata.tables
 
 
+def test_registration_task_reuses_verified_submission_portal(db_engine):
+    from app.models import RegistrationTask
+
+    table = RegistrationTask.__table__
+    assert "registration_url" not in table.c
+    portal_id = table.c.get("portal_id")
+    assert portal_id is not None
+    assert isinstance(portal_id.type, CHAR)
+    assert portal_id.type.length == 36
+    assert portal_id.nullable is False
+    foreign_key = next(iter(portal_id.foreign_keys))
+    assert foreign_key.column.table.name == "journal_submission_portals"
+    assert foreign_key.column.name == "id"
+    assert foreign_key.ondelete == "RESTRICT"
+    assert any(
+        foreign_key["constrained_columns"] == ["portal_id"]
+        and foreign_key["referred_table"] == "journal_submission_portals"
+        and foreign_key["referred_columns"] == ["id"]
+        and foreign_key["options"].get("ondelete") == "RESTRICT"
+        for foreign_key in inspect(db_engine).get_foreign_keys("registration_tasks")
+    )
+
+
 def test_registration_initialization_is_idempotent_and_preserves_publisher_ids(
     db_engine, db_session, migration_config
 ):
@@ -140,7 +164,20 @@ def test_registration_initialization_is_idempotent_and_preserves_publisher_ids(
         first_ids[row["publisher_code"]] = row["publisher_id"]
     assert first_ids["ELSEVIER"] == existing_id
 
-    command.upgrade(migration_config, "head")
+    migration = runpy.run_path(
+        str(BACKEND_DIR / "alembic" / "versions" / "0007_registration_foundation.py")
+    )
+    with db_engine.begin() as connection:
+        migration["initialize_registration_support"](connection)
+        migration["initialize_registration_support"](connection)
+    with db_engine.connect() as connection:
+        repeated_rows = connection.execute(query).mappings().all()
+    assert len(repeated_rows) == 5
+    assert {row["publisher_code"] for row in repeated_rows} == set(CANONICAL_PUBLISHERS)
+    assert {
+        row["publisher_code"]: row["publisher_id"] for row in repeated_rows
+    } == first_ids
+
     command.downgrade(migration_config, "0006")
     inspector = inspect(db_engine)
     assert "publisher_registration_support" not in inspector.get_table_names()

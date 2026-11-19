@@ -151,13 +151,17 @@ class RegistrationTask(UUIDPrimaryKeyMixin, CreatedUpdatedByMixin, Base):
     journal_id: Mapped[str | None] = mapped_column(
         CHAR(36), ForeignKey("journals.id", ondelete="RESTRICT"), nullable=True
     )
+    portal_id: Mapped[str] = mapped_column(
+        CHAR(36),
+        ForeignKey("journal_submission_portals.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
     authorization_id: Mapped[str] = mapped_column(
         CHAR(36),
         ForeignKey("author_authorizations.id", ondelete="RESTRICT"),
         nullable=False,
     )
     platform_code: Mapped[str] = mapped_column(VARCHAR(64), nullable=False)
-    registration_url: Mapped[str] = mapped_column(TEXT, nullable=False)
     adapter_code: Mapped[str | None] = mapped_column(VARCHAR(64), nullable=True)
     adapter_version: Mapped[str | None] = mapped_column(VARCHAR(32), nullable=True)
     task_status: Mapped[str] = mapped_column(

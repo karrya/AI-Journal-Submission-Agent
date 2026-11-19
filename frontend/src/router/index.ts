@@ -53,6 +53,12 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true },
   },
   {
+    path: '/registration',
+    name: 'registration-workspace',
+    component: () => import('../views/registration/RegistrationView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
     path: '/journals',
     name: 'journal-list',
     component: () => import('../views/journals/JournalListView.vue'),

@@ -19,6 +19,7 @@ const navigation = computed(() => [
   { to: '/manuscripts', label: '稿件管理', icon: 'manuscripts' },
   { to: '/authors', label: '作者与单位', icon: 'authors' },
   { to: '/authorizations', label: '作者授权', icon: 'authorizations' },
+  { to: '/registration', label: '注册任务', icon: 'authorizations' },
   { to: '/journals', label: '期刊管理', icon: 'journals' },
   ...(isAdmin.value ? [{ to: '/users', label: '用户管理', icon: 'users' }] : []),
 ])

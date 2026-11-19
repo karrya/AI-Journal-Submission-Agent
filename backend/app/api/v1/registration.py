@@ -23,15 +23,18 @@ from app.models import (
     UserRole,
 )
 from app.repositories.registration import RegistrationRepository
-from app.schemas.common import ErrorResponse, InputModel, Page
+from app.schemas.common import ErrorResponse, InputModel
 from app.schemas.identification import (
     JournalOption,
     JournalOptionsResponse,
     SubmissionPortalResponse,
 )
 from app.schemas.registration import (
+    PlatformAdapterListResponse,
     PlatformAdapterResponse,
+    PublisherAccountPage,
     PublisherAccountResponse,
+    PublisherSupportListResponse,
     PublisherSupportResponse,
     RegistrationTaskCreate,
     RegistrationTaskPage,
@@ -42,7 +45,6 @@ from app.services.registration import RegistrationService
 
 router = APIRouter(prefix="/api/v1", tags=["registration"])
 VALIDATION_RESPONSE: dict[int | str, dict[str, Any]] = {422: {"model": ErrorResponse}}
-PublisherAccountPage = Page[PublisherAccountResponse]
 SupportStatus = Literal["SUPPORTED", "TESTING", "DISABLED"]
 PublisherCode = Literal[
     "SPRINGER_NATURE", "ELSEVIER", "WILEY", "TAYLOR_FRANCIS", "SAGE"
@@ -110,23 +112,24 @@ def _utc_filter(value: datetime | None) -> datetime | None:
 
 @router.get(
     "/registration/publishers",
-    response_model=list[PublisherSupportResponse],
+    response_model=PublisherSupportListResponse,
     responses=VALIDATION_RESPONSE,
 )
 def list_registration_publishers(
     db: Annotated[Session, Depends(get_db)],
     principal: Annotated[Principal, Depends(get_principal)],
-) -> list[PublisherRegistrationSupport]:
-    return list(
-        db.scalars(
-            select(PublisherRegistrationSupport)
-            .join(Publisher, Publisher.id == PublisherRegistrationSupport.publisher_id)
-            .where(Publisher.deleted_at.is_(None))
-            .order_by(
-                PublisherRegistrationSupport.display_name.asc(),
-                PublisherRegistrationSupport.id.asc(),
-            )
+) -> PublisherSupportListResponse:
+    records = db.scalars(
+        select(PublisherRegistrationSupport)
+        .join(Publisher, Publisher.id == PublisherRegistrationSupport.publisher_id)
+        .where(Publisher.deleted_at.is_(None))
+        .order_by(
+            PublisherRegistrationSupport.display_name.asc(),
+            PublisherRegistrationSupport.id.asc(),
         )
+    )
+    return PublisherSupportListResponse(
+        items=[PublisherSupportResponse.model_validate(record) for record in records]
     )
 
 
@@ -202,21 +205,22 @@ def configure_registration_publisher(
 
 @router.get(
     "/registration/platform-adapters",
-    response_model=list[PlatformAdapterResponse],
+    response_model=PlatformAdapterListResponse,
     responses=VALIDATION_RESPONSE,
 )
 def list_registration_adapters(
     db: Annotated[Session, Depends(get_db)],
     principal: Annotated[Principal, Depends(get_principal)],
-) -> list[PlatformAdapter]:
-    return list(
-        db.scalars(
-            select(PlatformAdapter).order_by(
-                PlatformAdapter.adapter_code.asc(),
-                PlatformAdapter.adapter_version.asc(),
-                PlatformAdapter.id.asc(),
-            )
+) -> PlatformAdapterListResponse:
+    records = db.scalars(
+        select(PlatformAdapter).order_by(
+            PlatformAdapter.adapter_code.asc(),
+            PlatformAdapter.adapter_version.asc(),
+            PlatformAdapter.id.asc(),
         )
+    )
+    return PlatformAdapterListResponse(
+        items=[PlatformAdapterResponse.model_validate(record) for record in records]
     )
 
 

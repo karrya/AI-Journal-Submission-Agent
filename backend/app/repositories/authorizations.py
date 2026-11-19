@@ -4,7 +4,7 @@ import json
 from datetime import datetime
 
 from sqlalchemy import ColumnElement, Select, func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import InstrumentedAttribute, Session
 
 from app.models import Author, AuthorAuthorization, User
 
@@ -108,7 +108,10 @@ class AuthorizationRepository:
         return list(self.db.scalars(statement)), total or 0
 
     @staticmethod
-    def _active_subject_predicates(user_id: str, author_id: str | ColumnElement[str]):
+    def _active_subject_predicates(
+        user_id: str,
+        author_id: str | ColumnElement[str] | InstrumentedAttribute[str],
+    ):
         return (
             AuthorAuthorization.user_id == user_id,
             AuthorAuthorization.author_id == author_id,
@@ -131,7 +134,7 @@ class AuthorizationRepository:
         cls,
         *,
         user_id: str,
-        author_id: str | ColumnElement[str],
+        author_id: str | ColumnElement[str] | InstrumentedAttribute[str],
         permission: str,
         now_utc: datetime,
     ) -> Select[tuple[str]]:

@@ -5,6 +5,7 @@ import pytest
 from pydantic import ValidationError
 
 from app.api.v1.contract_manifest import CONTRACTS
+from app.main import app
 from app.schemas import (
     audit,
     auth,
@@ -46,10 +47,10 @@ EXPECTED_ROUTES = {
     ("POST", "/tasks/{task_id}/cancel", "TaskResponse"),
     ("POST", "/tasks/{task_id}/confirm-candidate", "TaskResponse"),
     ("GET", "/journals/{journal_id}/submission-portals", "SubmissionPortalListResponse"),
-    ("GET", "/registration/publishers", "PublisherSupportResponse"),
+    ("GET", "/registration/publishers", "PublisherSupportListResponse"),
     ("GET", "/registration/publishers/{publisher_id}/journals", "JournalOptionsResponse"),
     ("PUT", "/registration/publishers/{publisher_id}/support", "PublisherSupportResponse"),
-    ("GET", "/registration/platform-adapters", "PlatformAdapterResponse"),
+    ("GET", "/registration/platform-adapters", "PlatformAdapterListResponse"),
     ("POST", "/registration/tasks", "RegistrationTaskResponse"),
     ("GET", "/registration/tasks", "RegistrationTaskPage"),
     ("GET", "/registration/tasks/{task_id}", "RegistrationTaskResponse"),
@@ -60,7 +61,7 @@ EXPECTED_ROUTES = {
         "/registration/submission-portals/{portal_id}",
         "SubmissionPortalResponse",
     ),
-    ("GET", "/publisher-accounts", "PublisherAccountResponse"),
+    ("GET", "/publisher-accounts", "PublisherAccountPage"),
     ("GET", "/users", "UserPage"),
     ("POST", "/users", "ManagedUserResponse"),
     ("GET", "/users/{user_id}", "ManagedUserResponse"),
@@ -175,6 +176,33 @@ def test_routes_are_unique_and_cover_critical_resources():
 def test_manifest_matches_the_complete_approved_route_contract():
     actual = {(item.method, item.path, item.response_schema) for item in CONTRACTS}
     assert actual == EXPECTED_ROUTES
+
+
+def test_concrete_manifest_responses_match_openapi_success_schemas():
+    document = app.openapi()
+    components = document["components"]["schemas"]
+    for contract in CONTRACTS:
+        if not (
+            contract.path.startswith("/registration/")
+            or contract.path == "/publisher-accounts"
+        ):
+            continue
+        if contract.response_schema not in components:
+            continue
+        operation = document["paths"][f"/api/v1{contract.path}"][
+            contract.method.lower()
+        ]
+        success_status = next(
+            status
+            for status in ("200", "201", "202")
+            if status in operation["responses"]
+        )
+        response_schema = operation["responses"][success_status]["content"][
+            "application/json"
+        ]["schema"]
+        assert response_schema == {
+            "$ref": f"#/components/schemas/{contract.response_schema}"
+        }, f"{contract.method} {contract.path}"
 
 
 def test_manifest_response_names_resolve_to_schema_exports():

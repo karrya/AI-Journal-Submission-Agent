@@ -151,11 +151,13 @@ def test_registration_catalogs_expose_only_safe_target_metadata(
     )
 
     assert publishers.status_code == 200, publishers.text
-    assert [item["id"] for item in publishers.json()] == [
+    assert [item["id"] for item in publishers.json()["items"]] == [
         registration_records.support.id
     ]
     assert adapters.status_code == 200, adapters.text
-    assert [item["id"] for item in adapters.json()] == [registration_records.adapter.id]
+    assert [item["id"] for item in adapters.json()["items"]] == [
+        registration_records.adapter.id
+    ]
     assert journals.status_code == 200, journals.text
     assert [item["id"] for item in journals.json()["items"]] == [
         registration_records.journal.id

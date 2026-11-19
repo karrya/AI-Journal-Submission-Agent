@@ -203,7 +203,7 @@ class RegistrationWorker:
             self._validate_prerequisites(task, session)
             self._save_checkpoint(session, task, checkpoint)
 
-    def execute_claimed(self, task_id: UUID) -> None:
+    def execute_claimed(self, task_id: UUID | str) -> None:
         try:
             with Session(bind=self.engine, expire_on_commit=False) as session:
                 task = session.get(RegistrationTask, str(task_id))
@@ -294,11 +294,15 @@ class RegistrationWorker:
             {"account:register"},
             f"registration-worker:{task.id}",
         )
+        journal_id = task.journal_id
+        portal_id = task.portal_id
+        if journal_id is None or portal_id is None:
+            raise AppError(409, "INVALID_TASK_STATE", "注册任务缺少期刊或投稿入口")
         require_supported_registration_target(
             session,
             task.publisher_id,
-            task.journal_id,
-            task.portal_id,
+            journal_id,
+            portal_id,
             task.platform_code,
         )
 

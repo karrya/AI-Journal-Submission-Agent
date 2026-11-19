@@ -45,6 +45,10 @@ class PublisherSupportResponse(OutputModel):
     updated_at: datetime
 
 
+class PublisherSupportListResponse(OutputModel):
+    items: list[PublisherSupportResponse]
+
+
 class PlatformAdapterResponse(OutputModel):
     id: UUID
     adapter_code: str
@@ -58,6 +62,10 @@ class PlatformAdapterResponse(OutputModel):
     verification_notes: str | None
     created_at: datetime
     updated_at: datetime
+
+
+class PlatformAdapterListResponse(OutputModel):
+    items: list[PlatformAdapterResponse]
 
 
 class PublisherAccountResponse(OutputModel):
@@ -76,3 +84,7 @@ class PublisherAccountResponse(OutputModel):
     last_checked_at: datetime | None
     created_at: datetime
     updated_at: datetime
+
+
+class PublisherAccountPage(Page[PublisherAccountResponse]):
+    pass

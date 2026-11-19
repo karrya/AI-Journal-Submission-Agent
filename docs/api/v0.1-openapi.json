@@ -4785,11 +4785,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/PublisherSupportResponse"
-                  },
-                  "type": "array",
-                  "title": "响应数据"
+                  "$ref": "#/components/schemas/PublisherSupportListResponse"
                 }
               }
             }
@@ -4948,11 +4944,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/PlatformAdapterResponse"
-                  },
-                  "type": "array",
-                  "title": "响应数据"
+                  "$ref": "#/components/schemas/PlatformAdapterListResponse"
                 }
               }
             }
@@ -5517,7 +5509,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Page_PublisherAccountResponse_"
+                  "$ref": "#/components/schemas/PublisherAccountPage"
                 }
               }
             }
@@ -12107,42 +12099,6 @@
         ],
         "title": "稿件版本分页响应"
       },
-      "Page_PublisherAccountResponse_": {
-        "properties": {
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/PublisherAccountResponse"
-            },
-            "type": "array",
-            "title": "记录列表"
-          },
-          "page": {
-            "type": "integer",
-            "minimum": 1.0,
-            "title": "页码"
-          },
-          "page_size": {
-            "type": "integer",
-            "maximum": 100.0,
-            "minimum": 1.0,
-            "title": "每页数量"
-          },
-          "total": {
-            "type": "integer",
-            "minimum": 0.0,
-            "title": "总记录数"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "items",
-          "page",
-          "page_size",
-          "total"
-        ],
-        "title": "出版社账号分页响应"
-      },
       "Page_PublisherResponse_": {
         "properties": {
           "items": {
@@ -12214,6 +12170,23 @@
           "total"
         ],
         "title": "注册任务分页响应"
+      },
+      "PlatformAdapterListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PlatformAdapterResponse"
+            },
+            "type": "array",
+            "title": "记录列表"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "平台适配器列表响应"
       },
       "PlatformAdapterResponse": {
         "properties": {
@@ -12312,6 +12285,42 @@
           "updated_at"
         ],
         "title": "平台适配器响应"
+      },
+      "PublisherAccountPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PublisherAccountResponse"
+            },
+            "type": "array",
+            "title": "记录列表"
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "页码"
+          },
+          "page_size": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "每页数量"
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "总记录数"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items",
+          "page",
+          "page_size",
+          "total"
+        ],
+        "title": "出版社账号分页响应"
       },
       "PublisherAccountResponse": {
         "properties": {
@@ -12753,6 +12762,23 @@
           "support_level"
         ],
         "title": "出版社注册支持配置请求"
+      },
+      "PublisherSupportListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PublisherSupportResponse"
+            },
+            "type": "array",
+            "title": "记录列表"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "出版社注册支持列表响应"
       },
       "PublisherSupportResponse": {
         "properties": {

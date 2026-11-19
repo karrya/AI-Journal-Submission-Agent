@@ -69,11 +69,15 @@ class RegistrationService:
                 "IDEMPOTENCY_KEY_REUSED",
                 "相同幂等键已用于其他注册任务",
             )
+        journal_id = task.journal_id
+        portal_id = task.portal_id
+        if journal_id is None or portal_id is None:
+            raise AppError(409, "INVALID_TASK_STATE", "注册任务缺少期刊或投稿入口")
         require_supported_registration_target(
             self.db,
             task.publisher_id,
-            task.journal_id,
-            task.portal_id,
+            journal_id,
+            portal_id,
             task.platform_code,
         )
         return task

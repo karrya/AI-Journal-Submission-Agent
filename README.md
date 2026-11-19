@@ -1,6 +1,6 @@
 # AI-Journal-Submission-Agent
 
-本地 V0.1 学术投稿工作区，采用 FastAPI、Vue 3、MySQL 8、服务端会话、作者范围授权、不可变稿件快照、经校验的文件存储、操作审计和加密备份。
+本地 V0.1 学术投稿工作区，采用 FastAPI、Vue 3、MySQL 8、服务端会话、作者范围授权、不可变稿件快照、经校验的文件存储、操作审计和加密备份。当前阶段一还提供注册基础：显式作者授权、受支持且已核验的入口准入、可恢复注册任务和一次性确认；不执行真实平台注册或外部提交。
 
 ## 本地开发
 
@@ -14,7 +14,7 @@ npm --prefix frontend ci
 .venv/bin/python scripts/bootstrap_mysql.py
 ```
 
-完成受保护的 `.env` 配置后，连续运行两次迁移，以证明第二次调用不会执行任何操作：
+完成受保护的 `.env` 配置后，使用专用迁移账号 `asa_migrate@127.0.0.1` 对应的 `ALEMBIC_DATABASE_URL` 连续运行两次迁移，以证明第二次调用不会执行任何操作。不要使用应用账号或测试账号迁移开发库：
 
 ```bash
 cd "/Users/didi/PycharmProjects/AI Journal Submission Agent/backend"
@@ -26,11 +26,12 @@ cd ..
 
 `create_admin.py` 读取初始密码时不会回显，并要求首次登录时修改密码。不要将初始化或管理员创建纳入日常启动流程。
 
-在两个独立终端中启动开发进程；使用自动化网络识别时，再在第三个终端启动独立 Worker：
+使用 macOS launchd 启动后端、期刊识别 Worker 和注册 Worker，再在独立终端启动前端：
 
 ```bash
 cd "/Users/didi/PycharmProjects/AI Journal Submission Agent"
-bash scripts/dev_backend.sh
+bash scripts/dev_services.sh start
+bash scripts/dev_services.sh status
 ```
 
 ```bash
@@ -38,12 +39,7 @@ cd "/Users/didi/PycharmProjects/AI Journal Submission Agent"
 bash scripts/dev_frontend.sh
 ```
 
-```bash
-cd "/Users/didi/PycharmProjects/AI Journal Submission Agent"
-bash scripts/dev_worker.sh
-```
-
-网络识别的 Provider、Kimi、Chromium 和证据配置见[自动化期刊网络识别](docs/network-discovery.md)。需要长期运行时，可改用 `bash scripts/dev_services.sh start` 由 macOS launchd 托管后端和 Worker，避免 Claude 后台任务的运行时限。
+网络识别的 Provider、Kimi、Chromium 和证据配置见[自动化期刊网络识别](docs/network-discovery.md)。注册阶段一的表、权限、任务恢复和验收边界见[注册基础与阶段一验收](docs/registration-foundation.md)。注册 Worker 的默认执行器只进行准入复核并转入人工复核，不执行真实注册、邮箱读取或外部提交。
 
 后端监听 `127.0.0.1:8000`；前端地址为 `http://127.0.0.1:5173`。默认 `ALLOWED_ORIGINS` 同时信任该地址和 `http://localhost:5173`，因此可在文档所列地址正常登录并执行受 CSRF 保护的密码修改。Vite 的 `/api` 代理保留浏览器源，并将请求转发至后端。健康检查地址为 `http://127.0.0.1:8000/api/v1/health`。
 
@@ -54,10 +50,11 @@ cd "/Users/didi/PycharmProjects/AI Journal Submission Agent"
 bash scripts/verify.sh
 ```
 
-验证仅会对预置的 `academic_submission_agent_test` 数据库执行破坏性操作，并使用隔离的临时文件存储。对于非测试数据库、非回环数据库目标及正式存储，验证会拒绝执行。不要让测试变量指向开发数据。
+验证仅会对预置的独立 `academic_submission_agent_test` MySQL 数据库执行破坏性操作，并使用隔离的临时文件存储。对于非测试数据库、非回环数据库目标及正式存储，验证会拒绝执行。**切勿让 `TEST_DATABASE_URL` 指向开发库或任何真实用户数据。** 本阶段测试使用模拟执行器，不进行真实注册、邮箱访问、验证链接访问或外部提交。
 
 ## 运维与发布证据
 
+- [注册基础与阶段一验收](docs/registration-foundation.md)：模块 2/3 表关系、显式授权、入口准入、Worker 恢复、确认防重放、启动和完整验收。
 - [自动化期刊网络识别](docs/network-discovery.md)：独立 Worker、开放数据、Kimi 搜索、官网与投稿入口证据、浏览器降级及安全边界。
 - [运维手册](docs/operations.md)：准确的 Homebrew 配置、初始化及凭据失步恢复、迁移、启动、测试、OpenAPI/Postman、存储核对、age 密钥、加密备份、隔离恢复和未知提交恢复。
 - [安全说明与矩阵](docs/security.md)：信任边界、角色行为、密钥处理、可执行安全检查及剩余限制。

@@ -78,7 +78,7 @@ MySQL 用户变更无法参与随后的文件系统重命名。如果运行过�
 
 ## 3. 迁移与模式验证
 
-连续运行两次迁移命令。第一次到达 head；第二次不得产生重复数据或模式变更。`alembic check` 验证模型与已迁移的 head 一致。
+连续运行两次迁移命令。第一次到达 head；第二次不得产生重复数据或模式变更。迁移必须读取受保护 `.env` 中的 `ALEMBIC_DATABASE_URL`，其身份为仅拥有开发库迁移权限的 `asa_migrate@127.0.0.1`；不得改用 `DATABASE_URL` 的应用账号或 `TEST_DATABASE_URL` 的测试账号。`alembic check` 验证模型与已迁移的 head 一致。
 
 ```bash
 cd "$PROJECT_ROOT/backend"
@@ -93,15 +93,15 @@ session = SessionLocal()
 try:
     names = set(inspect(session.bind).get_table_names())
     application_tables = names - {"alembic_version"}
-    assert len(application_tables) == 25, sorted(application_tables)
+    assert len(application_tables) == 31, sorted(application_tables)
     assert "alembic_version" in names
-    print("25 application tables plus alembic_version; migration head verified")
+    print("31 application tables plus alembic_version; migration head verified")
 finally:
     session.close()
 PY
 ```
 
-模式包含 25 张应用表；`alembic_version` 用于迁移簿记，因此完全迁移的 MySQL 模式共含 26 张表。
+模式包含 31 张应用表；`alembic_version` 用于迁移簿记，因此完全迁移的 MySQL 模式共含 32 张表。模块 3 新增 6 张表并扩展模块 2 的 `journal_submission_portals`，具体关系和阶段一验收见[注册基础与阶段一验收](registration-foundation.md)。
 
 ## 4. 隐藏输入创建管理员与首次登录
 
@@ -116,14 +116,14 @@ cd "$PROJECT_ROOT"
 
 启动应用，在前端登录并完成强制修改密码表单。修改密码会撤销现有会话；使用新密码重新登录。在完成此步骤前，业务 API 返回 `403 PASSWORD_CHANGE_REQUIRED`；仅会话身份、CSRF、退出登录和修改密码路由保持可用。
 
-## 5. 后端与前端启动
+## 5. 后端、两个 Worker 与前端启动
 
-使用两个终端，使完整参数列表均来自已纳入版本控制的脚本：
+使用 `dev_services.sh` 由当前用户的 macOS launchd 托管后端、期刊识别 Worker 和注册 Worker，并在独立终端启动前端。所有参数均来自已纳入版本控制的脚本：
 
 ```bash
 cd "$PROJECT_ROOT"
-bash scripts/dev_backend.sh
-# .venv/bin/python -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000
+bash scripts/dev_services.sh start
+bash scripts/dev_services.sh status
 ```
 
 ```bash
@@ -139,19 +139,19 @@ curl --fail --silent http://127.0.0.1:8000/api/v1/health
 curl --fail --silent http://127.0.0.1:5173/ >/dev/null
 ```
 
-打开 `http://127.0.0.1:5173`。不要将任一开发监听器暴露到非回环接口。计划内持久化维护时，停止写入，运行经授权的 `brew services restart mysql@8.0`，重启两个脚本，然后在恢复工作前验证数据库记录及存储文件的 SHA-256（安全哈希算法 256 位）值。
+打开 `http://127.0.0.1:5173`。不要将任一开发监听器暴露到非回环接口。计划内持久化维护时，停止写入，运行经授权的 `brew services restart mysql@8.0`，重启上述服务，然后在恢复工作前验证数据库记录及存储文件的 SHA-256（安全哈希算法 256 位）值。
 
-### 5.1 使用 launchd 长期运行后端和 Worker
+### 5.1 launchd 服务管理
 
-Claude 等工具的后台任务有运行时限，需要长期运行时使用 macOS 用户级 launchd：
+`dev_services.sh start` 会安装并启动三个专用服务；`restart` 重启全部三个服务，`status` 分别显示状态，`stop` 停止全部服务：
 
 ```bash
-bash scripts/dev_services.sh start
+bash scripts/dev_services.sh restart
 bash scripts/dev_services.sh status
 bash scripts/dev_services.sh stop
 ```
 
-`start` 会写入当前用户的 `~/Library/LaunchAgents` 并启用 `RunAtLoad` 与异常退出后的自动重启。日志位于 `storage/logs/`。`uninstall` 会停止服务并删除这两个专用 plist；不要删除其他服务配置。
+`start` 会写入当前用户的 `~/Library/LaunchAgents` 并启用 `RunAtLoad` 与异常退出后的自动重启。日志位于 `storage/logs/` 下的 `backend`、`worker` 和 `registration-worker` 日志文件。`uninstall` 会停止服务并删除这三个专用 plist；不要删除其他服务配置，也不要使用 root 运行。注册 Worker 的阶段一默认执行器只复核授权和入口准入并请求人工复核，不进行真实注册、邮箱读取或外部提交。
 
 ## 6. 测试、覆盖率、OpenAPI 与 Postman/Newman
 
@@ -164,7 +164,7 @@ bash scripts/verify.sh
 
 该命令运行 Ruff、mypy、完整 MySQL 后端 pytest 套件、后端总体及分层覆盖率下限、确定性 OpenAPI 生成与校验、隔离的 Newman 集合、前端单元测试与覆盖率，以及前端生产构建。它在首次失败时停止，并输出失败命令。
 
-测试要求 `ENVIRONMENT=test`，且回环地址 `TEST_DATABASE_URL` 中的数据库必须恰好为 `academic_submission_agent_test`。Pytest 创建隔离的临时存储。`scripts/test_api.sh` 同样创建临时存储，使用后端端口 `8001`，生成一次性凭据，并通过 trap 终止其后端。测试防护要求显式环境和数据库主机参数，并拒绝正式存储或嵌套在正式存储内的路径。**这些命令会删除并重建测试数据；切勿将其重定向到开发环境。**
+测试要求 `ENVIRONMENT=test`，且回环地址 `TEST_DATABASE_URL` 中的数据库必须恰好为独立 MySQL 测试库 `academic_submission_agent_test`。Pytest 创建隔离的临时存储。`scripts/test_api.sh` 同样创建临时存储，使用后端端口 `8001`，生成一次性凭据，并通过 trap 终止其后端。测试防护要求显式环境和数据库主机参数，并拒绝正式存储或嵌套在正式存储内的路径。**这些命令会删除并重建测试数据；切勿将其重定向到开发库、开发环境或任何真实用户数据。** 注册测试使用模拟执行器，不执行真实注册、邮箱读取、验证链接访问或外部提交。阶段一专项验收命令和预期结果见[注册基础与阶段一验收](registration-foundation.md)。
 
 常用专项命令为：
 

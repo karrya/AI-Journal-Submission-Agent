@@ -41,7 +41,7 @@ describe('AuthorizationView', () => {
   })
 
   function mountView() {
-    return mount(AuthorizationView, { props: { authorId: 'a1' } })
+    return mount(AuthorizationView, { props: { authorId: 'a1' }, global: { stubs: { teleport: true, transition: false } } })
   }
 
   it('offers exactly the nine permissions and creates a finite authorization', async () => {
@@ -127,6 +127,7 @@ describe('AuthorizationView', () => {
     const wrapper = mountView()
     await flushPromises()
     await wrapper.get('[data-test="revoke-authorization-z1"]').trigger('click')
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
     await wrapper.get('[data-test="revoke-reason"]').setValue('Access ended')
     await wrapper.get('[data-test="confirm-revoke-z1"]').trigger('click')
     expect(adapter.mock.calls.some(([config]) => config.method === 'post')).toBe(false)
@@ -137,6 +138,7 @@ describe('AuthorizationView', () => {
     const revokeCall = adapter.mock.calls.find(([config]) => config.method === 'post')
     expect(revokeCall?.[0].url).toBe('/author-authorizations/z1/revoke')
     expect(JSON.parse(String(revokeCall?.[0].data))).toEqual({ reason: 'Access ended' })
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
   })
 
   it('keeps inactive subjects visible when editing an existing authorization', async () => {

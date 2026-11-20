@@ -14,25 +14,18 @@ const unsupportedPublisher = {
   ...supportedPublisher, id: 'support-2', publisher_id: 'p2', publisher_code: 'WILEY',
   display_name: 'Wiley', support_status: 'TESTING', support_level: 'V0_2',
 }
-const supportedPlatform = {
-  id: 'adapter-1', adapter_code: 'EM_ADAPTER', adapter_name: 'Editorial Manager',
-  platform_type: 'EM', adapter_version: '1.0.0', support_status: 'SUPPORTED',
-  allowed_domains: ['register.example'], capability_config: null, last_verified_at: now,
-  verification_notes: null, created_at: now, updated_at: now,
-}
-const unsupportedPlatform = {
-  ...supportedPlatform, id: 'adapter-2', adapter_code: 'TEST_ADAPTER', adapter_name: 'Unverified adapter',
-  platform_type: 'TEST', support_status: 'DISABLED', last_verified_at: null,
-}
 const supportedPortal = {
   id: 'portal-1', journal_id: 'j1', original_url: 'https://register.example/start',
   final_url: 'https://register.example/register', redirect_chain: [], verification_status: 'VERIFIED',
   access_status: 'ACCESSIBLE', platform_code: 'EM', confidence: 1, evidence_summary: [],
-  platform_adapter_id: 'adapter-1', support_status: 'SUPPORTED',
+  adapter_code: 'EM_ADAPTER', adapter_name: 'Editorial Manager', adapter_version: '1.0.0',
+  adapter_support_status: 'SUPPORTED', adapter_allowed_domains: ['register.example'],
+  adapter_last_verified_at: now, support_status: 'SUPPORTED',
 }
 const unsupportedPortal = {
-  ...supportedPortal, id: 'portal-2', platform_code: 'TEST', platform_adapter_id: 'adapter-2',
-  support_status: 'DISABLED',
+  ...supportedPortal, id: 'portal-2', platform_code: 'TEST',
+  adapter_code: 'TEST_ADAPTER', adapter_name: 'Unverified adapter', adapter_version: '1.0.0',
+  adapter_support_status: 'DISABLED', support_status: 'DISABLED',
 }
 const journal = {
   id: 'j1', publisher_id: 'p1', name: 'Journal of Tests', issn: '1234-5678', eissn: null,
@@ -41,14 +34,6 @@ const journal = {
 const task = {
   id: 't1', author_id: 'a1', publisher_id: 'p1', journal_id: 'j1', platform_code: 'EM',
   task_status: 'PENDING', current_step: '等待执行', retryable: false, created_at: now,
-}
-const account = {
-  id: 'account-1', author_id: 'a1', publisher_id: 'p1', journal_id: 'j1', platform_code: 'EM',
-  account_namespace: 'register.example', account_email: 'author@example.com',
-  platform_account_id: 'platform-user', username: 'author', account_status: 'REGISTERED',
-  email_verified_at: now, registered_at: now, last_checked_at: now, created_at: now, updated_at: now,
-  credential_ref: 'secret-credential-reference', password: 'secret-password',
-  verification_url: 'https://register.example/verify?token=complete-secret-link',
 }
 const authorization = {
   id: 'grant-1', author_id: 'a1', user_id: 'u1', permissions: ['account:register'],
@@ -82,14 +67,10 @@ describe('RegistrationView', () => {
       if (config.url === '/registration/publishers') {
         return success(config, { items: [supportedPublisher, unsupportedPublisher] })
       }
-      if (config.url === '/registration/platform-adapters') {
-        return success(config, { items: [supportedPlatform, unsupportedPlatform] })
-      }
       if (config.url === '/registration/publishers/p1/journals') return success(config, { items: [journal] })
       if (config.url === '/journals/j1/submission-portals') return success(config, { items: [supportedPortal, unsupportedPortal] })
       if (config.url === '/registration/publishers/p2/journals') return success(config, { items: [] })
       if (config.url === '/registration/tasks') return success(config, page([task]))
-      if (config.url === '/publisher-accounts') return success(config, page([account]))
       if (config.url === '/author-authorizations/options') {
         return success(config, { authors: [{ id: 'a1', display_name: 'Author One' }], users: [{ id: 'u1', username: 'operator', display_name: 'Operator' }] })
       }
@@ -105,19 +86,20 @@ describe('RegistrationView', () => {
   })
 
   function mountView(): VueWrapper {
-    const wrapper = mount(RegistrationView, { attachTo: document.body })
+    const wrapper = mount(RegistrationView, { attachTo: document.body, global: { stubs: { teleport: true, transition: false } } })
     wrappers.push(wrapper)
     return wrapper
   }
 
   async function selectSupportedTarget(wrapper: VueWrapper): Promise<void> {
+    await wrapper.get('[data-test="open-create-registration"]').trigger('click')
     await wrapper.get('[data-test="registration-author"]').setValue('a1')
     await flushPromises()
     await wrapper.get('[data-test="registration-publisher"]').setValue('p1')
     await flushPromises()
     await wrapper.get('[data-test="registration-journal"]').setValue('j1')
     await flushPromises()
-    await wrapper.get('[data-test="registration-platform"]').setValue('adapter-1')
+    await wrapper.get('[data-test="registration-platform"]').setValue('portal-1')
   }
 
   it('shows workflow steps and disables unsupported targets without exposing secrets', async () => {
@@ -125,6 +107,7 @@ describe('RegistrationView', () => {
     await flushPromises()
 
     expect(wrapper.find('[data-test="registration-workflow"]').exists()).toBe(true)
+    await wrapper.get('[data-test="open-create-registration"]').trigger('click')
     expect(wrapper.get('[data-test="unsupported-target"]').attributes('disabled')).toBeDefined()
     expect(wrapper.find('[data-test="registration-platform"]').text()).toContain('请选择投稿平台')
     await selectSupportedTarget(wrapper)
@@ -138,7 +121,8 @@ describe('RegistrationView', () => {
     expect(wrapper.text().toLowerCase()).not.toContain('token')
     expect(wrapper.text()).not.toContain('https://register.example/verify?token=complete-secret-link')
     expect(wrapper.text()).not.toContain('author@example.com')
-    expect(wrapper.get('[data-test="publisher-accounts"]').text()).toContain('a•••@example.com')
+    expect(wrapper.find('[data-test="publisher-accounts"]').exists()).toBe(false)
+    expect(adapter.mock.calls.some(([config]) => config.url === '/publisher-accounts')).toBe(false)
   })
 
   it('loads journals after publisher selection and submits a read-only confirmed target', async () => {
@@ -147,11 +131,9 @@ describe('RegistrationView', () => {
         return success(config, { ...task, id: 'created-task' }, 202)
       }
       if (config.url === '/registration/publishers') return success(config, { items: [supportedPublisher, unsupportedPublisher] })
-      if (config.url === '/registration/platform-adapters') return success(config, { items: [supportedPlatform, unsupportedPlatform] })
       if (config.url === '/registration/publishers/p1/journals') return success(config, { items: [journal] })
       if (config.url === '/journals/j1/submission-portals') return success(config, { items: [supportedPortal, unsupportedPortal] })
       if (config.url === '/registration/tasks') return success(config, page([task]))
-      if (config.url === '/publisher-accounts') return success(config, page([]))
       if (config.url === '/author-authorizations/options') return success(config, { authors: [{ id: 'a1', display_name: 'Author One' }], users: [] })
       if (config.url === '/author-authorizations') return success(config, page([authorization]))
       if (config.url === '/authors/a1/emails') return success(config, page([email]))
@@ -179,6 +161,7 @@ describe('RegistrationView', () => {
     })
     expect(payload.idempotency_key.length).toBeGreaterThanOrEqual(16)
     expect(wrapper.text()).toContain('created-task')
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
   })
 
   it('applies task status and time filters with timezone-aware dates', async () => {
@@ -200,9 +183,7 @@ describe('RegistrationView', () => {
     adapter.mockImplementation(async (config) => {
       if (config.url?.endsWith('/cancel')) return success(config, { ...task, task_status: 'CANCELLED', current_step: '用户取消' })
       if (config.url === '/registration/publishers') return success(config, { items: [supportedPublisher] })
-      if (config.url === '/registration/platform-adapters') return success(config, { items: [supportedPlatform] })
       if (config.url === '/registration/tasks') return success(config, page([task]))
-      if (config.url === '/publisher-accounts') return success(config, page([]))
       if (config.url === '/author-authorizations/options') return success(config, { authors: [], users: [] })
       throw new Error(`Unexpected request: ${config.method} ${config.url}`)
     })
@@ -219,14 +200,32 @@ describe('RegistrationView', () => {
     expect(wrapper.get('[data-test="selected-task-status"]').text()).toContain('已取消')
   })
 
+  it('keeps the cancellation dialog open with its error when cancellation fails', async () => {
+    adapter.mockImplementation(async (config) => {
+      if (config.url?.endsWith('/cancel')) throw new Error('cancel failed')
+      if (config.url === '/registration/publishers') return success(config, { items: [supportedPublisher] })
+      if (config.url === '/registration/tasks') return success(config, page([task]))
+      if (config.url === '/author-authorizations/options') return success(config, { authors: [], users: [] })
+      throw new Error(`Unexpected request: ${config.method} ${config.url}`)
+    })
+    const wrapper = mountView()
+    await flushPromises()
+    await wrapper.get('[data-test="cancel-task-t1"]').trigger('click')
+    await wrapper.get('[data-test="cancel-confirmation"]').setValue(true)
+    await wrapper.get('[data-test="confirm-cancel-t1"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
+    expect(wrapper.get('[role="alert"]').text()).toContain('无法取消')
+    expect((wrapper.get('[data-test="cancel-confirmation"]').element as HTMLInputElement).checked).toBe(true)
+  })
+
   it('retries only an eligible failed task and renders the returned state', async () => {
     const failedTask = { ...task, task_status: 'FAILED', current_step: '网络暂时不可用', retryable: true }
     adapter.mockImplementation(async (config) => {
       if (config.url?.endsWith('/retry')) return success(config, { ...failedTask, task_status: 'PENDING', current_step: '重新执行', retryable: false })
       if (config.url === '/registration/publishers') return success(config, { items: [supportedPublisher] })
-      if (config.url === '/registration/platform-adapters') return success(config, { items: [supportedPlatform] })
       if (config.url === '/registration/tasks') return success(config, page([failedTask]))
-      if (config.url === '/publisher-accounts') return success(config, page([]))
       if (config.url === '/author-authorizations/options') return success(config, { authors: [], users: [] })
       throw new Error(`Unexpected request: ${config.method} ${config.url}`)
     })
@@ -248,9 +247,7 @@ describe('RegistrationView', () => {
     ]
     adapter.mockImplementation(async (config) => {
       if (config.url === '/registration/publishers') return success(config, { items: [supportedPublisher] })
-      if (config.url === '/registration/platform-adapters') return success(config, { items: [supportedPlatform] })
       if (config.url === '/registration/tasks') return success(config, page(manualTasks))
-      if (config.url === '/publisher-accounts') return success(config, page([]))
       if (config.url === '/author-authorizations/options') return success(config, { authors: [], users: [] })
       throw new Error(`Unexpected request: ${config.method} ${config.url}`)
     })
@@ -270,8 +267,6 @@ describe('RegistrationView', () => {
     adapter.mockImplementation(async (config) => {
       if (config.url === '/registration/tasks') return new Promise<AxiosResponse>((resolve) => { resolveTasks = resolve })
       if (config.url === '/registration/publishers') return success(config, { items: [] })
-      if (config.url === '/registration/platform-adapters') return success(config, { items: [] })
-      if (config.url === '/publisher-accounts') return success(config, page([]))
       if (config.url === '/author-authorizations/options') return success(config, { authors: [], users: [] })
       throw new Error(`Unexpected request: ${config.method} ${config.url}`)
     })
@@ -284,7 +279,6 @@ describe('RegistrationView', () => {
     await flushPromises()
     expect(wrapper.find('[data-test="task-skeleton"]').exists()).toBe(false)
     expect(wrapper.get('[data-test="task-empty"]').text()).toContain('清除筛选')
-    expect(wrapper.get('[data-test="account-empty"]').text()).toContain('账号')
   })
 
   it('keeps current tasks on a refresh error and retries the same safe query', async () => {
@@ -298,8 +292,6 @@ describe('RegistrationView', () => {
         return success(config, page([task]))
       }
       if (config.url === '/registration/publishers') return success(config, { items: [supportedPublisher] })
-      if (config.url === '/registration/platform-adapters') return success(config, { items: [supportedPlatform] })
-      if (config.url === '/publisher-accounts') return success(config, page([]))
       if (config.url === '/author-authorizations/options') return success(config, { authors: [], users: [] })
       throw new Error(`Unexpected request: ${config.method} ${config.url}`)
     })
@@ -327,11 +319,9 @@ describe('RegistrationView', () => {
         return success(config, { ...task, id: 'created-after-retry' }, 202)
       }
       if (config.url === '/registration/publishers') return success(config, { items: [supportedPublisher] })
-      if (config.url === '/registration/platform-adapters') return success(config, { items: [supportedPlatform] })
       if (config.url === '/registration/publishers/p1/journals') return success(config, { items: [journal] })
       if (config.url === '/journals/j1/submission-portals') return success(config, { items: [supportedPortal, unsupportedPortal] })
       if (config.url === '/registration/tasks') return success(config, page([]))
-      if (config.url === '/publisher-accounts') return success(config, page([]))
       if (config.url === '/author-authorizations/options') return success(config, { authors: [{ id: 'a1', display_name: 'Author One' }], users: [] })
       if (config.url === '/author-authorizations') return success(config, page([authorization]))
       if (config.url === '/authors/a1/emails') return success(config, page([email]))
@@ -361,17 +351,16 @@ describe('RegistrationView', () => {
     const pending = new Map<string, (response: AxiosResponse) => void>()
     adapter.mockImplementation(async (config) => {
       if (config.url === '/registration/publishers') return success(config, { items: [supportedPublisher, secondPublisher] })
-      if (config.url === '/registration/platform-adapters') return success(config, { items: [supportedPlatform] })
       if (config.url?.match(/^\/registration\/publishers\/p[12]\/journals$/)) {
         return new Promise<AxiosResponse>((resolve) => { pending.set(config.url as string, resolve) })
       }
       if (config.url === '/registration/tasks') return success(config, page([]))
-      if (config.url === '/publisher-accounts') return success(config, page([]))
       if (config.url === '/author-authorizations/options') return success(config, { authors: [], users: [] })
       throw new Error(`Unexpected request: ${config.method} ${config.url}`)
     })
     const wrapper = mountView()
     await flushPromises()
+    await wrapper.get('[data-test="open-create-registration"]').trigger('click')
     const publisherSelect = wrapper.get('[data-test="registration-publisher"]')
     const journalSelect = wrapper.get('[data-test="registration-journal"]')
 
@@ -402,12 +391,10 @@ describe('RegistrationView', () => {
     const pending = new Map<string, (response: AxiosResponse) => void>()
     adapter.mockImplementation(async (config) => {
       if (config.url === '/registration/publishers') return success(config, { items: [supportedPublisher, secondPublisher] })
-      if (config.url === '/registration/platform-adapters') return success(config, { items: [supportedPlatform] })
       if (config.url?.match(/^\/registration\/publishers\/p[12]\/journals$/)) {
         return new Promise<AxiosResponse>((resolve) => { pending.set(config.url as string, resolve) })
       }
       if (config.url === '/registration/tasks') return success(config, page([]))
-      if (config.url === '/publisher-accounts') return success(config, page([]))
       if (config.url === '/author-authorizations/options') return success(config, { authors: [], users: [] })
       throw new Error(`Unexpected request: ${config.method} ${config.url}`)
     })
@@ -432,9 +419,7 @@ describe('RegistrationView', () => {
     const terminalTask = { ...task, task_status: status, current_step: '流程终止' }
     adapter.mockImplementation(async (config) => {
       if (config.url === '/registration/publishers') return success(config, { items: [supportedPublisher] })
-      if (config.url === '/registration/platform-adapters') return success(config, { items: [supportedPlatform] })
       if (config.url === '/registration/tasks') return success(config, page([terminalTask]))
-      if (config.url === '/publisher-accounts') return success(config, page([]))
       if (config.url === '/author-authorizations/options') return success(config, { authors: [], users: [] })
       throw new Error(`Unexpected request: ${config.method} ${config.url}`)
     })
@@ -492,24 +477,14 @@ describe('RegistrationView', () => {
     expect(wrapper.get('[data-test="open-evidence-t1"]').attributes('type')).toBe('button')
   })
   it('scopes exact adapter versions to the selected journal without duplicate values', async () => {
-    const secondVersion = {
-      ...supportedPlatform, id: 'adapter-3', adapter_version: '2.0.0', adapter_name: 'Editorial Manager v2',
-    }
     const secondPortal = {
-      ...supportedPortal, id: 'portal-3', platform_adapter_id: 'adapter-3',
-    }
-    const unboundPlatform = {
-      ...supportedPlatform, id: 'adapter-unbound', adapter_version: '9.0.0', adapter_name: 'Unbound adapter',
+      ...supportedPortal, id: 'portal-3', adapter_version: '2.0.0', adapter_name: 'Editorial Manager v2',
     }
     adapter.mockImplementation(async (config) => {
       if (config.url === '/registration/publishers') return success(config, { items: [supportedPublisher] })
-      if (config.url === '/registration/platform-adapters') {
-        return success(config, { items: [supportedPlatform, secondVersion, unboundPlatform] })
-      }
       if (config.url === '/registration/publishers/p1/journals') return success(config, { items: [journal] })
       if (config.url === '/journals/j1/submission-portals') return success(config, { items: [supportedPortal, secondPortal] })
       if (config.url === '/registration/tasks') return success(config, page([]))
-      if (config.url === '/publisher-accounts') return success(config, page([]))
       if (config.url === '/author-authorizations/options') return success(config, { authors: [{ id: 'a1', display_name: 'Author One' }], users: [] })
       if (config.url === '/author-authorizations') return success(config, page([authorization]))
       if (config.url === '/authors/a1/emails') return success(config, page([email]))
@@ -517,6 +492,7 @@ describe('RegistrationView', () => {
     })
     const wrapper = mountView()
     await flushPromises()
+    await wrapper.get('[data-test="open-create-registration"]').trigger('click')
     const platformSelect = wrapper.get('[data-test="registration-platform"]')
     expect(platformSelect.findAll('option')).toHaveLength(1)
     expect((platformSelect.element as HTMLSelectElement).disabled).toBe(true)
@@ -529,20 +505,17 @@ describe('RegistrationView', () => {
     await flushPromises()
 
     const options = platformSelect.findAll('option')
-    expect(options.map((option) => option.attributes('value'))).toEqual(['', 'adapter-1', 'adapter-3'])
+    expect(options.map((option) => option.attributes('value'))).toEqual(['', 'portal-1', 'portal-3'])
     expect(new Set(options.map((option) => option.attributes('value'))).size).toBe(options.length)
     expect(platformSelect.text()).toContain('1.0.0')
     expect(platformSelect.text()).toContain('2.0.0')
-    expect(platformSelect.text()).not.toContain('Unbound adapter')
   })
 
   it('maps PROCESSING to the execution phase and uses phase-one safe messages', async () => {
     const processingTask = { ...task, task_status: 'PROCESSING', current_step: 'CLAIMED' }
     adapter.mockImplementation(async (config) => {
       if (config.url === '/registration/publishers') return success(config, { items: [supportedPublisher] })
-      if (config.url === '/registration/platform-adapters') return success(config, { items: [supportedPlatform] })
       if (config.url === '/registration/tasks') return success(config, page([processingTask]))
-      if (config.url === '/publisher-accounts') return success(config, page([]))
       if (config.url === '/author-authorizations/options') return success(config, { authors: [], users: [] })
       throw new Error(`Unexpected request: ${config.method} ${config.url}`)
     })

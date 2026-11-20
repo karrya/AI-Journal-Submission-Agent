@@ -1,4 +1,5 @@
 import { flushPromises, mount } from '@vue/test-utils'
+import { ElMessageBox } from 'element-plus'
 import type { AxiosAdapter, AxiosResponse, InternalAxiosRequestConfig } from 'axios'
 import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
@@ -25,7 +26,7 @@ const router = createRouter({
 })
 
 function mountUser() {
-  return mount(UserListView, { global: { plugins: [router] } })
+  return mount(UserListView, { global: { plugins: [router], stubs: { teleport: true, transition: false } } })
 }
 
 beforeEach(() => {
@@ -224,5 +225,39 @@ describe('UserListView', () => {
     await flushPromises()
     expect(wrapper.find('[data-test="user-reset-form"]').exists()).toBe(true)
     expect(wrapper.find('[data-test="user-edit-form"]').exists()).toBe(false)
+  })
+
+  it('keeps the reset dialog open with its error when password reset fails', async () => {
+    adapter.mockImplementation(async (config) => {
+      if (config.url === '/users/u1/reset-password' && config.method === 'post') {
+        throw new Error('reset failed')
+      }
+      return success(config, { ...emptyPage, items: [managedUser], total: 1 })
+    })
+    const wrapper = mountUser()
+    await flushPromises()
+    await wrapper.get('[data-test="reset-user-u1"]').trigger('click')
+    await wrapper.get('[data-test="reset-new-password"]').setValue('New-Passphrase-1!')
+    await wrapper.get('[data-test="reset-password-confirmation"]').setValue('New-Passphrase-1!')
+    await wrapper.get('[data-test="user-reset-form"]').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
+    expect(wrapper.get('[role="alert"]').text()).toContain('无法重置密码')
+    expect((wrapper.get('[data-test="reset-new-password"]').element as HTMLInputElement).value).toBe('New-Passphrase-1!')
+  })
+
+  it('discards unsaved create values after explicit close confirmation', async () => {
+    vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never)
+    adapter.mockImplementation(async (config) => success(config, emptyPage))
+    const wrapper = mountUser()
+    await flushPromises()
+    await wrapper.get('[data-test="add-user"]').trigger('click')
+    await wrapper.get('[data-test="new-username"]').setValue('discarded-user')
+    await wrapper.get('[data-test="user-create-form"] button[type="button"]').trigger('click')
+    await flushPromises()
+
+    await wrapper.get('[data-test="add-user"]').trigger('click')
+    expect((wrapper.get('[data-test="new-username"]').element as HTMLInputElement).value).toBe('')
   })
 })

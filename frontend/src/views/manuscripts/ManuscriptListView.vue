@@ -14,6 +14,8 @@ import {
 } from '../../api/manuscripts'
 import { fetchAllPages } from '../../api/pagination'
 import AuthorshipEditor from '../../components/AuthorshipEditor.vue'
+import AppModal from '../../components/AppModal.vue'
+import { useDirtyGuard } from '../../composables/useDirtyGuard'
 import { useAuthStore } from '../../stores/auth'
 import { displayText, MANUSCRIPT_STATUS_LABELS } from '../../utils/display'
 import { showSaveSuccess } from '../../utils/feedback'
@@ -37,6 +39,7 @@ const query = reactive({
 let loadSequence = 0
 
 const showCreate = ref(false)
+const createModal = ref<InstanceType<typeof AppModal> | null>(null)
 const creating = ref(false)
 const createError = ref('')
 const authorOptions = ref<AuthorResponse[]>([])
@@ -50,6 +53,11 @@ const metadata = reactive({
   conflict_of_interest_statement: '', ethics_statement: '',
   data_availability_statement: '', notes: '',
 })
+const createGuard = useDirtyGuard(() => ({
+  ...metadata,
+  owner_id: ownerAuthorId.value,
+  authors: createAuthors.value,
+}))
 
 function safeError(error: unknown, fallback: string): string {
   const requestId = getSafeRequestId(error)
@@ -160,6 +168,7 @@ async function saveCreate(authorship: ManuscriptAuthorsUpdate): Promise<void> {
       conflict_of_interest_statement: '', ethics_statement: '',
       data_availability_statement: '', notes: '',
     })
+    createGuard.capture()
     await load()
     showSaveSuccess()
   } catch (error) {
@@ -207,8 +216,7 @@ onMounted(() => void load())
 
     <p v-if="errorMessage" class="form-error" role="alert">{{ errorMessage }}</p>
 
-    <section v-if="showCreate" aria-labelledby="create-manuscript-title">
-      <h2 id="create-manuscript-title">创建稿件</h2>
+    <AppModal ref="createModal" v-model="showCreate" title="创建稿件" description="填写工作元数据并确认作者名单，保存后生成稿件工作区。" width="960px" :busy="creating" :dirty="() => createGuard.dirty.value" :error="createError">
       <div class="stacked-form">
         <label>所有者作者
           <select v-model="ownerAuthorId" data-test="owner-author" required @change="ownerChanged">
@@ -246,8 +254,8 @@ onMounted(() => void load())
         @submit="saveCreate"
       />
       <p v-if="createError" class="form-error" role="alert">{{ createError }}</p>
-      <button class="action-button action-button--compact action-button--neutral" type="button" :disabled="creating" @click="showCreate = false">取消</button>
-    </section>
+      <button class="action-button action-button--compact action-button--neutral" type="button" :disabled="creating" @click="createModal?.requestClose()">取消</button>
+    </AppModal>
 
     <p v-if="loading">正在加载稿件…</p>
     <p v-else-if="!errorMessage && manuscripts.length === 0">未找到稿件。</p>

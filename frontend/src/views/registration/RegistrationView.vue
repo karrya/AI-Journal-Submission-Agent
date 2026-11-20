@@ -16,17 +16,16 @@ import {
 import {
   cancelRegistrationTask,
   createRegistrationTask,
-  getPublisherAccounts,
   getRegistrationJournals,
-  getRegistrationPlatforms,
   getRegistrationPublishers,
   getRegistrationTasks,
   retryRegistrationTask,
-  type PublisherAccount,
-  type RegistrationPlatform,
   type RegistrationPublisher,
   type RegistrationTask,
 } from '../../api/registration'
+import AppModal from '../../components/AppModal.vue'
+import AppConfirmDialog from '../../components/AppConfirmDialog.vue'
+import { useDirtyGuard } from '../../composables/useDirtyGuard'
 
 const TASK_STATUS_LABELS: Record<string, string> = {
   PENDING: '待执行',
@@ -49,14 +48,10 @@ const TASK_STATUS_LABELS: Record<string, string> = {
   CANCELLED: '已取消',
   EXPIRED: '已过期',
 }
-const ACCOUNT_STATUS_LABELS: Record<string, string> = {
-  REGISTERED: '已注册', ACTIVE: '正常', DISABLED: '已停用', EXPIRED: '已过期',
-}
 const WORKFLOW_STEPS = ['授权核验', '表单准备', '人工确认', '邮箱验证', '完成']
 const TERMINAL_STATUSES = new Set(['REGISTERED', 'FAILED', 'CANCELLED', 'EXPIRED'])
 
 const publishers = ref<RegistrationPublisher[]>([])
-const platforms = ref<RegistrationPlatform[]>([])
 const authors = ref<Array<{ id: string; display_name: string }>>([])
 const journals = ref<JournalOption[]>([])
 const journalPortals = ref<SubmissionPortal[]>([])
@@ -64,7 +59,6 @@ const filterJournals = ref<JournalOption[]>([])
 const authorizations = ref<AuthorizationResponse[]>([])
 const registrationEmail = ref<EmailResponse | null>(null)
 const tasks = ref<RegistrationTask[]>([])
-const accounts = ref<PublisherAccount[]>([])
 const total = ref(0)
 
 const catalogLoading = ref(false)
@@ -73,17 +67,15 @@ const journalsLoading = ref(false)
 const platformsLoading = ref(false)
 const filterJournalsLoading = ref(false)
 const tasksLoading = ref(false)
-const accountsLoading = ref(false)
 const creating = ref(false)
 const busyTaskId = ref<string | null>(null)
 const catalogError = ref('')
 const authorDataError = ref('')
 const taskError = ref('')
-const accountError = ref('')
 const actionMessage = ref('')
 
 const target = reactive({
-  author_id: '', authorization_id: '', publisher_id: '', journal_id: '', platform_adapter_id: '',
+  author_id: '', authorization_id: '', publisher_id: '', journal_id: '', portal_id: '',
 })
 const filters = reactive({
   page: 1,
@@ -96,7 +88,13 @@ const filters = reactive({
   created_to: '',
 })
 const selectedTaskId = ref('')
+const showCreate = ref(false)
+const createGuard = useDirtyGuard(() => target)
 const cancelTargetId = ref<string | null>(null)
+const cancelDialogOpen = computed({
+  get: () => cancelTargetId.value !== null,
+  set: (open: boolean) => { if (!open) cancelTargetId.value = null },
+})
 const cancelConfirmed = ref(false)
 const evidenceTaskId = ref<string | null>(null)
 const evidenceCloseButton = ref<HTMLButtonElement | null>(null)
@@ -113,28 +111,17 @@ const evidenceTask = computed(() => tasks.value.find((item) => item.id === evide
 const selectedAuthor = computed(() => authors.value.find((item) => item.id === target.author_id) ?? null)
 const selectedPublisher = computed(() => publishers.value.find((item) => item.publisher_id === target.publisher_id) ?? null)
 const selectedJournal = computed(() => journals.value.find((item) => item.id === target.journal_id) ?? null)
-const platformOptions = computed(() => {
-  const bound = new Map<string, RegistrationPlatform>()
-  for (const platform of platforms.value) {
-    const portal = journalPortals.value.find((item) => (
-      item.journal_id === target.journal_id
-      && item.platform_adapter_id === platform.id
-      && item.platform_code === platform.platform_type
-      && item.verification_status === 'VERIFIED'
-    ))
-    if (portal) bound.set(platform.id, platform)
-  }
-  return [...bound.values()]
-})
-const selectedPlatform = computed(() => platformOptions.value.find((item) => item.id === target.platform_adapter_id) ?? null)
+const platformOptions = computed(() => journalPortals.value.filter((item) => (
+  item.journal_id === target.journal_id && item.verification_status === 'VERIFIED'
+)))
 const selectedPortal = computed(() => journalPortals.value.find((item) => (
-  item.journal_id === target.journal_id && item.platform_adapter_id === target.platform_adapter_id
-) && item.platform_code === selectedPlatform.value?.platform_type) ?? null)
+  item.journal_id === target.journal_id && item.id === target.portal_id
+)) ?? null)
 const selectedAuthorization = computed(() => authorizations.value.find((item) => item.id === target.authorization_id) ?? null)
 const canCreate = computed(() => Boolean(
-  target.author_id && target.authorization_id && target.publisher_id && target.journal_id && target.platform_adapter_id
+  target.author_id && target.authorization_id && target.publisher_id && target.journal_id && target.portal_id
   && selectedPublisher.value?.support_status === 'SUPPORTED'
-  && selectedPlatform.value?.support_status === 'SUPPORTED'
+  && selectedPortal.value?.adapter_support_status === 'SUPPORTED'
   && selectedPortal.value?.support_status === 'SUPPORTED'
   && selectedPortal.value?.verification_status === 'VERIFIED'
   && selectedAuthorization.value?.validity_status === 'active'
@@ -188,10 +175,6 @@ function taskStatusLabel(status: string): string {
   return TASK_STATUS_LABELS[status] ?? status
 }
 
-function accountStatusLabel(status: string): string {
-  return ACCOUNT_STATUS_LABELS[status] ?? status
-}
-
 function statusTone(status: string): string {
   if (status === 'REGISTERED') return 'success'
   if (['FAILED', 'EXPIRED'].includes(status)) return 'danger'
@@ -233,11 +216,10 @@ async function loadCatalogs(): Promise<void> {
   catalogLoading.value = true
   catalogError.value = ''
   try {
-    const [publisherItems, platformItems, options] = await Promise.all([
-      getRegistrationPublishers(), getRegistrationPlatforms(), getAuthorizationOptions(),
+    const [publisherItems, options] = await Promise.all([
+      getRegistrationPublishers(), getAuthorizationOptions(),
     ])
     publishers.value = publisherItems
-    platforms.value = platformItems
     authors.value = options.authors
   } catch (error) {
     catalogError.value = safeError(error, '无法加载注册目标选项，请稍后重试。')
@@ -278,7 +260,7 @@ async function onPublisherChange(): Promise<void> {
   const sequence = ++journalLoadSequence
   platformLoadSequence += 1
   target.journal_id = ''
-  target.platform_adapter_id = ''
+  target.portal_id = ''
   journals.value = []
   journalPortals.value = []
   platformsLoading.value = false
@@ -302,7 +284,7 @@ async function onPublisherChange(): Promise<void> {
 
 async function onJournalChange(): Promise<void> {
   const sequence = ++platformLoadSequence
-  target.platform_adapter_id = ''
+  target.portal_id = ''
   journalPortals.value = []
   authorDataError.value = ''
   if (!target.journal_id) {
@@ -398,16 +380,9 @@ function changePage(page: number): void {
   void loadTasks()
 }
 
-async function loadAccounts(): Promise<void> {
-  accountsLoading.value = true
-  accountError.value = ''
-  try {
-    accounts.value = (await getPublisherAccounts()).items
-  } catch (error) {
-    accountError.value = safeError(error, '无法加载出版社账号，当前数据已保留。')
-  } finally {
-    accountsLoading.value = false
-  }
+function openCreate(): void {
+  createGuard.capture()
+  showCreate.value = true
 }
 
 async function submitRegistrationTask(): Promise<void> {
@@ -421,7 +396,7 @@ async function submitRegistrationTask(): Promise<void> {
       publisher_id: target.publisher_id,
       journal_id: target.journal_id,
       authorization_id: target.authorization_id,
-      platform_code: selectedPlatform.value!.platform_type,
+      platform_code: selectedPortal.value!.platform_code,
     }
     const signature = JSON.stringify(confirmedPayload)
     if (!createAttempt || createAttempt.signature !== signature) {
@@ -435,6 +410,7 @@ async function submitRegistrationTask(): Promise<void> {
     tasks.value = [created, ...tasks.value.filter((item) => item.id !== created.id)]
     total.value += 1
     selectedTaskId.value = created.id
+    showCreate.value = false
     actionMessage.value = `注册任务 ${created.id} 已创建；工作器仅复核授权与入口并转人工复核，不执行外部注册。`
   } catch (error) {
     taskError.value = safeError(error, '无法创建注册任务，请核对授权与支持状态后重试。')
@@ -569,13 +545,12 @@ function journalName(journalId: string): string {
 }
 
 function platformName(platformCode: string): string {
-  return platforms.value.find((item) => item.platform_type === platformCode)?.adapter_name ?? platformCode
+  return platformCode
 }
 
 onMounted(() => {
   void loadCatalogs()
   void loadTasks()
-  void loadAccounts()
 })
 </script>
 
@@ -595,7 +570,8 @@ onMounted(() => {
       {{ catalogError }} <button type="button" class="text-button" @click="loadCatalogs">重试选项加载</button>
     </p>
 
-    <section class="workbench-panel target-panel" aria-labelledby="registration-target-title">
+    <AppModal v-model="showCreate" title="创建注册任务" description="选择已授权、已支持的出版社与投稿平台，创建前逐项核对只读摘要。" width="960px" :busy="creating" :dirty="() => createGuard.dirty.value" :error="authorDataError || taskError">
+      <section class="workbench-panel target-panel" aria-labelledby="registration-target-title">
       <div class="section-heading">
         <div><p class="section-kicker">01 · 目标任务</p><h2 id="registration-target-title">选择作者、出版社、期刊与平台</h2></div>
         <span v-if="catalogLoading" role="status">正在加载选项…</span>
@@ -640,13 +616,13 @@ onMounted(() => {
         <div class="target-card">
           <span class="target-number">4</span>
           <label for="registration-platform">投稿平台</label>
-          <select id="registration-platform" v-model="target.platform_adapter_id" data-test="registration-platform" :disabled="catalogLoading || !target.journal_id || platformsLoading">
+          <select id="registration-platform" v-model="target.portal_id" data-test="registration-platform" :disabled="catalogLoading || !target.journal_id || platformsLoading">
             <option value="">{{ platformsLoading ? '正在加载已绑定平台…' : '请选择投稿平台' }}</option>
             <option
               v-for="platform in platformOptions" :key="platform.id" :value="platform.id"
-              :disabled="platform.support_status !== 'SUPPORTED' || journalPortals.find((portal) => portal.platform_adapter_id === platform.id)?.support_status !== 'SUPPORTED'"
-              :data-test="platform.support_status !== 'SUPPORTED' ? 'unsupported-platform' : undefined"
-            >{{ platform.adapter_name }} · v{{ platform.adapter_version }} · {{ platform.support_status === 'SUPPORTED' ? '已支持' : '未验收，不可选' }}</option>
+              :disabled="platform.support_status !== 'SUPPORTED' || platform.adapter_support_status !== 'SUPPORTED'"
+              :data-test="platform.support_status !== 'SUPPORTED' || platform.adapter_support_status !== 'SUPPORTED' ? 'unsupported-platform' : undefined"
+            >{{ platform.adapter_name }} · v{{ platform.adapter_version }} · {{ platform.support_status === 'SUPPORTED' && platform.adapter_support_status === 'SUPPORTED' ? '已支持' : '未验收，不可选' }}</option>
           </select>
           <p>仅列出当前期刊已核验入口绑定的具体适配器版本；平台最终准入由服务端复核。</p>
         </div>
@@ -660,7 +636,7 @@ onMounted(() => {
             <div><dt>作者</dt><dd>{{ selectedAuthor?.display_name ?? '尚未选择' }}</dd></div>
             <div><dt>注册邮箱</dt><dd>{{ registrationEmail ? maskEmail(registrationEmail.email) : '未找到已授权注册邮箱' }}</dd></div>
             <div><dt>出版社 / 期刊</dt><dd>{{ selectedPublisher?.display_name ?? '尚未选择' }} / {{ selectedJournal?.name ?? '尚未选择' }}</dd></div>
-            <div><dt>平台</dt><dd>{{ selectedPlatform?.adapter_name ?? '尚未选择' }}</dd></div>
+            <div><dt>平台</dt><dd>{{ selectedPortal?.adapter_name ?? '尚未选择' }}</dd></div>
             <div><dt>授权</dt><dd>{{ selectedAuthorization ? `有效至 ${formatDate(selectedAuthorization.valid_to)}` : '尚未选择有效授权' }}</dd></div>
             <div><dt>文件</dt><dd>注册任务不接收或发送稿件文件</dd></div>
           </dl>
@@ -673,6 +649,7 @@ onMounted(() => {
         </div>
       </div>
     </section>
+    </AppModal>
 
     <p v-if="actionMessage" class="action-message" role="status">{{ actionMessage }}</p>
 
@@ -680,7 +657,10 @@ onMounted(() => {
       <section class="workbench-panel task-panel" data-test="registration-task-list" :aria-busy="tasksLoading" aria-labelledby="registration-tasks-title">
         <div class="section-heading">
           <div><p class="section-kicker">02 · 任务队列</p><h2 id="registration-tasks-title">注册任务</h2></div>
-          <button type="button" class="secondary-button" data-test="refresh-tasks" :disabled="tasksLoading" @click="loadTasks">刷新</button>
+          <div class="section-heading__actions">
+            <button type="button" class="primary-button" data-test="open-create-registration" @click="openCreate">创建注册任务</button>
+            <button type="button" class="secondary-button" data-test="refresh-tasks" :disabled="tasksLoading" @click="loadTasks">刷新</button>
+          </div>
         </div>
         <form class="task-filters" aria-label="注册任务筛选" @submit.prevent="applyFilters">
           <label for="task-author-filter">作者</label>
@@ -735,13 +715,6 @@ onMounted(() => {
               <button v-if="canCancel(item)" type="button" class="danger-text-button" :data-test="`cancel-task-${item.id}`" @click="startCancel(item.id)">取消任务</button>
               <button v-if="canRetry(item)" type="button" class="secondary-button" :data-test="`retry-task-${item.id}`" :disabled="busyTaskId === item.id" @click="retryTask(item)">重新识别 / 重试</button>
             </div>
-            <section v-if="cancelTargetId === item.id" class="cancel-confirmation" aria-label="确认取消注册任务">
-              <strong>确认取消任务 {{ item.id }}</strong>
-              <p>后果：任务将停止后续自动步骤；已产生的平台状态不会被撤销。</p>
-              <label for="cancel-confirmation"><input id="cancel-confirmation" v-model="cancelConfirmed" data-test="cancel-confirmation" type="checkbox"> 我已了解后果并确认取消。</label>
-              <button type="button" class="danger-button" :data-test="`confirm-cancel-${item.id}`" :disabled="!cancelConfirmed || busyTaskId === item.id" @click="confirmCancel">确认取消</button>
-              <button type="button" class="text-button" @click="cancelTargetId = null; cancelConfirmed = false">返回</button>
-            </section>
           </article>
         </div>
         <nav v-if="total > filters.page_size" class="pagination" aria-label="注册任务分页">
@@ -780,6 +753,21 @@ onMounted(() => {
       </section>
     </div>
 
+    <AppConfirmDialog
+      v-model="cancelDialogOpen"
+      title="取消注册任务"
+      :description="`任务 ${cancelTargetId} 将停止后续自动步骤；已产生的平台状态不会被撤销。`"
+      confirmation-text="我已了解后果并确认取消。"
+      confirm-label="确认取消"
+      :confirmed="cancelConfirmed"
+      :confirm-test="`confirm-cancel-${cancelTargetId}`"
+      confirmation-test="cancel-confirmation"
+      :busy="Boolean(busyTaskId)"
+      :error="taskError"
+      @update:confirmed="cancelConfirmed = $event"
+      @confirm="confirmCancel"
+    />
+
     <section class="workbench-panel manual-panel" aria-labelledby="manual-center-title">
       <div class="section-heading"><div><p class="section-kicker">04 · 人工处理中心</p><h2 id="manual-center-title">需要人工关注的任务</h2></div><span>仅查看与定位，不执行外部操作</span></div>
       <div class="manual-grid">
@@ -794,22 +782,6 @@ onMounted(() => {
       </div>
     </section>
 
-    <section class="workbench-panel accounts-panel" aria-labelledby="accounts-title">
-      <div class="section-heading"><div><p class="section-kicker">05 · 出版社账号</p><h2 id="accounts-title">账号管理</h2></div><button type="button" class="secondary-button" :disabled="accountsLoading" @click="loadAccounts">刷新账号</button></div>
-      <p v-if="accountError" class="inline-alert" role="alert">{{ accountError }} <button type="button" class="text-button" @click="loadAccounts">重试</button></p>
-      <p v-if="accountsLoading" role="status">正在加载出版社账号…</p>
-      <div v-if="!accountsLoading && !accountError && accounts.length === 0" class="empty-state" data-test="account-empty"><strong>暂无出版社账号</strong><p>完成注册并核验后，账号摘要会显示在这里。</p></div>
-      <div v-if="accounts.length" class="account-table-wrap" data-test="publisher-accounts">
-        <table>
-          <caption>账号邮箱默认脱敏；可按需展开非敏感详情。</caption>
-          <thead><tr><th scope="col">账号邮箱</th><th scope="col">出版社 / 期刊</th><th scope="col">平台</th><th scope="col">状态</th><th scope="col">邮箱验证</th><th scope="col">最近检查</th><th scope="col">详情</th></tr></thead>
-          <tbody><tr v-for="account in accounts" :key="account.id">
-            <td>{{ maskEmail(account.account_email) }}</td><td>{{ publisherName(account.publisher_id) }} / {{ account.journal_id ? journalName(account.journal_id) : '未关联' }}</td><td>{{ platformName(account.platform_code) }}</td><td><span class="status-badge status-neutral">{{ accountStatusLabel(account.account_status) }}</span></td><td>{{ formatDate(account.email_verified_at) }}</td><td>{{ formatDate(account.last_checked_at) }}</td>
-            <td><details><summary>查看详情</summary><dl class="account-details"><div><dt>账号域</dt><dd>{{ account.account_namespace }}</dd></div><div><dt>平台账号</dt><dd>{{ account.platform_account_id ?? '—' }}</dd></div><div><dt>注册时间</dt><dd>{{ formatDate(account.registered_at) }}</dd></div></dl></details></td>
-          </tr></tbody>
-        </table>
-      </div>
-    </section>
     </div>
 
     <div v-if="evidenceTask" class="drawer-backdrop">
@@ -836,6 +808,7 @@ h3 { font-size: 16px; }
 .scope-note { padding: 8px 12px; color: #36524a; font-size: 12px; background: #eef7f3; border: 1px solid #cee3da; border-radius: 8px; }
 .workbench-panel { margin-bottom: 22px; padding: 24px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 5px 18px rgb(23 32 58 / 4%); }
 .section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+.section-heading__actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; }
 .section-heading.compact { align-items: center; margin-bottom: 12px; }
 .section-heading > span { color: var(--ink-secondary); font-size: 12px; }
 .target-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }

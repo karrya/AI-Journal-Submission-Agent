@@ -19,7 +19,9 @@ const email: EmailResponse = {
 
 describe('EmailTable', () => {
   it('requires explicit binding confirmation when creating an email', async () => {
-    const wrapper = mount(EmailTable, { props: { emails: [], canManage: true } })
+    const wrapper = mount(EmailTable, { global: { stubs: { teleport: true, transition: false } }, props: { emails: [], canManage: true } })
+    await wrapper.get('[data-test="add-email"]').trigger('click')
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
     await wrapper.get('[data-test="new-email"]').setValue(address('new'))
     await wrapper.get('[data-test="create-email-form"]').trigger('submit')
     expect(wrapper.emitted('create')).toBeUndefined()
@@ -35,7 +37,7 @@ describe('EmailTable', () => {
   })
 
   it('requires confirmation again when changing an email address', async () => {
-    const wrapper = mount(EmailTable, { props: { emails: [email], canManage: true } })
+    const wrapper = mount(EmailTable, { global: { stubs: { teleport: true, transition: false } }, props: { emails: [email], canManage: true } })
     await wrapper.get('[data-test="edit-email-e1"]').trigger('click')
     await wrapper.get('[data-test="edit-email-address"]').setValue(address('changed'))
     await wrapper.get('[data-test="edit-email-form"]').trigger('submit')
@@ -53,7 +55,7 @@ describe('EmailTable', () => {
   })
 
   it('supports institutional purpose when editing an email', async () => {
-    const wrapper = mount(EmailTable, { props: { emails: [email], canManage: true } })
+    const wrapper = mount(EmailTable, { global: { stubs: { teleport: true, transition: false } }, props: { emails: [email], canManage: true } })
     await wrapper.get('[data-test="edit-email-e1"]').trigger('click')
     const purposeSelect = wrapper.get('[data-test="edit-email-form"] select')
     const institutionalOption = purposeSelect.find('option[value="institutional"]')
@@ -70,7 +72,7 @@ describe('EmailTable', () => {
   })
 
   it('uses a separate explicit confirmation before unbinding', async () => {
-    const wrapper = mount(EmailTable, { props: { emails: [email], canManage: true } })
+    const wrapper = mount(EmailTable, { global: { stubs: { teleport: true, transition: false } }, props: { emails: [email], canManage: true } })
     await wrapper.get('[data-test="delete-email-e1"]').trigger('click')
     expect(wrapper.emitted('delete')).toBeUndefined()
     await wrapper.get('[data-test="confirm-delete-e1"]').trigger('click')
@@ -84,8 +86,23 @@ describe('EmailTable', () => {
     })
   })
 
+  it.each(['create', 'edit', 'delete'])('shows request failures inside the %s dialog', async (scenario) => {
+    const wrapper = mount(EmailTable, {
+      global: { stubs: { teleport: true, transition: false } },
+      props: {
+        emails: scenario === 'create' ? [] : [email],
+        canManage: true,
+        requestError: '邮箱请求失败，请求 ID：req-email',
+      },
+    })
+    const trigger = scenario === 'create' ? 'add-email' : scenario === 'edit' ? 'edit-email-e1' : 'delete-email-e1'
+    await wrapper.get(`[data-test="${trigger}"]`).trigger('click')
+
+    expect(wrapper.get('[role="alert"]').text()).toContain('邮箱请求失败，请求 ID：req-email')
+  })
+
   it('resets edit and unbind panels when manage permission is lost', async () => {
-    const wrapper = mount(EmailTable, { props: { emails: [email], canManage: true } })
+    const wrapper = mount(EmailTable, { global: { stubs: { teleport: true, transition: false } }, props: { emails: [email], canManage: true } })
     await wrapper.get('[data-test="edit-email-e1"]').trigger('click')
     expect(wrapper.find('[data-test="edit-email-form"]').exists()).toBe(true)
 

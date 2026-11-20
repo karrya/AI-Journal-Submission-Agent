@@ -107,7 +107,12 @@ export interface SubmissionPortal {
   verification_status: string
   access_status: string
   platform_code: string
-  platform_adapter_id: string | null
+  adapter_code: string | null
+  adapter_name: string | null
+  adapter_version: string | null
+  adapter_support_status: string | null
+  adapter_allowed_domains: string[] | null
+  adapter_last_verified_at: string | null
   support_status: string
   confidence: number
   evidence_summary: EvidenceSummary[]

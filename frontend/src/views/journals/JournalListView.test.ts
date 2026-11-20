@@ -18,12 +18,9 @@ const publisher = {
   id: 'p1', name: 'Publisher One', website_url: 'https://publisher.example', notes: null,
   created_at: '2026-11-01T00:00:00Z', updated_at: '2026-11-01T00:00:00Z',
 }
-const platform = {
-  id: 's1', code: 'OJS', name: 'Open Journal Systems', description: '', status: 'active',
-  created_at: '2026-11-01T00:00:00Z', updated_at: '2026-11-01T00:00:00Z',
-}
+const platform = 'OJS'
 const journal = {
-  id: 'j1', publisher_id: 'p1', platform_id: 's1', name: 'Journal One', issn: '03785955',
+  id: 'j1', publisher_id: 'p1', platform_code: platform, name: 'Journal One', issn: '03785955',
   eissn: null, website_url: 'https://journal.example', submission_url: null,
   author_guidelines_url: null, subject_categories: [], article_types: [], requirements: [],
   requirements_source_url: null, requirements_verified_at: null, status: 'active', notes: null,
@@ -44,13 +41,12 @@ describe('JournalListView', () => {
 
   function resource(config: InternalAxiosRequestConfig): object[] {
     if (config.url === '/publishers') return [publisher]
-    if (config.url === '/journal-platforms') return [platform]
     return [journal]
   }
 
-  it('uses server pagination and allowlisted sorting for all three tables', async () => {
+  it('uses server pagination and allowlisted sorting for publishers and journals', async () => {
     adapter.mockImplementation(async (config) => success(config, page(resource(config), 21)))
-    const wrapper = mount(JournalListView)
+    const wrapper = mount(JournalListView, { global: { stubs: { teleport: true, transition: false } } })
     await flushPromises()
     await wrapper.get('[data-test="next-publishers"]').trigger('click')
     await flushPromises()
@@ -59,15 +55,6 @@ describe('JournalListView', () => {
     await flushPromises()
     expect(adapter.mock.calls.at(-1)?.[0].params).toMatchObject({ page: 1, sort: 'created_at' })
     expect(wrapper.get('[data-test="publisher-sort"]').html()).not.toContain('created_by')
-
-    await wrapper.get('[data-test="platforms-tab"]').trigger('click')
-    await flushPromises()
-    await wrapper.get('[data-test="next-platforms"]').trigger('click')
-    await flushPromises()
-    expect(adapter.mock.calls.at(-1)?.[0].params).toMatchObject({ page: 2 })
-    await wrapper.get('[data-test="platform-sort"]').setValue('name')
-    await flushPromises()
-    expect(adapter.mock.calls.at(-1)?.[0].params).toMatchObject({ sort: 'name' })
 
     await wrapper.get('[data-test="journals-tab"]').trigger('click')
     await flushPromises()
@@ -82,7 +69,7 @@ describe('JournalListView', () => {
 
   it('loads and renders journal management only on the journals tab', async () => {
     adapter.mockImplementation(async (config) => success(config, page([])))
-    const wrapper = mount(JournalListView)
+    const wrapper = mount(JournalListView, { global: { stubs: { teleport: true, transition: false } } })
     await flushPromises()
     await wrapper.get('[data-test="identification-tab"]').trigger('click')
     await flushPromises()
@@ -96,12 +83,9 @@ describe('JournalListView', () => {
   })
   it('shows a specific empty state for every resource', async () => {
     adapter.mockImplementation(async (config) => success(config, page([])))
-    const wrapper = mount(JournalListView)
+    const wrapper = mount(JournalListView, { global: { stubs: { teleport: true, transition: false } } })
     await flushPromises()
     expect(wrapper.text()).toContain('未找到出版商')
-    await wrapper.get('[data-test="platforms-tab"]').trigger('click')
-    await flushPromises()
-    expect(wrapper.text()).toContain('未找到平台')
     await wrapper.get('[data-test="journals-tab"]').trigger('click')
     await flushPromises()
     expect(wrapper.text()).toContain('未找到期刊')
@@ -109,13 +93,10 @@ describe('JournalListView', () => {
 
   it('suppresses empty states when resource loading fails', async () => {
     adapter.mockImplementation(async () => { throw new Error('offline') })
-    const wrapper = mount(JournalListView)
+    const wrapper = mount(JournalListView, { global: { stubs: { teleport: true, transition: false } } })
     await flushPromises()
     expect(wrapper.text()).toContain('无法加载出版商')
     expect(wrapper.text()).not.toContain('未找到出版商')
-    await wrapper.get('[data-test="platforms-tab"]').trigger('click')
-    await flushPromises()
-    expect(wrapper.text()).not.toContain('未找到平台')
     await wrapper.get('[data-test="journals-tab"]').trigger('click')
     await flushPromises()
     expect(wrapper.text()).not.toContain('未找到期刊')
@@ -125,7 +106,7 @@ describe('JournalListView', () => {
     adapter.mockImplementation(async (config) => success(config,
       ['post', 'patch'].includes(config.method ?? '') ? publisher : page([publisher]),
     ))
-    const wrapper = mount(JournalListView)
+    const wrapper = mount(JournalListView, { global: { stubs: { teleport: true, transition: false } } })
     await flushPromises()
     await wrapper.get('[data-test="add-publisher"]').trigger('click')
     await wrapper.get('[data-test="publisher-name"]').setValue('New Publisher')
@@ -144,47 +125,29 @@ describe('JournalListView', () => {
     expectSaveSuccessToast()
   })
 
-  it('creates and updates journal platforms', async () => {
-    adapter.mockImplementation(async (config) => {
-      if (config.url === '/publishers') return success(config, page([]))
-      if (['post', 'patch'].includes(config.method ?? '')) return success(config, platform)
-      return success(config, page([platform]))
-    })
-    const wrapper = mount(JournalListView)
+  it('does not expose the removed platform catalog', async () => {
+    adapter.mockImplementation(async (config) => success(config, page([])))
+    const wrapper = mount(JournalListView, { global: { stubs: { teleport: true, transition: false } } })
     await flushPromises()
-    await wrapper.get('[data-test="platforms-tab"]').trigger('click')
-    await flushPromises()
-    await wrapper.get('[data-test="add-platform"]').trigger('click')
-    await wrapper.get('[data-test="platform-code"]').setValue('OJS')
-    await wrapper.get('[data-test="platform-name"]').setValue('Open Journal Systems')
-    await wrapper.get('[data-test="platform-form"]').trigger('submit')
-    await flushPromises()
-    expect(JSON.parse(String(adapter.mock.calls.find(([config]) => config.method === 'post')?.[0].data))).toMatchObject({ code: 'OJS', status: 'active' })
 
-    await wrapper.get('[data-test="edit-platform-s1"]').trigger('click')
-    await wrapper.get('[data-test="platform-name"]').setValue('Updated Platform')
-    await wrapper.get('[data-test="platform-form"]').trigger('submit')
-    await flushPromises()
-    const updateCall = adapter.mock.calls.find(([config]) => config.method === 'patch')
-    expect(updateCall?.[0].url).toBe('/journal-platforms/s1')
-    expect(JSON.parse(String(updateCall?.[0].data))).toMatchObject({ name: 'Updated Platform' })
-    expectSaveSuccessToast()
+    expect(wrapper.find('[data-test="platforms-tab"]').exists()).toBe(false)
+    expect(adapter.mock.calls.some(([config]) => config.url === '/journal-platforms')).toBe(false)
   })
 
   it('shows Chinese journal status options and submits the selected English value', async () => {
     adapter.mockImplementation(async (config) => {
       if (config.url === '/publishers') return success(config, page([publisher]))
-      if (config.url === '/journal-platforms') return success(config, page([platform]))
       if (config.url === '/journals' && config.method === 'get') return success(config, page([journal]))
       if (config.method === 'post') return success(config, journal)
       throw new Error(`Unexpected request: ${config.method} ${config.url}`)
     })
-    const wrapper = mount(JournalListView)
+    const wrapper = mount(JournalListView, { global: { stubs: { teleport: true, transition: false } } })
     await flushPromises()
     await wrapper.get('[data-test="journals-tab"]').trigger('click')
     await flushPromises()
     await wrapper.get('[data-test="add-journal"]').trigger('click')
     await flushPromises()
+    expect(wrapper.get('[role="dialog"]').text()).toContain('添加期刊')
 
     const statusSelect = wrapper.get('[data-test="journal-status"]')
     expect(statusSelect.element.tagName).toBe('SELECT')
@@ -198,22 +161,23 @@ describe('JournalListView', () => {
     await wrapper.get('[data-test="journal-name"]').setValue('New Journal')
     await wrapper.get('[data-test="journal-publisher"]').setValue('p1')
     await statusSelect.setValue('needs_review')
+    await wrapper.get('[data-test="journal-platform"]').setValue('OJS')
     await wrapper.get('[data-test="journal-form"]').trigger('submit')
     await flushPromises()
     const createCall = adapter.mock.calls.find(([config]) => config.method === 'post')
-    expect(JSON.parse(String(createCall?.[0].data))).toMatchObject({ status: 'needs_review' })
+    expect(JSON.parse(String(createCall?.[0].data))).toMatchObject({ status: 'needs_review', platform_code: 'OJS' })
     expectSaveSuccessToast()
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
   })
 
   it('requires every journal requirement field and an HTTPS source', async () => {
     adapter.mockImplementation(async (config) => {
       if (config.url === '/publishers') return success(config, page([publisher]))
-      if (config.url === '/journal-platforms') return success(config, page([platform]))
       if (config.url === '/journals' && config.method === 'get') return success(config, page([journal]))
       if (['post', 'patch'].includes(config.method ?? '')) return success(config, journal)
       throw new Error(`Unexpected request: ${config.method} ${config.url}`)
     })
-    const wrapper = mount(JournalListView)
+    const wrapper = mount(JournalListView, { global: { stubs: { teleport: true, transition: false } } })
     await flushPromises()
     await wrapper.get('[data-test="journals-tab"]').trigger('click')
     await flushPromises()
@@ -266,12 +230,11 @@ describe('JournalListView', () => {
     }
     adapter.mockImplementation(async (config) => {
       if (config.url === '/publishers') return success(config, page([publisher]))
-      if (config.url === '/journal-platforms') return success(config, page([platform]))
       if (config.url === '/journals' && config.method === 'get') return success(config, page([typedJournal]))
       if (config.method === 'patch') return success(config, typedJournal)
       throw new Error(`Unexpected request: ${config.method} ${config.url}`)
     })
-    const wrapper = mount(JournalListView)
+    const wrapper = mount(JournalListView, { global: { stubs: { teleport: true, transition: false } } })
     await flushPromises()
     await wrapper.get('[data-test="journals-tab"]').trigger('click')
     await flushPromises()
@@ -300,11 +263,10 @@ describe('JournalListView', () => {
     adapter.mockImplementation(async (config) => {
       if (config.url === '/publishers' && config.method === 'get') return success(config, page([unsafePublisher]))
       if (config.url === '/journals') return success(config, page([unsafeJournal]))
-      if (config.url === '/journal-platforms') return success(config, page([platform]))
       if (config.method === 'patch') return success(config, unsafePublisher)
       throw new Error(`Unexpected request: ${config.method} ${config.url}`)
     })
-    const wrapper = mount(JournalListView)
+    const wrapper = mount(JournalListView, { global: { stubs: { teleport: true, transition: false } } })
     await flushPromises()
     expect(wrapper.find('a[href^="javascript:"]').exists()).toBe(false)
     expect(wrapper.text()).toContain('javascript:alert(1)')
@@ -324,12 +286,11 @@ describe('JournalListView', () => {
   it('rejects unsafe optional journal URLs before update', async () => {
     adapter.mockImplementation(async (config) => {
       if (config.url === '/publishers') return success(config, page([publisher]))
-      if (config.url === '/journal-platforms') return success(config, page([platform]))
       if (config.url === '/journals' && config.method === 'get') return success(config, page([journal]))
       if (config.method === 'patch') return success(config, journal)
       throw new Error(`Unexpected request: ${config.method} ${config.url}`)
     })
-    const wrapper = mount(JournalListView)
+    const wrapper = mount(JournalListView, { global: { stubs: { teleport: true, transition: false } } })
     await flushPromises()
     await wrapper.get('[data-test="journals-tab"]').trigger('click')
     await flushPromises()
@@ -343,20 +304,18 @@ describe('JournalListView', () => {
     expect(wrapper.text()).toContain('HTTPS，或经允许的本地 HTTP')
   })
 
-  it('loads every publisher and platform selector page', async () => {
+  it('loads every publisher selector page and accepts a platform code', async () => {
     const publisherChoices = Array.from({ length: 101 }, (_, index) => ({ ...publisher, id: `p${index}`, name: `Publisher ${index}` }))
-    const platformChoices = Array.from({ length: 101 }, (_, index) => ({ ...platform, id: `s${index}`, name: `Platform ${index}` }))
     adapter.mockImplementation(async (config) => {
       if (config.url === '/journals') return success(config, page([]))
       if (config.url === '/publishers' && config.params?.page_size === 20) return success(config, page([publisher]))
-      if (config.url === '/publishers' || config.url === '/journal-platforms') {
+      if (config.url === '/publishers') {
         const pageNumber = Number(config.params?.page ?? 1)
-        const choices = config.url === '/publishers' ? publisherChoices : platformChoices
-        return success(config, { items: choices.slice((pageNumber - 1) * 100, pageNumber * 100), page: pageNumber, page_size: 100, total: 101 })
+        return success(config, { items: publisherChoices.slice((pageNumber - 1) * 100, pageNumber * 100), page: pageNumber, page_size: 100, total: 101 })
       }
       throw new Error(`Unexpected request: ${config.method} ${config.url}`)
     })
-    const wrapper = mount(JournalListView)
+    const wrapper = mount(JournalListView, { global: { stubs: { teleport: true, transition: false } } })
     await flushPromises()
     await wrapper.get('[data-test="journals-tab"]').trigger('click')
     await flushPromises()
@@ -364,20 +323,20 @@ describe('JournalListView', () => {
     await flushPromises()
 
     expect(adapter.mock.calls.filter(([config]) => config.url === '/publishers' && config.params?.page_size === 100).map(([config]) => config.params.page)).toEqual([1, 2])
-    expect(adapter.mock.calls.filter(([config]) => config.url === '/journal-platforms').map(([config]) => config.params.page)).toEqual([1, 2])
     expect(wrapper.get('[data-test="journal-publisher"]').find('option[value="p100"]').exists()).toBe(true)
-    expect(wrapper.get('[data-test="journal-platform"]').find('option[value="s100"]').exists()).toBe(true)
+    await wrapper.get('[data-test="journal-platform"]').setValue('CUSTOM_PLATFORM')
+    expect((wrapper.get('[data-test="journal-platform"]').element as HTMLInputElement).value).toBe('CUSTOM_PLATFORM')
   })
 
   it('preserves selected journal relationships missing from selector results', async () => {
-    const current = { ...journal, publisher_id: 'missing-p', platform_id: 'missing-s' }
+    const current = { ...journal, publisher_id: 'missing-p', platform_code: 'missing-s' }
     adapter.mockImplementation(async (config) => {
       if (config.url === '/publishers' && config.params?.page_size === 20) return success(config, page([]))
       if (config.url === '/journals') return success(config, page([current]))
-      if (config.url === '/publishers' || config.url === '/journal-platforms') return success(config, page([]))
+      if (config.url === '/publishers') return success(config, page([]))
       throw new Error(`Unexpected request: ${config.method} ${config.url}`)
     })
-    const wrapper = mount(JournalListView)
+    const wrapper = mount(JournalListView, { global: { stubs: { teleport: true, transition: false } } })
     await flushPromises()
     await wrapper.get('[data-test="journals-tab"]').trigger('click')
     await flushPromises()
@@ -385,18 +344,36 @@ describe('JournalListView', () => {
     await flushPromises()
 
     const publisherSelect = wrapper.get('[data-test="journal-publisher"]')
-    const platformSelect = wrapper.get('[data-test="journal-platform"]')
+    const platformInput = wrapper.get('[data-test="journal-platform"]')
     expect((publisherSelect.element as HTMLSelectElement).value).toBe('missing-p')
-    expect((platformSelect.element as HTMLSelectElement).value).toBe('missing-s')
+    expect((platformInput.element as HTMLInputElement).value).toBe('missing-s')
     expect(publisherSelect.text()).toContain('missing-p')
-    expect(platformSelect.text()).toContain('missing-s')
   })
 
-  it('requires separate soft-delete confirmation for publishers, platforms, and journals', async () => {
+  it('keeps the delete dialog open with its error when deletion fails', async () => {
+    adapter.mockImplementation(async (config) => {
+      if (config.method === 'delete') throw new Error('delete failed')
+      return success(config, page([journal]))
+    })
+    const wrapper = mount(JournalListView, { global: { stubs: { teleport: true, transition: false } } })
+    await flushPromises()
+    await wrapper.get('[data-test="journals-tab"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-test="delete-journal-j1"]').trigger('click')
+    await wrapper.get('[data-test="delete-confirm"]').setValue(true)
+    await wrapper.get('[data-test="confirm-delete-journal-j1"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
+    expect(wrapper.get('[role="alert"]').text()).toContain('无法删除该资源')
+    expect((wrapper.get('[data-test="delete-confirm"]').element as HTMLInputElement).checked).toBe(true)
+  })
+
+  it('requires separate soft-delete confirmation for publishers and journals', async () => {
     adapter.mockImplementation(async (config) => success(config,
       config.method === 'delete' ? null : page(resource(config)),
     ))
-    const wrapper = mount(JournalListView)
+    const wrapper = mount(JournalListView, { global: { stubs: { teleport: true, transition: false } } })
     await flushPromises()
     await wrapper.get('[data-test="delete-publisher-p1"]').trigger('click')
     await wrapper.get('[data-test="confirm-delete-publisher-p1"]').trigger('click')
@@ -405,14 +382,6 @@ describe('JournalListView', () => {
     await wrapper.get('[data-test="confirm-delete-publisher-p1"]').trigger('click')
     await flushPromises()
     expect(adapter.mock.calls.some(([config]) => config.method === 'delete' && config.url === '/publishers/p1')).toBe(true)
-
-    await wrapper.get('[data-test="platforms-tab"]').trigger('click')
-    await flushPromises()
-    await wrapper.get('[data-test="delete-platform-s1"]').trigger('click')
-    await wrapper.get('[data-test="delete-confirm"]').setValue(true)
-    await wrapper.get('[data-test="confirm-delete-platform-s1"]').trigger('click')
-    await flushPromises()
-    expect(adapter.mock.calls.some(([config]) => config.method === 'delete' && config.url === '/journal-platforms/s1')).toBe(true)
 
     await wrapper.get('[data-test="journals-tab"]').trigger('click')
     await flushPromises()

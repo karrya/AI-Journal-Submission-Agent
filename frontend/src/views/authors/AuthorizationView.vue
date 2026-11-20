@@ -21,6 +21,9 @@ import {
   PERMISSION_LABELS,
 } from '../../utils/display'
 import { showSaveSuccess } from '../../utils/feedback'
+import AppModal from '../../components/AppModal.vue'
+import AppConfirmDialog from '../../components/AppConfirmDialog.vue'
+import { useDirtyGuard } from '../../composables/useDirtyGuard'
 
 const props = withDefaults(defineProps<{ authorId?: string }>(), { authorId: '' })
 const auth = useAuthStore()
@@ -37,6 +40,7 @@ const query = reactive({
   order: 'desc' as SortOrder,
 })
 const showForm = ref(false)
+const authorizationModal = ref<InstanceType<typeof AppModal> | null>(null)
 const editingId = ref<string | null>(null)
 const saving = ref(false)
 const form = reactive({
@@ -68,6 +72,11 @@ const userOptionMissing = computed(() => Boolean(
 let optionsSequence = 0
 const revokeReason = ref('')
 const revokeConfirmed = ref(false)
+const revokeDialogOpen = computed({
+  get: () => revokingId.value !== null,
+  set: (open: boolean) => { if (!open) revokingId.value = null },
+})
+const formGuard = useDirtyGuard(() => form)
 let loadSequence = 0
 
 function safeError(error: unknown, fallback: string): string {
@@ -145,6 +154,7 @@ function openForm(authorization?: AuthorizationResponse): void {
     evidence_ref: authorization?.evidence_ref ?? '',
     notes: authorization?.notes ?? '',
   })
+  formGuard.capture()
   showForm.value = true
   revokingId.value = null
   errorMessage.value = ''
@@ -269,44 +279,55 @@ watch(() => props.authorId, () => {
     </div>
     <p v-if="errorMessage" class="form-error" role="alert">{{ errorMessage }}</p>
 
-    <form v-if="showForm" data-test="authorization-form" class="stacked-form" novalidate @submit.prevent="save">
-      <h2>{{ editingId ? '编辑授权' : '添加授权' }}</h2>
-      <div class="form-grid">
-        <label>作者
-          <select v-model="form.author_id" data-test="authorization-author-id" :disabled="Boolean(editingId) || optionsLoading" required>
-            <option value="" disabled>请选择作者</option>
-            <option v-for="author in authorOptions" :key="author.id" :value="author.id">{{ author.display_name }}</option>
-            <option v-if="authorOptionMissing" :value="form.author_id">当前作者（已失效）</option>
-          </select>
-        </label>
-        <label>用户
-          <select v-model="form.user_id" data-test="authorization-user-id" :disabled="Boolean(editingId) || optionsLoading" required>
-            <option value="" disabled>请选择用户</option>
-            <option v-for="user in userOptions" :key="user.id" :value="user.id">{{ user.display_name }}（@{{ user.username }}）</option>
-            <option v-if="userOptionMissing" :value="form.user_id">当前用户（已失效）</option>
-          </select>
-        </label>
-        <label>开始时间<input v-model="form.valid_from" data-test="valid-from" type="datetime-local" required></label>
-        <label>结束时间<input v-model="form.valid_to" data-test="valid-to" type="datetime-local" required></label>
-      </div>
-      <fieldset>
-        <legend>权限</legend>
-        <label v-for="code in PERMISSION_CODES" :key="code" class="permission-option"><input v-model="form.permissions" data-test="permission-option" type="checkbox" :value="code"> {{ displayText(PERMISSION_LABELS, code) }}</label>
-      </fieldset>
-      <label>授权依据<input v-model="form.evidence_ref" maxlength="1024"></label>
-      <label>备注<textarea v-model="form.notes" rows="3"></textarea></label>
-      <button class="action-button action-button--permission" type="submit" :disabled="saving || optionsLoading || !optionsLoaded">保存授权</button>
-      <button class="action-button action-button--neutral" type="button" @click="showForm = false">取消</button>
-    </form>
+    <AppModal ref="authorizationModal" v-model="showForm" :title="editingId ? '编辑授权' : '添加授权'" description="设置明确的授权对象、权限范围和有效期限。" width="760px" :busy="saving" :dirty="() => formGuard.dirty.value" :error="errorMessage">
+      <form data-test="authorization-form" class="stacked-form" novalidate @submit.prevent="save">
+        <div class="form-grid">
+          <label>作者
+            <select v-model="form.author_id" data-test="authorization-author-id" :disabled="Boolean(editingId) || optionsLoading" required>
+              <option value="" disabled>请选择作者</option>
+              <option v-for="author in authorOptions" :key="author.id" :value="author.id">{{ author.display_name }}</option>
+              <option v-if="authorOptionMissing" :value="form.author_id">当前作者（已失效）</option>
+            </select>
+          </label>
+          <label>用户
+            <select v-model="form.user_id" data-test="authorization-user-id" :disabled="Boolean(editingId) || optionsLoading" required>
+              <option value="" disabled>请选择用户</option>
+              <option v-for="user in userOptions" :key="user.id" :value="user.id">{{ user.display_name }}（@{{ user.username }}）</option>
+              <option v-if="userOptionMissing" :value="form.user_id">当前用户（已失效）</option>
+            </select>
+          </label>
+          <label>开始时间<input v-model="form.valid_from" data-test="valid-from" type="datetime-local" required></label>
+          <label>结束时间<input v-model="form.valid_to" data-test="valid-to" type="datetime-local" required></label>
+        </div>
+        <fieldset>
+          <legend>权限</legend>
+          <label v-for="code in PERMISSION_CODES" :key="code" class="permission-option"><input v-model="form.permissions" data-test="permission-option" type="checkbox" :value="code"> {{ displayText(PERMISSION_LABELS, code) }}</label>
+        </fieldset>
+        <label>授权依据<input v-model="form.evidence_ref" maxlength="1024"></label>
+        <label>备注<textarea v-model="form.notes" rows="3"></textarea></label>
+        <div class="form-actions">
+          <button class="action-button action-button--permission" type="submit" :disabled="saving || optionsLoading || !optionsLoaded">保存授权</button>
+          <button class="action-button action-button--neutral" type="button" @click="authorizationModal?.requestClose()">取消</button>
+        </div>
+      </form>
+    </AppModal>
 
-    <section v-if="revokingId" class="confirmation-panel" aria-label="确认撤销授权">
-      <h2>撤销授权</h2>
-      <p>撤销与编辑相互独立，并将在授权对象的下次请求时生效。</p>
-      <label>原因<textarea v-model="revokeReason" data-test="revoke-reason" rows="3" maxlength="2000"></textarea></label>
-      <label class="confirmation-control"><input v-model="revokeConfirmed" data-test="revoke-confirm" type="checkbox"> 我确认撤销此授权。</label>
-      <button class="action-button action-button--danger" type="button" :data-test="`confirm-revoke-${revokingId}`" :disabled="saving" @click="confirmRevoke">确认撤销</button>
-      <button class="action-button action-button--neutral" type="button" @click="revokingId = null">取消</button>
-    </section>
+    <AppConfirmDialog
+      v-model="revokeDialogOpen"
+      title="撤销授权"
+      description="撤销将在授权对象的下次请求时生效，且不会删除历史记录。"
+      confirmation-text="我确认撤销此授权。"
+      confirm-label="确认撤销"
+      :confirmed="revokeConfirmed"
+      :confirm-test="`confirm-revoke-${revokingId}`"
+      confirmation-test="revoke-confirm"
+      :busy="saving"
+      :error="errorMessage"
+      @update:confirmed="revokeConfirmed = $event"
+      @confirm="confirmRevoke"
+    >
+      <label>原因<textarea v-model="revokeReason" data-test="revoke-reason" rows="3" maxlength="2000" /></label>
+    </AppConfirmDialog>
 
     <p v-if="loading">正在加载授权…</p>
     <p v-else-if="!errorMessage && items.length === 0">未找到授权。</p>

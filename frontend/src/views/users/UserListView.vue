@@ -17,6 +17,8 @@ import {
 import { useAuthStore } from '../../stores/auth'
 import { displayText, ROLE_LABELS } from '../../utils/display'
 import { showSaveSuccess } from '../../utils/feedback'
+import AppModal from '../../components/AppModal.vue'
+import { useDirtyGuard } from '../../composables/useDirtyGuard'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -36,6 +38,7 @@ const loading = ref(false)
 const errorMessage = ref('')
 const creating = ref(false)
 const showCreate = ref(false)
+const createModal = ref<InstanceType<typeof AppModal> | null>(null)
 const query = reactive({
   page: 1,
   page_size: 20,
@@ -51,6 +54,25 @@ const createForm = reactive({
   password_confirmation: '',
   roles: [] as RoleCode[],
 })
+const createGuard = useDirtyGuard(() => createForm)
+
+function openCreate(): void {
+  createGuard.capture()
+  errorMessage.value = ''
+  showCreate.value = true
+}
+
+function resetCreateForm(): void {
+  Object.assign(createForm, {
+    username: '',
+    display_name: '',
+    password: '',
+    password_confirmation: '',
+    roles: [],
+  })
+  createGuard.capture()
+  showCreate.value = false
+}
 
 async function load(): Promise<void> {
   const sequence = ++loadSequence
@@ -105,6 +127,7 @@ async function saveCreate(): Promise<void> {
       password_confirmation: '',
       roles: [],
     })
+    createGuard.capture()
     await load()
     showSaveSuccess()
   } catch (error) {
@@ -115,13 +138,17 @@ async function saveCreate(): Promise<void> {
 }
 
 const editing = ref<ManagedUser | null>(null)
+const editModal = ref<InstanceType<typeof AppModal> | null>(null)
 const resetting = ref<ManagedUser | null>(null)
+const resetModal = ref<InstanceType<typeof AppModal> | null>(null)
 const editForm = reactive({
   display_name: '',
   roles: [] as RoleCode[],
   status: 'active' as UserStatus,
 })
 const resetForm = reactive({ new_password: '', password_confirmation: '' })
+const editGuard = useDirtyGuard(() => editForm)
+const resetGuard = useDirtyGuard(() => resetForm)
 
 async function openEdit(user: ManagedUser): Promise<void> {
   const sequence = ++editSequence
@@ -136,6 +163,7 @@ async function openEdit(user: ManagedUser): Promise<void> {
       roles: [...detail.roles],
       status: detail.status,
     })
+    editGuard.capture()
   } catch (error) {
     if (sequence === editSequence) {
       errorMessage.value = safeError(error, '无法加载用户详情。')
@@ -179,6 +207,7 @@ function openReset(user: ManagedUser): void {
   editing.value = null
   resetting.value = user
   Object.assign(resetForm, { new_password: '', password_confirmation: '' })
+  resetGuard.capture()
 }
 
 async function saveReset(): Promise<void> {
@@ -245,57 +274,66 @@ onMounted(() => void load())
         </select>
       </label>
       <button class="action-button action-button--neutral" type="button" data-test="apply-user-filters" @click="query.page = 1; load()">应用筛选</button>
-      <button class="action-button action-button--create" type="button" data-test="add-user" @click="showCreate = true">新增用户</button>
+      <button class="action-button action-button--create" type="button" data-test="add-user" @click="openCreate">新增用户</button>
     </div>
     <p v-if="errorMessage" class="form-error" role="alert">{{ errorMessage }}</p>
 
-    <form v-if="showCreate" data-test="user-create-form" class="stacked-form" novalidate @submit.prevent="saveCreate">
-      <h2>新增用户</h2>
-      <div class="form-grid">
-        <label>用户名<input v-model="createForm.username" data-test="new-username" maxlength="64" required></label>
-        <label>显示姓名<input v-model="createForm.display_name" data-test="new-display-name" maxlength="128" required></label>
-        <label>初始密码<input v-model="createForm.password" data-test="new-password" type="password" autocomplete="new-password" required></label>
-        <label>确认初始密码<input v-model="createForm.password_confirmation" data-test="new-password-confirmation" type="password" autocomplete="new-password" required></label>
-      </div>
-      <fieldset>
-        <legend>角色</legend>
-        <label v-for="code in roleCodes" :key="code">
-          <input v-model="createForm.roles" type="checkbox" :value="code" :data-test="`create-role-${code}`">
-          {{ displayText(ROLE_LABELS, code) }}
-        </label>
-      </fieldset>
-      <button class="action-button action-button--create" type="submit" :disabled="creating">保存用户</button>
-      <button class="action-button action-button--neutral" type="button" @click="showCreate = false">取消</button>
-    </form>
+    <AppModal ref="createModal" v-model="showCreate" title="新增用户" description="创建本地工作区用户并分配初始角色。" width="720px" :busy="creating" :dirty="() => createGuard.dirty.value" :error="errorMessage" @cancel="resetCreateForm">
+      <form data-test="user-create-form" class="stacked-form" novalidate @submit.prevent="saveCreate">
+        <div class="form-grid">
+          <label>用户名<input v-model="createForm.username" data-test="new-username" maxlength="64" required></label>
+          <label>显示姓名<input v-model="createForm.display_name" data-test="new-display-name" maxlength="128" required></label>
+          <label>初始密码<input v-model="createForm.password" data-test="new-password" type="password" autocomplete="new-password" required></label>
+          <label>确认初始密码<input v-model="createForm.password_confirmation" data-test="new-password-confirmation" type="password" autocomplete="new-password" required></label>
+        </div>
+        <fieldset>
+          <legend>角色</legend>
+          <label v-for="code in roleCodes" :key="code">
+            <input v-model="createForm.roles" type="checkbox" :value="code" :data-test="`create-role-${code}`">
+            {{ displayText(ROLE_LABELS, code) }}
+          </label>
+        </fieldset>
+        <div class="form-actions">
+          <button class="action-button action-button--create" type="submit" :disabled="creating">保存用户</button>
+          <button class="action-button action-button--neutral" type="button" @click="createModal?.requestClose()">取消</button>
+        </div>
+      </form>
+    </AppModal>
 
-    <form v-if="editing" data-test="user-edit-form" class="stacked-form" novalidate @submit.prevent="saveEdit">
-      <h2>编辑用户</h2>
-      <label>显示姓名<input v-model="editForm.display_name" data-test="edit-display-name" maxlength="128" required></label>
-      <fieldset>
-        <legend>角色</legend>
-        <label v-for="code in roleCodes" :key="code">
-          <input v-model="editForm.roles" type="checkbox" :value="code" :data-test="`edit-role-${code}`">
-          {{ displayText(ROLE_LABELS, code) }}
+    <AppModal ref="editModal" :model-value="Boolean(editing)" title="编辑用户" description="调整用户显示姓名、角色和启用状态。" width="680px" :busy="saving" :dirty="() => editGuard.dirty.value" :error="errorMessage" @update:model-value="editing = $event ? editing : null">
+      <form v-if="editing" data-test="user-edit-form" class="stacked-form" novalidate @submit.prevent="saveEdit">
+        <label>显示姓名<input v-model="editForm.display_name" data-test="edit-display-name" maxlength="128" required></label>
+        <fieldset>
+          <legend>角色</legend>
+          <label v-for="code in roleCodes" :key="code">
+            <input v-model="editForm.roles" type="checkbox" :value="code" :data-test="`edit-role-${code}`">
+            {{ displayText(ROLE_LABELS, code) }}
+          </label>
+        </fieldset>
+        <label>状态
+          <select v-model="editForm.status" data-test="edit-status">
+            <option value="active">启用</option>
+            <option value="disabled">停用</option>
+          </select>
         </label>
-      </fieldset>
-      <label>状态
-        <select v-model="editForm.status" data-test="edit-status">
-          <option value="active">启用</option>
-          <option value="disabled">停用</option>
-        </select>
-      </label>
-      <p v-if="editing.id === auth.user?.id">不能停用本人或移除本人的系统管理员角色。</p>
-      <button class="action-button action-button--create" type="submit" :disabled="saving">保存修改</button>
-      <button class="action-button action-button--neutral" type="button" @click="editing = null">取消</button>
-    </form>
+        <p v-if="editing.id === auth.user?.id">不能停用本人或移除本人的系统管理员角色。</p>
+        <div class="form-actions">
+          <button class="action-button action-button--create" type="submit" :disabled="saving">保存修改</button>
+          <button class="action-button action-button--neutral" type="button" @click="editModal?.requestClose()">取消</button>
+        </div>
+      </form>
+    </AppModal>
 
-    <form v-if="resetting" data-test="user-reset-form" class="stacked-form" novalidate @submit.prevent="saveReset">
-      <h2>重置密码</h2>
-      <label>新密码<input v-model="resetForm.new_password" data-test="reset-new-password" type="password" autocomplete="new-password" required></label>
-      <label>确认新密码<input v-model="resetForm.password_confirmation" data-test="reset-password-confirmation" type="password" autocomplete="new-password" required></label>
-      <button class="action-button action-button--create" type="submit" :disabled="saving">保存新密码</button>
-      <button class="action-button action-button--neutral" type="button" @click="resetting = null">取消</button>
-    </form>
+    <AppModal ref="resetModal" :model-value="Boolean(resetting)" title="重置密码" description="设置用户的新密码，保存后立即生效。" width="560px" :busy="saving" :dirty="() => resetGuard.dirty.value" :error="errorMessage" @update:model-value="resetting = $event ? resetting : null">
+      <form v-if="resetting" data-test="user-reset-form" class="stacked-form" novalidate @submit.prevent="saveReset">
+        <label>新密码<input v-model="resetForm.new_password" data-test="reset-new-password" type="password" autocomplete="new-password" required></label>
+        <label>确认新密码<input v-model="resetForm.password_confirmation" data-test="reset-password-confirmation" type="password" autocomplete="new-password" required></label>
+        <div class="form-actions">
+          <button class="action-button action-button--create" type="submit" :disabled="saving">保存新密码</button>
+          <button class="action-button action-button--neutral" type="button" @click="resetModal?.requestClose()">取消</button>
+        </div>
+      </form>
+    </AppModal>
 
     <p v-if="loading">正在加载用户…</p>
     <p v-else-if="!errorMessage && users.length === 0">未找到用户。</p>

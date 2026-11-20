@@ -6,6 +6,7 @@ import type {
   AuthorInstitutionLinkUpdate,
   InstitutionSummaryResponse,
 } from '../api/authors'
+import { useDirtyGuard } from '../composables/useDirtyGuard'
 
 const props = withDefaults(defineProps<{
   institutions: InstitutionSummaryResponse[]
@@ -19,6 +20,7 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{
   submit: [payload: AuthorInstitutionLinkCreate | AuthorInstitutionLinkUpdate]
   cancel: []
+  'dirty-change': [dirty: boolean]
 }>()
 
 const form = reactive({
@@ -32,6 +34,8 @@ const form = reactive({
   confirm: false,
 })
 const errorMessage = ref('')
+const guard = useDirtyGuard(() => form)
+watch(guard.dirty, (value) => emit('dirty-change', value), { immediate: true })
 
 watch(() => props.link, (link) => {
   Object.assign(form, {
@@ -44,6 +48,7 @@ watch(() => props.link, (link) => {
     display_order: link?.display_order ?? 0,
     confirm: false,
   })
+  guard.capture()
   errorMessage.value = ''
 }, { immediate: true })
 

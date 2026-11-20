@@ -30,6 +30,8 @@ import {
 import EmailTable from '../../components/EmailTable.vue'
 import InstitutionLinkForm from '../../components/InstitutionLinkForm.vue'
 import AuthorForm from '../../components/AuthorForm.vue'
+import AppModal from '../../components/AppModal.vue'
+import AppConfirmDialog from '../../components/AppConfirmDialog.vue'
 import { getSafeRequestId } from '../../api/client'
 import { useAuthStore } from '../../stores/auth'
 import { AUTHOR_STATUS_LABELS, displayText } from '../../utils/display'
@@ -51,16 +53,24 @@ const institutionMessage = ref('')
 const emailBusy = ref(false)
 const emailTableKey = ref(0)
 const showAffiliationForm = ref(false)
+const affiliationModal = ref<InstanceType<typeof AppModal> | null>(null)
 const affiliationBusy = ref(false)
 const affiliationError = ref('')
 const institutionOptions = ref<InstitutionSummaryResponse[]>([])
 const institutionOptionsLoaded = ref(false)
 const showAuthorForm = ref(false)
+const authorModal = ref<InstanceType<typeof AppModal> | null>(null)
+const authorDirty = ref(false)
 const authorBusy = ref(false)
 const authorMutationError = ref('')
 const editingLink = ref<AuthorInstitutionLinkResponse | null>(null)
 const deletingLinkId = ref<string | null>(null)
 const affiliationDeleteConfirmed = ref(false)
+const affiliationDirty = ref(false)
+const deletingLinkOpen = computed({
+  get: () => deletingLinkId.value !== null,
+  set: (open: boolean) => { if (!open) deletingLinkId.value = null },
+})
 let loadSequence = 0
 
 const effectivePermissions = computed(() => props.permissions ?? rolePermissions(auth.user?.roles ?? []))
@@ -381,14 +391,16 @@ watch([() => props.authorId, effectivePermissions], () => void load(), { immedia
       </dl>
       <button v-if="canManage && !showAuthorForm" class="action-button action-button--edit" type="button" data-test="edit-author" @click="showAuthorForm = true">编辑作者</button>
       <p v-if="authorMutationError" class="form-error" role="alert">{{ authorMutationError }}</p>
-      <AuthorForm
-        v-if="canManage && showAuthorForm"
-        data-test="author-edit-form"
-        :author="author"
-        :submitting="authorBusy"
-        @submit="saveAuthor"
-        @cancel="showAuthorForm = false"
-      />
+      <AppModal ref="authorModal" v-model="showAuthorForm" title="编辑作者" description="更新作者身份资料，保存前请核对变更。" width="720px" :busy="authorBusy" :dirty="() => authorDirty" :error="authorMutationError">
+        <AuthorForm
+          data-test="author-edit-form"
+          :author="author"
+          :submitting="authorBusy"
+          @dirty-change="authorDirty = $event"
+          @submit="saveAuthor"
+          @cancel="authorModal?.requestClose()"
+        />
+      </AppModal>
     </template>
 
     <section aria-labelledby="email-title">
@@ -400,6 +412,7 @@ watch([() => props.authorId, effectivePermissions], () => void load(), { immedia
         :emails="emails"
         :can-manage="canManage"
         :busy="emailBusy"
+        :request-error="emailMessage"
         :suppress-empty-state="Boolean(emailMessage)"
         @create="createEmailBinding"
         @update="updateEmailBinding"
@@ -424,21 +437,31 @@ watch([() => props.authorId, effectivePermissions], () => void load(), { immedia
       </table>
       <button v-if="canManage && !showAffiliationForm" class="action-button action-button--create" type="button" data-test="add-affiliation" @click="openAffiliationForm()">添加单位关联</button>
       <p v-if="affiliationError" class="form-error" role="alert">{{ affiliationError }}</p>
-      <section v-if="canManage && deletingLinkId" class="confirmation-panel" aria-label="确认移除单位关联">
-        <p>确定从该作者移除单位关联吗？此操作需单独确认。</p>
-        <label class="confirmation-control"><input v-model="affiliationDeleteConfirmed" data-test="affiliation-delete-confirm" type="checkbox"> 我确认移除该单位关联。</label>
-        <button class="action-button action-button--danger" type="button" :data-test="`confirm-delete-affiliation-${deletingLinkId}`" :disabled="affiliationBusy" @click="confirmAffiliationDelete">确认移除</button>
-        <button class="action-button action-button--neutral" type="button" @click="deletingLinkId = null">取消</button>
-      </section>
-      <InstitutionLinkForm
-        v-if="canManage && showAffiliationForm"
-        data-test="affiliation-form"
-        :institutions="institutionOptions"
-        :link="editingLink"
-        :submitting="affiliationBusy"
-        @submit="saveAffiliation"
-        @cancel="showAffiliationForm = false"
+      <AppConfirmDialog
+        v-model="deletingLinkOpen"
+        title="移除单位关联"
+        description="该单位将从当前作者的关联资料中移除，历史记录仍会保留。"
+        confirmation-text="我确认移除该单位关联。"
+        confirm-label="确认移除"
+        :confirmed="affiliationDeleteConfirmed"
+        :confirm-test="`confirm-delete-affiliation-${deletingLinkId}`"
+        confirmation-test="affiliation-delete-confirm"
+        :busy="affiliationBusy"
+        :error="affiliationError"
+        @update:confirmed="affiliationDeleteConfirmed = $event"
+        @confirm="confirmAffiliationDelete"
       />
+      <AppModal ref="affiliationModal" v-model="showAffiliationForm" :title="editingLink ? '编辑单位关联' : '添加单位关联'" description="维护作者单位、职务与有效期信息。" width="760px" :busy="affiliationBusy" :dirty="() => affiliationDirty" :error="affiliationError">
+        <InstitutionLinkForm
+          data-test="affiliation-form"
+          :institutions="institutionOptions"
+          :link="editingLink"
+          :submitting="affiliationBusy"
+          @dirty-change="affiliationDirty = $event"
+          @submit="saveAffiliation"
+          @cancel="affiliationModal?.requestClose()"
+        />
+      </AppModal>
     </section>
   </section>
 </template>

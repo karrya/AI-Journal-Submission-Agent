@@ -1,4 +1,5 @@
 import { flushPromises, mount } from '@vue/test-utils'
+import { ElMessageBox } from 'element-plus'
 import type { AxiosAdapter, AxiosResponse, InternalAxiosRequestConfig } from 'axios'
 import { createPinia, setActivePinia } from 'pinia'
 import { api } from '../../api/client'
@@ -19,7 +20,7 @@ const author = {
   created_at: '2026-11-01T00:00:00Z', updated_at: '2026-11-01T00:00:00Z',
 }
 const emptyPage = { items: [], page: 1, page_size: 20, total: 0 }
-const stubs = { RouterLink: { template: '<a><slot /></a>' } }
+const stubs = { RouterLink: { template: '<a><slot /></a>' }, teleport: true, transition: false }
 
 describe('AuthorListView', () => {
   let adapter: ReturnType<typeof vi.fn<AxiosAdapter>>
@@ -68,6 +69,8 @@ describe('AuthorListView', () => {
     await flushPromises()
     expect(wrapper.text()).toContain('未找到作者')
     await wrapper.get('[data-test="add-author"]').trigger('click')
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
+    await flushPromises()
     await wrapper.get('[data-test="display-name"]').setValue('New Author')
     await wrapper.get('[data-test="identity-confirm"]').setValue(true)
     await wrapper.get('[data-test="author-create-form"]').trigger('submit')
@@ -79,6 +82,27 @@ describe('AuthorListView', () => {
       display_name: 'New Author', confirm_identity_change: true,
     })
     expectSaveSuccessToast()
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+  })
+
+  it('routes the form cancel button through the dirty-close guard', async () => {
+    const confirm = vi.spyOn(ElMessageBox, 'confirm').mockRejectedValue('cancel')
+    adapter.mockImplementation(async (config) => success(config, emptyPage))
+    const wrapper = mountList()
+    await flushPromises()
+    await wrapper.get('[data-test="add-author"]').trigger('click')
+    await wrapper.get('[data-test="display-name"]').setValue('Unsaved Author')
+
+    await wrapper.get('[data-test="author-create-form"] button[type="button"]').trigger('click')
+    await flushPromises()
+
+    expect(confirm).toHaveBeenCalledWith(
+      '关闭后将丢失未保存的修改。',
+      '放弃未保存的修改？',
+      expect.objectContaining({ confirmButtonText: '放弃修改' }),
+    )
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
+    confirm.mockRestore()
   })
 
   it('requires separate confirmation before soft-deleting an author', async () => {
@@ -88,6 +112,7 @@ describe('AuthorListView', () => {
     const wrapper = mountList()
     await flushPromises()
     await wrapper.get('[data-test="delete-author-a1"]').trigger('click')
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
     await wrapper.get('[data-test="confirm-delete-author-a1"]').trigger('click')
     expect(adapter.mock.calls.some(([config]) => config.method === 'delete')).toBe(false)
 
@@ -95,6 +120,7 @@ describe('AuthorListView', () => {
     await wrapper.get('[data-test="confirm-delete-author-a1"]').trigger('click')
     await flushPromises()
     expect(adapter.mock.calls.some(([config]) => config.method === 'delete' && config.url === '/authors/a1')).toBe(true)
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
   })
 
   it('manages institutions from paginated summaries with confirmed soft delete', async () => {

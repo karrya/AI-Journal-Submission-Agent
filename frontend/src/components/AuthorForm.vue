@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { reactive, ref, watch } from 'vue'
 import type { AuthorCreate, AuthorResponse, AuthorUpdate } from '../api/authors'
+import { useDirtyGuard } from '../composables/useDirtyGuard'
 
 const props = withDefaults(defineProps<{
   author?: AuthorResponse | null
@@ -13,6 +14,7 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{
   submit: [payload: AuthorCreate | AuthorUpdate]
   cancel: []
+  'dirty-change': [dirty: boolean]
 }>()
 
 interface FormState {
@@ -43,6 +45,8 @@ const emptyForm = (): FormState => ({
 
 const form = reactive<FormState>(emptyForm())
 const errorMessage = ref('')
+const guard = useDirtyGuard(() => form)
+watch(guard.dirty, (value) => emit('dirty-change', value), { immediate: true })
 type OptionalAuthorField =
   | 'given_name'
   | 'middle_name'
@@ -72,6 +76,7 @@ watch(() => props.author, (author) => {
     status: author?.status ?? 'active',
     notes: author?.notes ?? '',
   })
+  guard.capture()
   errorMessage.value = ''
 }, { immediate: true })
 

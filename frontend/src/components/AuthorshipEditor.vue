@@ -6,6 +6,7 @@ import type {
   ManuscriptAuthorInput,
   ManuscriptAuthorsUpdate,
 } from '../api/manuscripts'
+import { useDirtyGuard } from '../composables/useDirtyGuard'
 
 const props = withDefaults(defineProps<{
   modelValue: ManuscriptAuthor[]
@@ -16,12 +17,19 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   submit: [payload: ManuscriptAuthorsUpdate]
+  'dirty-change': [dirty: boolean]
 }>()
 
 const rows = ref<ManuscriptAuthor[]>([])
 const selectedAuthorId = ref('')
 const confirmed = ref(false)
 const error = ref('')
+const guard = useDirtyGuard(() => ({
+  rows: rows.value,
+  selectedAuthorId: selectedAuthorId.value,
+  confirmed: confirmed.value,
+}))
+watch(guard.dirty, (value) => emit('dirty-change', value), { immediate: true })
 
 watch(
   () => props.modelValue,
@@ -30,6 +38,7 @@ watch(
     rows.value = value
       .map((author) => ({ ...author }))
       .sort((left, right) => left.position - right.position)
+    guard.capture()
   },
   { immediate: true, deep: true },
 )

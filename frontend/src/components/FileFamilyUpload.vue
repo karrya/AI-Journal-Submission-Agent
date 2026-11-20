@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import axios from 'axios'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { getSafeRequestId } from '../api/client'
 import {
   FILE_TYPES,
@@ -9,6 +9,7 @@ import {
   type ManuscriptFile,
 } from '../api/files'
 import { displayText, FILE_TYPE_LABELS } from '../utils/display'
+import { useDirtyGuard } from '../composables/useDirtyGuard'
 
 const props = defineProps<{
   manuscriptId: string
@@ -19,6 +20,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   uploaded: [file: ManuscriptFile]
   refresh: []
+  'dirty-change': [dirty: boolean]
+  'busy-change': [busy: boolean]
 }>()
 
 const existingMode = ref(false)
@@ -31,6 +34,15 @@ const progress = ref<number | null>(null)
 const error = ref('')
 const conflict = ref(false)
 const successMessage = ref('')
+const guard = useDirtyGuard(() => ({
+  existingMode: existingMode.value,
+  selectedFamilyId: selectedFamilyId.value,
+  fileType: fileType.value,
+  displayName: displayName.value,
+  selectedFileName: selectedFile.value?.name ?? '',
+}))
+watch(guard.dirty, (value) => emit('dirty-change', value), { immediate: true })
+watch(uploading, (value) => emit('busy-change', value), { immediate: true })
 
 const families = computed(() => {
   const unique = new Map<string, ManuscriptFile>()
@@ -104,7 +116,7 @@ async function submit(): Promise<void> {
 </script>
 
 <template>
-  <form class="stacked-form" novalidate @submit.prevent="submit">
+  <form class="stacked-form" data-test="file-upload-form" novalidate @submit.prevent="submit">
     <label class="confirmation-control">
       <input v-model="existingMode" data-test="existing-family-mode" type="checkbox" :disabled="families.length === 0">
       向现有文件族上传新版本

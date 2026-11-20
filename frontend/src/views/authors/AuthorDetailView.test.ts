@@ -63,7 +63,7 @@ function linkRecord() {
   }
 }
 
-const stubs = { RouterLink: { template: '<a><slot /></a>' } }
+const stubs = { RouterLink: { template: '<a><slot /></a>' }, teleport: true, transition: false }
 
 describe('AuthorDetailView', () => {
   let adapter: ReturnType<typeof vi.fn<AxiosAdapter>>
@@ -163,6 +163,8 @@ describe('AuthorDetailView', () => {
     })
     const wrapper = mount(AuthorDetailView, { global: { stubs }, props: { authorId: 'a1' } })
     await flushPromises()
+    await wrapper.get('[data-test="add-email"]').trigger('click')
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
     await wrapper.get('[data-test="new-email"]').setValue(address('new'))
     await wrapper.get('[data-test="create-email-confirm"]').setValue(true)
     await wrapper.get('[data-test="create-email-form"]').trigger('submit')
@@ -176,6 +178,26 @@ describe('AuthorDetailView', () => {
     })
     expect(adapter.mock.calls.filter(([config]) => config.url === '/authors/a1/emails' && config.method === 'get')).toHaveLength(2)
     expectSaveSuccessToast()
+  })
+
+  it('shows email API failures inside the open create dialog', async () => {
+    adapter.mockImplementation(async (config) => {
+      if (config.url === '/authors/a1' && config.method === 'get') return success(config, author('a1', 'Email Author'))
+      if (config.url === '/authors/a1/emails' && config.method === 'post') throw new Error('create failed')
+      if (config.url?.endsWith('/emails') || config.url?.endsWith('/institutions')) return success(config, emptyPage)
+      throw new Error(`Unexpected request: ${config.method} ${config.url}`)
+    })
+    const wrapper = mount(AuthorDetailView, { global: { stubs }, props: { authorId: 'a1' } })
+    await flushPromises()
+    await wrapper.get('[data-test="add-email"]').trigger('click')
+    await wrapper.get('[data-test="new-email"]').setValue(address('failed'))
+    await wrapper.get('[data-test="create-email-confirm"]').setValue(true)
+    await wrapper.get('[data-test="create-email-form"]').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
+    expect(wrapper.get('[role="alert"]').text()).toContain('无法创建邮箱绑定')
+    expect((wrapper.get('[data-test="new-email"]').element as HTMLInputElement).value).toBe(address('failed'))
   })
 
   it('loads summary institutions on demand and creates a confirmed affiliation', async () => {
@@ -364,6 +386,7 @@ describe('AuthorDetailView', () => {
     })
     const wrapper = mount(AuthorDetailView, { global: { stubs }, props: { authorId: 'a1' } })
     await flushPromises()
+    await wrapper.get('[data-test="add-email"]').trigger('click')
     await wrapper.get('[data-test="new-email"]').setValue(address('new-a'))
     await wrapper.get('[data-test="create-email-confirm"]').setValue(true)
     await wrapper.get('[data-test="create-email-form"]').trigger('submit')

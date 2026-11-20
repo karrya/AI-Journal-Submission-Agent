@@ -17,19 +17,6 @@ export interface RegistrationPublisher {
   updated_at: string
 }
 
-export interface RegistrationPlatform {
-  id: string
-  adapter_code: string
-  adapter_name: string
-  platform_type: string
-  adapter_version: string
-  support_status: RegistrationSupportStatus
-  allowed_domains: string[]
-  last_verified_at: string | null
-  created_at: string
-  updated_at: string
-}
-
 export interface RegistrationTask {
   id: string
   author_id: string
@@ -62,24 +49,6 @@ export interface RegistrationTaskQuery {
   created_to?: string
 }
 
-export interface PublisherAccount {
-  id: string
-  author_id: string
-  publisher_id: string
-  journal_id: string | null
-  platform_code: string
-  account_namespace: string
-  account_email: string
-  platform_account_id: string | null
-  username: string | null
-  account_status: string
-  email_verified_at: string | null
-  registered_at: string | null
-  last_checked_at: string | null
-  created_at: string
-  updated_at: string
-}
-
 export async function getRegistrationPublishers(): Promise<RegistrationPublisher[]> {
   const response = await api.get<{ items: RegistrationPublisher[] }>('/registration/publishers')
   return response.data.items
@@ -89,11 +58,6 @@ export async function getRegistrationJournals(publisherId: string): Promise<Jour
   const response = await api.get<{ items: JournalOption[] }>(
     `/registration/publishers/${encodeURIComponent(publisherId)}/journals`,
   )
-  return response.data.items
-}
-
-export async function getRegistrationPlatforms(): Promise<RegistrationPlatform[]> {
-  const response = await api.get<{ items: RegistrationPlatform[] }>('/registration/platform-adapters')
   return response.data.items
 }
 
@@ -122,12 +86,5 @@ export async function retryRegistrationTask(taskId: string): Promise<Registratio
   const response = await api.post<RegistrationTask>(
     `/registration/tasks/${encodeURIComponent(taskId)}/retry`,
   )
-  return response.data
-}
-
-export async function getPublisherAccounts(): Promise<Page<PublisherAccount>> {
-  const response = await api.get<Page<PublisherAccount>>('/publisher-accounts', {
-    params: { page: 1, page_size: 100 },
-  })
   return response.data
 }

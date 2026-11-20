@@ -18,6 +18,8 @@ import {
 import { fetchAllPages } from '../../api/pagination'
 import AuthorshipEditor from '../../components/AuthorshipEditor.vue'
 import FileFamilyUpload from '../../components/FileFamilyUpload.vue'
+import AppModal from '../../components/AppModal.vue'
+import { useDirtyGuard } from '../../composables/useDirtyGuard'
 import { useAuthStore } from '../../stores/auth'
 import {
   displayText,
@@ -51,6 +53,15 @@ const versionBusy = ref(false)
 const versionError = ref('')
 const versionLabel = ref('')
 const versionNote = ref('')
+const showMetadata = ref(false)
+const metadataModal = ref<InstanceType<typeof AppModal> | null>(null)
+const showAuthorship = ref(false)
+const showVersion = ref(false)
+const versionModal = ref<InstanceType<typeof AppModal> | null>(null)
+const showUpload = ref(false)
+const authorshipDirty = ref(false)
+const uploadDirty = ref(false)
+const uploadBusy = ref(false)
 const downloadingId = ref<string | null>(null)
 const fileError = ref('')
 let loadSequence = 0
@@ -62,6 +73,11 @@ const metadata = reactive({
   conflict_of_interest_statement: '', ethics_statement: '',
   data_availability_statement: '', notes: '',
 })
+const metadataGuard = useDirtyGuard(() => metadata)
+const versionGuard = useDirtyGuard(() => ({
+  label: versionLabel.value,
+  note: versionNote.value,
+}))
 
 function safeError(error: unknown, fallback: string): string {
   const requestId = getSafeRequestId(error)
@@ -92,6 +108,7 @@ function syncMetadata(value: Manuscript): void {
     data_availability_statement: value.data_availability_statement ?? '',
     notes: value.notes ?? '',
   })
+  metadataGuard.capture()
 }
 
 async function loadCurrentVersion(sequence: number, manuscriptId: string, versionId: string | null): Promise<void> {
@@ -125,6 +142,10 @@ function clearWorkspace(): void {
   authorshipError.value = ''
   versionError.value = ''
   fileError.value = ''
+  showMetadata.value = false
+  showAuthorship.value = false
+  showVersion.value = false
+  showUpload.value = false
 }
 
 async function loadWorkspace(): Promise<void> {
@@ -182,6 +203,12 @@ async function refreshCurrentWorkspace(): Promise<void> {
   } finally {
     if (isCurrent(sequence)) loading.value = false
   }
+}
+
+async function uploaded(): Promise<void> {
+  if (!canManage.value) return
+  showUpload.value = false
+  await refreshCurrentWorkspace()
 }
 
 function nullable(value: string): string | null {
@@ -242,6 +269,7 @@ async function saveMetadata(): Promise<void> {
       updated_at: result.updated_at,
     }
     syncMetadata(result)
+    showMetadata.value = false
     showSaveSuccess()
   } catch (error) {
     if (isCurrent(sequence)) metadataError.value = safeError(error, '无法更新稿件元数据。')
@@ -262,6 +290,7 @@ async function saveAuthorship(payload: ManuscriptAuthorsUpdate): Promise<void> {
     if (!isCurrent(sequence) || !manuscript.value) return
     manuscript.value = { ...manuscript.value, authors }
     authorshipFormKey.value += 1
+    showAuthorship.value = false
     showSaveSuccess()
   } catch (error) {
     if (isCurrent(sequence)) authorshipError.value = safeError(error, '无法更新作者名单。')
@@ -288,6 +317,8 @@ async function saveVersion(): Promise<void> {
     }
     versionLabel.value = ''
     versionNote.value = ''
+    versionGuard.capture()
+    showVersion.value = false
     await loadWorkspace()
   } catch (error) {
     versionError.value = safeError(error, '稿件版本可能已创建，请刷新后重试。')
@@ -327,6 +358,16 @@ async function download(file: ManuscriptFile): Promise<void> {
   }
 }
 
+watch(canManage, (allowed) => {
+  if (allowed) return
+  showMetadata.value = false
+  showAuthorship.value = false
+  showVersion.value = false
+  showUpload.value = false
+  uploadBusy.value = false
+  uploadDirty.value = false
+})
+
 watch(() => props.manuscriptId, () => {
   clearWorkspace()
   void loadWorkspace()
@@ -349,7 +390,8 @@ watch(() => props.manuscriptId, () => {
 
       <section aria-labelledby="working-metadata-title">
         <h2 id="working-metadata-title">工作元数据</h2>
-        <form v-if="canManage && manuscript.status !== 'archived'" data-test="metadata-form" class="stacked-form" novalidate @submit.prevent="saveMetadata">
+        <AppModal ref="metadataModal" v-model="showMetadata" title="编辑工作元数据" description="修改当前工作元数据，不会改变已有不可变快照。" width="960px" :busy="metadataBusy" :dirty="() => metadataGuard.dirty.value" :error="metadataError">
+          <form data-test="metadata-form" class="stacked-form" novalidate @submit.prevent="saveMetadata">
           <div class="form-grid">
             <label>标题<input v-model="metadata.title" data-test="metadata-title" maxlength="1000" required></label>
             <label>文章类型<input v-model="metadata.article_type" maxlength="100" required></label>
@@ -370,9 +412,14 @@ watch(() => props.manuscriptId, () => {
           <label>数据可用性声明<textarea v-model="metadata.data_availability_statement" rows="3"></textarea></label>
           <label>备注<textarea v-model="metadata.notes" rows="3"></textarea></label>
           <p v-if="metadataError" class="form-error" role="alert">{{ metadataError }}</p>
-          <button class="action-button action-button--create" type="submit" :disabled="metadataBusy">保存工作元数据</button>
+          <div class="form-actions">
+            <button class="action-button action-button--create" type="submit" :disabled="metadataBusy">保存工作元数据</button>
+            <button class="action-button action-button--neutral" type="button" @click="metadataModal?.requestClose()">取消</button>
+          </div>
         </form>
-        <dl v-else class="detail-grid">
+        </AppModal>
+        <button v-if="canManage && manuscript.status !== 'archived'" class="action-button action-button--edit" data-test="edit-metadata" type="button" @click="showMetadata = true">编辑元数据</button>
+        <dl v-if="!showMetadata" class="detail-grid">
           <div><dt>标题</dt><dd>{{ manuscript.title }}</dd></div>
           <div><dt>摘要</dt><dd>{{ manuscript.abstract }}</dd></div>
           <div><dt>关键词</dt><dd>{{ manuscript.keywords.join(', ') || '—' }}</dd></div>
@@ -390,33 +437,41 @@ watch(() => props.manuscriptId, () => {
       <section aria-labelledby="authorship-title">
         <h2 id="authorship-title">作者名单及顺序</h2>
         <p>仅提交作者 ID、位置和通讯作者标记，显示姓名为只读。</p>
-        <AuthorshipEditor
-          v-if="canManage && manuscript.status !== 'archived'"
-          :key="authorshipFormKey"
-          data-test="authorship-form"
-          :model-value="manuscript.authors"
-          :owner-author-id="manuscript.owner_author_id"
-          :available-authors="authorOptions"
-          :submitting="authorshipBusy"
-          @submit="saveAuthorship"
-        />
-        <ol v-else>
+        <button v-if="canManage && manuscript.status !== 'archived'" class="action-button action-button--edit" data-test="edit-authorship" type="button" @click="showAuthorship = true">编辑作者名单</button>
+        <ol v-if="!showAuthorship" class="authorship-list">
           <li v-for="author in manuscript.authors" :key="author.author_id">
             {{ author.position }}. {{ author.display_name }}<span v-if="author.is_corresponding"> · 通讯作者</span>
           </li>
         </ol>
+        <AppModal v-model="showAuthorship" title="编辑作者名单" description="调整共同作者、排列顺序和通讯作者，所有者必须保留。" width="860px" :busy="authorshipBusy" :dirty="() => authorshipDirty" :error="authorshipError">
+          <AuthorshipEditor
+            :key="authorshipFormKey"
+            data-test="authorship-form"
+            :model-value="manuscript.authors"
+            :owner-author-id="manuscript.owner_author_id"
+            :available-authors="authorOptions"
+            :submitting="authorshipBusy"
+            @dirty-change="authorshipDirty = $event"
+            @submit="saveAuthorship"
+          />
+        </AppModal>
         <p v-if="authorshipError" class="form-error" role="alert">{{ authorshipError }}</p>
       </section>
 
-      <section v-if="canManage && manuscript.status !== 'archived'" aria-labelledby="new-version-title">
+      <section aria-labelledby="new-version-title">
         <h2 id="new-version-title">创建不可变稿件版本</h2>
         <p>创建版本会为当前工作元数据和作者名单生成快照，现有快照永不更改。</p>
-        <form data-test="version-form" class="stacked-form" @submit.prevent="saveVersion">
-          <label>版本标签<input v-model="versionLabel" data-test="version-label" maxlength="100"></label>
-          <label>变更说明<textarea v-model="versionNote" rows="3"></textarea></label>
-          <button class="action-button action-button--create" type="submit" :disabled="versionBusy">创建新稿件版本</button>
-        </form>
-        <p v-if="versionError" class="form-error" role="alert">{{ versionError }}</p>
+        <button v-if="canManage && manuscript.status !== 'archived'" class="action-button action-button--create" data-test="create-version" type="button" @click="showVersion = true">创建新稿件版本</button>
+        <AppModal ref="versionModal" v-model="showVersion" title="创建不可变稿件版本" description="为当前工作元数据和作者名单生成新的不可变快照。" width="620px" :busy="versionBusy" :dirty="() => versionGuard.dirty.value" :error="versionError">
+          <form data-test="version-form" class="stacked-form" @submit.prevent="saveVersion">
+            <label>版本标签<input v-model="versionLabel" data-test="version-label" maxlength="100"></label>
+            <label>变更说明<textarea v-model="versionNote" rows="3"></textarea></label>
+            <div class="form-actions">
+              <button class="action-button action-button--create" type="submit" :disabled="versionBusy">创建新稿件版本</button>
+              <button class="action-button action-button--neutral" type="button" @click="versionModal?.requestClose()">取消</button>
+            </div>
+          </form>
+        </AppModal>
       </section>
 
       <section data-test="snapshot-history" aria-labelledby="snapshot-history-title">
@@ -455,14 +510,19 @@ watch(() => props.manuscriptId, () => {
       <section data-test="current-files" aria-labelledby="current-files-title">
         <h2 id="current-files-title">当前版本文件</h2>
         <p v-if="fileError" class="form-error" role="alert">{{ fileError }}</p>
-        <FileFamilyUpload
-          v-if="currentVersion && currentVersion.id === manuscript.current_version_id && canManage && manuscript.status !== 'archived'"
-          :manuscript-id="manuscript.id"
-          :version-id="currentVersion.id"
-          :current-files="currentFiles"
-          @uploaded="refreshCurrentWorkspace"
-          @refresh="refreshCurrentWorkspace"
-        />
+        <button v-if="currentVersion && currentVersion.id === manuscript.current_version_id && canManage && manuscript.status !== 'archived'" class="action-button action-button--create" data-test="upload-file" type="button" @click="showUpload = true">上传文件</button>
+        <AppModal v-model="showUpload" title="上传稿件文件" description="创建新文件族或向现有文件族上传新版本。" width="720px" :busy="() => uploadBusy" :dirty="() => uploadDirty" :error="fileError">
+          <FileFamilyUpload
+            v-if="currentVersion && currentVersion.id === manuscript.current_version_id && canManage && manuscript.status !== 'archived'"
+            :manuscript-id="manuscript.id"
+            :version-id="currentVersion.id"
+            :current-files="currentFiles"
+            @dirty-change="uploadDirty = $event"
+            @busy-change="uploadBusy = $event"
+            @uploaded="uploaded"
+            @refresh="refreshCurrentWorkspace"
+          />
+        </AppModal>
         <p v-if="!currentVersion">请先刷新稿件，再管理文件。</p>
         <p v-else-if="currentFiles.length === 0">当前版本暂无文件。</p>
         <table v-else>

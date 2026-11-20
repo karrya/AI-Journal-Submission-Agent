@@ -2,23 +2,16 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import {
   createJournal,
-  createPlatform,
   createPublisher,
   deleteJournal,
-  deletePlatform,
   deletePublisher,
-  listAllPlatforms,
   listAllPublishers,
   listJournals,
-  listPlatforms,
   listPublishers,
   updateJournal,
-  updatePlatform,
   updatePublisher,
   type JournalListQuery,
-  type JournalPlatformResponse,
   type JournalResponse,
-  type PlatformListQuery,
   type PublisherListQuery,
   type PublisherResponse,
 } from '../../api/journals'
@@ -33,10 +26,13 @@ import {
   RESOURCE_KIND_LABELS,
 } from '../../utils/display'
 import { showSaveSuccess } from '../../utils/feedback'
+import AppModal from '../../components/AppModal.vue'
+import AppConfirmDialog from '../../components/AppConfirmDialog.vue'
+import { useDirtyGuard } from '../../composables/useDirtyGuard'
 
 const auth = useAuthStore()
 const isAdmin = computed(() => auth.user?.roles.includes('system_admin') ?? false)
-const activeTab = ref<'publishers' | 'platforms' | 'journals' | 'identification'>('publishers')
+const activeTab = ref<'publishers' | 'journals' | 'identification'>('publishers')
 const errorMessage = ref('')
 const busy = ref(false)
 
@@ -45,30 +41,23 @@ const publisherTotal = ref(0)
 const publisherLoading = ref(false)
 const publisherQuery = reactive({ page: 1, page_size: 20, name: '', sort: 'name' as NonNullable<PublisherListQuery['sort']>, order: 'asc' as SortOrder })
 const showPublisherForm = ref(false)
+const publisherModal = ref<InstanceType<typeof AppModal> | null>(null)
 const editingPublisherId = ref<string | null>(null)
 const publisherForm = reactive({ name: '', website_url: '', notes: '' })
+const publisherGuard = useDirtyGuard(() => publisherForm)
 let publisherSequence = 0
-
-const platforms = ref<JournalPlatformResponse[]>([])
-const platformTotal = ref(0)
-const platformLoading = ref(false)
-const platformQuery = reactive({ page: 1, page_size: 20, name: '', sort: 'code' as NonNullable<PlatformListQuery['sort']>, order: 'asc' as SortOrder })
-const showPlatformForm = ref(false)
-const editingPlatformId = ref<string | null>(null)
-const platformForm = reactive({ code: '', name: '', description: '', status: 'active' as 'active' | 'needs_review' | 'disabled' })
-let platformSequence = 0
 
 const journals = ref<JournalResponse[]>([])
 const journalTotal = ref(0)
 const journalLoading = ref(false)
 const journalQuery = reactive({ page: 1, page_size: 20, name: '', sort: 'name' as NonNullable<JournalListQuery['sort']>, order: 'asc' as SortOrder })
 const showJournalForm = ref(false)
+const journalModal = ref<InstanceType<typeof AppModal> | null>(null)
 const editingJournalId = ref<string | null>(null)
 const publisherOptions = ref<Array<{ id: string; name?: string }>>([])
-const platformOptions = ref<Array<{ id: string; name?: string; code?: string }>>([])
 const journalForm = reactive({
   publisher_id: '',
-  platform_id: '',
+  platform_code: '',
   name: '',
   issn: '',
   eissn: '',
@@ -83,10 +72,18 @@ const journalForm = reactive({
   status: 'active',
   notes: '',
 })
+const journalGuard = useDirtyGuard(() => journalForm)
 let journalSequence = 0
 
-const deleteTarget = ref<{ kind: 'publisher' | 'platform' | 'journal'; id: string } | null>(null)
+const deleteTarget = ref<{ kind: 'publisher' | 'journal'; id: string } | null>(null)
 const deleteConfirmed = ref(false)
+const deleteDialogOpen = computed({
+  get: () => deleteTarget.value !== null,
+  set: (open: boolean) => { if (!open) deleteTarget.value = null },
+})
+const deleteDescription = computed(() => (
+  `该${displayText(RESOURCE_KIND_LABELS, deleteTarget.value?.kind ?? '')}将从在用列表中移除，历史记录仍会保留。`
+))
 
 function safeError(error: unknown, fallback: string): string {
   const requestId = getSafeRequestId(error)
@@ -131,6 +128,7 @@ function publisherSortChanged(): void {
 function openPublisherForm(publisher?: PublisherResponse): void {
   editingPublisherId.value = publisher?.id ?? null
   Object.assign(publisherForm, { name: publisher?.name ?? '', website_url: publisher?.website_url ?? '', notes: publisher?.notes ?? '' })
+  publisherGuard.capture()
   showPublisherForm.value = true
   errorMessage.value = ''
 }
@@ -158,71 +156,6 @@ async function savePublisher(): Promise<void> {
     showSaveSuccess()
   } catch (error) {
     errorMessage.value = safeError(error, '无法保存出版商。')
-  } finally {
-    busy.value = false
-  }
-}
-
-async function loadPlatforms(): Promise<void> {
-  const sequence = ++platformSequence
-  platformLoading.value = true
-  errorMessage.value = ''
-  try {
-    const result = await listPlatforms({ ...platformQuery, name: platformQuery.name.trim() || undefined })
-    if (sequence !== platformSequence) return
-    platforms.value = result.items
-    platformTotal.value = result.total
-  } catch (error) {
-    if (sequence !== platformSequence) return
-    platforms.value = []
-    platformTotal.value = 0
-    errorMessage.value = safeError(error, '无法加载平台。')
-  } finally {
-    if (sequence === platformSequence) platformLoading.value = false
-  }
-}
-
-function platformPage(page: number): void {
-  if (platformLoading.value || page < 1 || (page - 1) * platformQuery.page_size >= platformTotal.value) return
-  platformQuery.page = page
-  void loadPlatforms()
-}
-
-function platformSortChanged(): void {
-  platformQuery.page = 1
-  void loadPlatforms()
-}
-
-function openPlatformForm(platform?: JournalPlatformResponse): void {
-  editingPlatformId.value = platform?.id ?? null
-  Object.assign(platformForm, {
-    code: platform?.code ?? '', name: platform?.name ?? '', description: platform?.description ?? '', status: platform?.status ?? 'active',
-  })
-  showPlatformForm.value = true
-  errorMessage.value = ''
-}
-
-async function savePlatform(): Promise<void> {
-  if (busy.value) return
-  if (!platformForm.code.trim() || !platformForm.name.trim()) {
-    errorMessage.value = '请填写平台代码和名称。'
-    return
-  }
-  busy.value = true
-  errorMessage.value = ''
-  const payload = {
-    code: platformForm.code.trim(), name: platformForm.name.trim(),
-    description: platformForm.description, status: platformForm.status,
-  }
-  try {
-    if (editingPlatformId.value) await updatePlatform(editingPlatformId.value, payload)
-    else await createPlatform(payload)
-    showPlatformForm.value = false
-    editingPlatformId.value = null
-    await loadPlatforms()
-    showSaveSuccess()
-  } catch (error) {
-    errorMessage.value = safeError(error, '无法保存平台。')
   } finally {
     busy.value = false
   }
@@ -267,7 +200,7 @@ function toInputDate(value: string): string {
 async function openJournalForm(journal?: JournalResponse): Promise<void> {
   editingJournalId.value = journal?.id ?? null
   Object.assign(journalForm, {
-    publisher_id: journal?.publisher_id ?? '', platform_id: journal?.platform_id ?? '', name: journal?.name ?? '',
+    publisher_id: journal?.publisher_id ?? '', platform_code: journal?.platform_code ?? '', name: journal?.name ?? '',
     issn: journal?.issn ?? '', eissn: journal?.eissn ?? '', website_url: journal?.website_url ?? '',
     submission_url: journal?.submission_url ?? '', author_guidelines_url: journal?.author_guidelines_url ?? '',
     subject_categories: journal?.subject_categories.join(', ') ?? '', article_types: journal?.article_types.join(', ') ?? '',
@@ -281,26 +214,17 @@ async function openJournalForm(journal?: JournalResponse): Promise<void> {
     requirements_verified_at: journal?.requirements_verified_at ? toInputDate(journal.requirements_verified_at) : '',
     status: journal?.status ?? 'active', notes: journal?.notes ?? '',
   })
+  journalGuard.capture()
   showJournalForm.value = true
   errorMessage.value = ''
   try {
-    const [publisherItems, platformItems] = await Promise.all([
-      listAllPublishers(),
-      listAllPlatforms(),
-    ])
-    const publisherChoices: Array<{ id: string; name?: string }> = [...publisherItems]
-    const platformChoices: Array<{ id: string; name?: string; code?: string }> = [...platformItems]
+    const publisherChoices: Array<{ id: string; name?: string }> = await listAllPublishers()
     if (journal && !publisherChoices.some((option) => option.id === journal.publisher_id)) {
       publisherChoices.unshift({ id: journal.publisher_id })
     }
-    if (journal?.platform_id && !platformChoices.some((option) => option.id === journal.platform_id)) {
-      platformChoices.unshift({ id: journal.platform_id })
-    }
     publisherOptions.value = publisherChoices
-    platformOptions.value = platformChoices
   } catch (error) {
     publisherOptions.value = journal ? [{ id: journal.publisher_id }] : []
-    platformOptions.value = journal?.platform_id ? [{ id: journal.platform_id }] : []
     errorMessage.value = safeError(error, '无法加载期刊关联选项。')
   }
 }
@@ -381,7 +305,7 @@ async function saveJournal(): Promise<void> {
   }
   const payload = {
     publisher_id: journalForm.publisher_id,
-    platform_id: journalForm.platform_id || null,
+    platform_code: journalForm.platform_code || null,
     name: journalForm.name.trim(),
     issn: nullable(journalForm.issn), eissn: nullable(journalForm.eissn),
     website_url: nullable(journalForm.website_url), submission_url: nullable(journalForm.submission_url),
@@ -411,7 +335,7 @@ async function saveJournal(): Promise<void> {
   }
 }
 
-function requestDelete(kind: 'publisher' | 'platform' | 'journal', id: string): void {
+function requestDelete(kind: 'publisher' | 'journal', id: string): void {
   deleteTarget.value = { kind, id }
   deleteConfirmed.value = false
   errorMessage.value = ''
@@ -430,9 +354,6 @@ async function confirmDelete(): Promise<void> {
     if (kind === 'publisher') {
       await deletePublisher(id)
       await loadPublishers()
-    } else if (kind === 'platform') {
-      await deletePlatform(id)
-      await loadPlatforms()
     } else {
       await deleteJournal(id)
       await loadJournals()
@@ -445,12 +366,11 @@ async function confirmDelete(): Promise<void> {
   }
 }
 
-function selectTab(tab: 'publishers' | 'platforms' | 'journals' | 'identification'): void {
+function selectTab(tab: 'publishers' | 'journals' | 'identification'): void {
   activeTab.value = tab
   deleteTarget.value = null
   errorMessage.value = ''
   if (tab === 'publishers') void loadPublishers()
-  else if (tab === 'platforms') void loadPlatforms()
   else if (tab === 'journals') void loadJournals()
 }
 
@@ -469,10 +389,9 @@ onMounted(() => void loadPublishers())
 
 <template>
   <section class="management-page" aria-labelledby="journal-resources-title">
-    <h1 id="journal-resources-title">出版商、平台和期刊</h1>
+    <h1 id="journal-resources-title">出版商和期刊</h1>
     <div class="tabs" role="tablist" aria-label="期刊资源">
       <button type="button" role="tab" data-test="publishers-tab" :aria-selected="activeTab === 'publishers'" @click="selectTab('publishers')">出版商</button>
-      <button type="button" role="tab" data-test="platforms-tab" :aria-selected="activeTab === 'platforms'" @click="selectTab('platforms')">平台</button>
       <button type="button" role="tab" data-test="journals-tab" :aria-selected="activeTab === 'journals'" @click="selectTab('journals')">期刊</button>
       <button type="button" role="tab" data-test="identification-tab" :aria-selected="activeTab === 'identification'" @click="selectTab('identification')">识别</button>
     </div>
@@ -486,42 +405,23 @@ onMounted(() => void loadPublishers())
         <label>顺序<select v-model="publisherQuery.order" @change="publisherSortChanged"><option value="asc">升序</option><option value="desc">降序</option></select></label>
         <button v-if="isAdmin" class="action-button action-button--create" type="button" data-test="add-publisher" @click="openPublisherForm()">添加出版商</button>
       </div>
-      <form v-if="showPublisherForm" data-test="publisher-form" class="stacked-form" novalidate @submit.prevent="savePublisher">
-        <h2>{{ editingPublisherId ? '编辑出版商' : '添加出版商' }}</h2>
-        <label>名称<input v-model="publisherForm.name" data-test="publisher-name" required maxlength="255"></label>
-        <label>网站<input v-model="publisherForm.website_url" type="url"></label>
-        <label>备注<textarea v-model="publisherForm.notes" rows="3"></textarea></label>
-        <button class="action-button action-button--create" type="submit" :disabled="busy">保存出版商</button><button class="action-button action-button--neutral" type="button" @click="showPublisherForm = false">取消</button>
-      </form>
+      <AppModal ref="publisherModal" v-model="showPublisherForm" :title="editingPublisherId ? '编辑出版商' : '添加出版商'" description="维护出版商名称、网站与备注信息。" width="640px" :busy="busy" :dirty="() => publisherGuard.dirty.value" :error="errorMessage">
+        <form data-test="publisher-form" class="stacked-form" novalidate @submit.prevent="savePublisher">
+          <label>名称<input v-model="publisherForm.name" data-test="publisher-name" required maxlength="255"></label>
+          <label>网站<input v-model="publisherForm.website_url" type="url"></label>
+          <label>备注<textarea v-model="publisherForm.notes" rows="3"></textarea></label>
+          <div class="form-actions">
+            <button class="action-button action-button--create" type="submit" :disabled="busy">保存出版商</button>
+            <button class="action-button action-button--neutral" type="button" @click="publisherModal?.requestClose()">取消</button>
+          </div>
+        </form>
+      </AppModal>
       <p v-if="publisherLoading">正在加载出版商…</p><p v-else-if="!errorMessage && publishers.length === 0">未找到出版商。</p>
       <table v-else>
         <thead><tr><th>名称</th><th>网站</th><th v-if="isAdmin">操作</th></tr></thead>
         <tbody><tr v-for="publisher in publishers" :key="publisher.id"><td>{{ publisher.name }}</td><td><template v-if="publisher.website_url"><a v-if="safeResourceUrl(publisher.website_url)" class="action-button action-button--compact action-button--view" :href="safeResourceUrl(publisher.website_url) ?? undefined" target="_blank" rel="noopener noreferrer">网站</a><span v-else>{{ publisher.website_url }}</span></template><span v-else>—</span></td><td v-if="isAdmin"><button class="action-button action-button--compact action-button--edit" type="button" :data-test="`edit-publisher-${publisher.id}`" @click="openPublisherForm(publisher)">编辑</button><button class="action-button action-button--compact action-button--danger" type="button" :data-test="`delete-publisher-${publisher.id}`" @click="requestDelete('publisher', publisher.id)">删除</button></td></tr></tbody>
       </table>
       <nav class="pagination" aria-label="出版商分页"><button class="action-button action-button--compact action-button--neutral" type="button" :disabled="publisherQuery.page === 1 || publisherLoading" @click="publisherPage(publisherQuery.page - 1)">上一页</button><span>第 {{ publisherQuery.page }} 页 · 共 {{ publisherTotal }} 条</span><button class="action-button action-button--compact action-button--neutral" type="button" data-test="next-publishers" :disabled="publisherQuery.page * publisherQuery.page_size >= publisherTotal || publisherLoading" @click="publisherPage(publisherQuery.page + 1)">下一页</button></nav>
-    </section>
-
-    <section v-else-if="activeTab === 'platforms'" aria-label="平台管理">
-      <div class="toolbar">
-        <label>搜索名称<input v-model="platformQuery.name" @change="platformQuery.page = 1; loadPlatforms()"></label>
-        <label>排序<select v-model="platformQuery.sort" data-test="platform-sort" @change="platformSortChanged"><option value="code">代码</option><option value="name">名称</option><option value="created_at">创建时间</option><option value="updated_at">更新时间</option></select></label>
-        <label>顺序<select v-model="platformQuery.order" @change="platformSortChanged"><option value="asc">升序</option><option value="desc">降序</option></select></label>
-        <button v-if="isAdmin" class="action-button action-button--create" type="button" data-test="add-platform" @click="openPlatformForm()">添加平台</button>
-      </div>
-      <form v-if="showPlatformForm" data-test="platform-form" class="stacked-form" novalidate @submit.prevent="savePlatform">
-        <h2>{{ editingPlatformId ? '编辑平台' : '添加平台' }}</h2>
-        <label>代码<input v-model="platformForm.code" data-test="platform-code" required maxlength="64"></label>
-        <label>名称<input v-model="platformForm.name" data-test="platform-name" required maxlength="255"></label>
-        <label>描述<textarea v-model="platformForm.description" rows="3"></textarea></label>
-        <label>状态<select v-model="platformForm.status"><option value="active">启用</option><option value="needs_review">待审核</option><option value="disabled">已停用</option></select></label>
-        <button class="action-button action-button--create" type="submit" :disabled="busy">保存平台</button><button class="action-button action-button--neutral" type="button" @click="showPlatformForm = false">取消</button>
-      </form>
-      <p v-if="platformLoading">正在加载平台…</p><p v-else-if="!errorMessage && platforms.length === 0">未找到平台。</p>
-      <table v-else>
-        <thead><tr><th>代码</th><th>名称</th><th>状态</th><th v-if="isAdmin">操作</th></tr></thead>
-        <tbody><tr v-for="platform in platforms" :key="platform.id"><td>{{ platform.code }}</td><td>{{ platform.name }}</td><td>{{ displayText(PLATFORM_STATUS_LABELS, platform.status) }}</td><td v-if="isAdmin"><button class="action-button action-button--compact action-button--edit" type="button" :data-test="`edit-platform-${platform.id}`" @click="openPlatformForm(platform)">编辑</button><button class="action-button action-button--compact action-button--danger" type="button" :data-test="`delete-platform-${platform.id}`" @click="requestDelete('platform', platform.id)">删除</button></td></tr></tbody>
-      </table>
-      <nav class="pagination" aria-label="平台分页"><button class="action-button action-button--compact action-button--neutral" type="button" :disabled="platformQuery.page === 1 || platformLoading" @click="platformPage(platformQuery.page - 1)">上一页</button><span>第 {{ platformQuery.page }} 页 · 共 {{ platformTotal }} 条</span><button class="action-button action-button--compact action-button--neutral" type="button" data-test="next-platforms" :disabled="platformQuery.page * platformQuery.page_size >= platformTotal || platformLoading" @click="platformPage(platformQuery.page + 1)">下一页</button></nav>
     </section>
 
     <section v-else-if="activeTab === 'journals'" aria-label="期刊管理">
@@ -531,11 +431,11 @@ onMounted(() => void loadPublishers())
         <label>顺序<select v-model="journalQuery.order" @change="journalSortChanged"><option value="asc">升序</option><option value="desc">降序</option></select></label>
         <button v-if="isAdmin" class="action-button action-button--create" type="button" data-test="add-journal" @click="openJournalForm()">添加期刊</button>
       </div>
-      <form v-if="showJournalForm" data-test="journal-form" class="stacked-form" novalidate @submit.prevent="saveJournal">
-        <h2>{{ editingJournalId ? '编辑期刊' : '添加期刊' }}</h2>
+      <AppModal ref="journalModal" v-model="showJournalForm" :title="editingJournalId ? '编辑期刊' : '添加期刊'" description="维护期刊身份、平台、网址与投稿要求。" width="960px" :busy="busy" :dirty="() => journalGuard.dirty.value" :error="errorMessage">
+        <form data-test="journal-form" class="stacked-form" novalidate @submit.prevent="saveJournal">
         <div class="form-grid">
           <label>出版商<select v-model="journalForm.publisher_id" data-test="journal-publisher" required><option value="" disabled>请选择出版商</option><option v-for="option in publisherOptions" :key="option.id" :value="option.id">{{ option.name ?? option.id }}</option></select></label>
-          <label>平台<select v-model="journalForm.platform_id" data-test="journal-platform"><option value="">无平台</option><option v-for="option in platformOptions" :key="option.id" :value="option.id">{{ option.name ?? option.id }}<template v-if="option.code"> ({{ option.code }})</template></option></select></label>
+          <label>平台代码<input v-model="journalForm.platform_code" data-test="journal-platform" maxlength="64" placeholder="例如 EM、OJS"></label>
           <label>名称<input v-model="journalForm.name" data-test="journal-name" required maxlength="500"></label>
           <label>状态<select v-model="journalForm.status" data-test="journal-status" required><option v-for="(label, value) in PLATFORM_STATUS_LABELS" :key="value" :value="value">{{ label }}</option></select></label>
           <label>ISSN<input v-model="journalForm.issn" placeholder="0378-5955"></label>
@@ -565,13 +465,17 @@ onMounted(() => void loadPublishers())
         <label>整体要求来源网址<input v-model="journalForm.requirements_source_url" type="url"></label>
         <label>整体要求核验时间<input v-model="journalForm.requirements_verified_at" type="datetime-local"></label>
         <label>备注<textarea v-model="journalForm.notes" rows="3"></textarea></label>
-        <button class="action-button action-button--create" type="submit" :disabled="busy">保存期刊</button><button class="action-button action-button--neutral" type="button" @click="showJournalForm = false">取消</button>
-      </form>
+          <div class="form-actions">
+            <button class="action-button action-button--create" type="submit" :disabled="busy">保存期刊</button>
+            <button class="action-button action-button--neutral" type="button" @click="journalModal?.requestClose()">取消</button>
+          </div>
+        </form>
+      </AppModal>
       <p v-if="journalLoading">正在加载期刊…</p><p v-else-if="!errorMessage && journals.length === 0">未找到期刊。</p>
       <table v-else>
-        <thead><tr><th>名称</th><th>ISSN</th><th>eISSN</th><th>出版商 ID</th><th>平台 ID</th><th>状态</th><th>要求</th><th v-if="isAdmin">操作</th></tr></thead>
+        <thead><tr><th>名称</th><th>ISSN</th><th>eISSN</th><th>出版商 ID</th><th>平台代码</th><th>状态</th><th>要求</th><th v-if="isAdmin">操作</th></tr></thead>
         <tbody><tr v-for="journal in journals" :key="journal.id">
-          <td>{{ journal.name }}</td><td>{{ formatIssn(journal.issn) }}</td><td>{{ formatIssn(journal.eissn) }}</td><td>{{ journal.publisher_id }}</td><td>{{ journal.platform_id ?? '—' }}</td><td>{{ displayText(PLATFORM_STATUS_LABELS, journal.status) }}</td>
+          <td>{{ journal.name }}</td><td>{{ formatIssn(journal.issn) }}</td><td>{{ formatIssn(journal.eissn) }}</td><td>{{ journal.publisher_id }}</td><td>{{ journal.platform_code ?? '—' }}</td><td>{{ displayText(PLATFORM_STATUS_LABELS, journal.status) }}</td>
           <td><details><summary>{{ journal.requirements.length }} 项要求</summary><ul><li v-for="(requirement, index) in journal.requirements" :key="`${requirement.key}-${index}`">{{ requirement.key }}: {{ formatRequirementValue(requirement.value) }}（{{ requirement.scope }}） · <template v-if="safeResourceUrl(requirement.source_url)"><a class="action-button action-button--compact action-button--view" :href="safeResourceUrl(requirement.source_url) ?? undefined" target="_blank" rel="noopener noreferrer">来源</a></template><span v-else>{{ requirement.source_url }}</span> · 核验于 {{ requirement.verified_at }}</li></ul></details></td>
           <td v-if="isAdmin"><button class="action-button action-button--compact action-button--edit" type="button" :data-test="`edit-journal-${journal.id}`" @click="openJournalForm(journal)">编辑</button><button class="action-button action-button--compact action-button--danger" type="button" :data-test="`delete-journal-${journal.id}`" @click="requestDelete('journal', journal.id)">删除</button></td>
         </tr></tbody>
@@ -579,10 +483,18 @@ onMounted(() => void loadPublishers())
       <nav class="pagination" aria-label="期刊分页"><button class="action-button action-button--compact action-button--neutral" type="button" :disabled="journalQuery.page === 1 || journalLoading" @click="journalPage(journalQuery.page - 1)">上一页</button><span>第 {{ journalQuery.page }} 页 · 共 {{ journalTotal }} 条</span><button class="action-button action-button--compact action-button--neutral" type="button" data-test="next-journals" :disabled="journalQuery.page * journalQuery.page_size >= journalTotal || journalLoading" @click="journalPage(journalQuery.page + 1)">下一页</button></nav>
     </section>
 
-    <section v-if="deleteTarget" class="confirmation-panel" aria-label="确认软删除">
-      <h2>确认软删除</h2><p>该{{ displayText(RESOURCE_KIND_LABELS, deleteTarget.kind) }}将从在用列表中移除，历史记录仍会保留。</p>
-      <label class="confirmation-control"><input v-model="deleteConfirmed" data-test="delete-confirm" type="checkbox"> 我确认本次软删除。</label>
-      <button class="action-button action-button--danger" type="button" :data-test="`confirm-delete-${deleteTarget.kind}-${deleteTarget.id}`" :disabled="busy" @click="confirmDelete">确认删除</button><button class="action-button action-button--neutral" type="button" @click="deleteTarget = null">取消</button>
-    </section>
+    <AppConfirmDialog
+      v-model="deleteDialogOpen"
+      title="确认软删除"
+      :description="deleteDescription"
+      confirmation-text="我确认本次软删除。"
+      :confirmed="deleteConfirmed"
+      :confirm-test="`confirm-delete-${deleteTarget?.kind}-${deleteTarget?.id}`"
+      confirmation-test="delete-confirm"
+      :busy="busy"
+      :error="errorMessage"
+      @update:confirmed="deleteConfirmed = $event"
+      @confirm="confirmDelete"
+    />
   </section>
 </template>

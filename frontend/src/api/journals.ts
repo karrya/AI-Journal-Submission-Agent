@@ -31,40 +31,6 @@ export interface PublisherListQuery {
   order?: SortOrder
 }
 
-export interface JournalPlatformCreate {
-  code: string
-  name: string
-  description?: string
-  status?: 'active' | 'needs_review' | 'disabled'
-}
-
-export interface JournalPlatformUpdate {
-  code?: string
-  name?: string
-  description?: string | null
-  status?: 'active' | 'needs_review' | 'disabled'
-}
-
-export interface JournalPlatformResponse {
-  id: string
-  code: string
-  name: string
-  description: string
-  status: 'active' | 'needs_review' | 'disabled'
-  created_at: string
-  updated_at: string
-}
-
-export interface PlatformListQuery {
-  page?: number
-  page_size?: number
-  code?: string
-  name?: string
-  status?: 'active' | 'needs_review' | 'disabled'
-  sort?: 'code' | 'name' | 'created_at' | 'updated_at'
-  order?: SortOrder
-}
-
 export interface JournalRequirement {
   key: string
   value: string | number | boolean
@@ -74,7 +40,7 @@ export interface JournalRequirement {
 }
 
 interface JournalOptionalFields {
-  platform_id?: string | null
+  platform_code?: string | null
   issn?: string | null
   eissn?: string | null
   website_url?: string | null
@@ -106,7 +72,7 @@ export interface JournalUpdate extends JournalOptionalFields {
 export interface JournalResponse {
   id: string
   publisher_id: string
-  platform_id?: string | null
+  platform_code?: string | null
   name: string
   issn?: string | null
   eissn?: string | null
@@ -129,7 +95,7 @@ export interface JournalListQuery {
   page_size?: number
   name?: string
   publisher_id?: string
-  platform_id?: string
+  platform_code?: string
   issn?: string
   status?: string
   sort?: 'name' | 'created_at' | 'updated_at'
@@ -165,39 +131,6 @@ export async function updatePublisher(
 
 export async function deletePublisher(publisherId: string): Promise<void> {
   await api.delete(`/publishers/${publisherId}`)
-}
-
-export async function listPlatforms(
-  query: PlatformListQuery = {},
-): Promise<Page<JournalPlatformResponse>> {
-  const response = await api.get<Page<JournalPlatformResponse>>('/journal-platforms', {
-    params: { page: 1, page_size: 20, sort: 'code', order: 'asc', ...query },
-  })
-  return response.data
-}
-
-export async function listAllPlatforms(): Promise<JournalPlatformResponse[]> {
-  const result = await fetchAllPages((page, pageSize) => listPlatforms({ page, page_size: pageSize }))
-  return result.items
-}
-
-export async function createPlatform(
-  payload: JournalPlatformCreate,
-): Promise<JournalPlatformResponse> {
-  const response = await api.post<JournalPlatformResponse>('/journal-platforms', payload)
-  return response.data
-}
-
-export async function updatePlatform(
-  platformId: string,
-  payload: JournalPlatformUpdate,
-): Promise<JournalPlatformResponse> {
-  const response = await api.patch<JournalPlatformResponse>(`/journal-platforms/${platformId}`, payload)
-  return response.data
-}
-
-export async function deletePlatform(platformId: string): Promise<void> {
-  await api.delete(`/journal-platforms/${platformId}`)
 }
 
 export async function listJournals(query: JournalListQuery = {}): Promise<Page<JournalResponse>> {

@@ -23,6 +23,9 @@ import {
 } from '../../api/authors'
 import { getSafeRequestId } from '../../api/client'
 import AuthorForm from '../../components/AuthorForm.vue'
+import AppModal from '../../components/AppModal.vue'
+import AppConfirmDialog from '../../components/AppConfirmDialog.vue'
+import { useDirtyGuard } from '../../composables/useDirtyGuard'
 import { useAuthStore } from '../../stores/auth'
 import { safeResourceUrl } from '../../utils/url'
 import { AUTHOR_STATUS_LABELS, displayText } from '../../utils/display'
@@ -44,9 +47,15 @@ const authorQuery = reactive({
   order: 'asc' as SortOrder,
 })
 const showAuthorForm = ref(false)
+const authorModal = ref<InstanceType<typeof AppModal> | null>(null)
+const authorDirty = ref(false)
 const authorBusy = ref(false)
 const deletingAuthorId = ref<string | null>(null)
 const authorDeleteConfirmed = ref(false)
+const deletingAuthorOpen = computed({
+  get: () => deletingAuthorId.value !== null,
+  set: (open: boolean) => { if (!open) deletingAuthorId.value = null },
+})
 let authorSequence = 0
 
 const institutions = ref<InstitutionSummaryResponse[]>([])
@@ -61,6 +70,7 @@ const institutionQuery = reactive({
   order: 'asc' as SortOrder,
 })
 const showInstitutionForm = ref(false)
+const institutionModal = ref<InstanceType<typeof AppModal> | null>(null)
 const editingInstitutionId = ref<string | null>(null)
 const institutionBusy = ref(false)
 const institutionForm = reactive({
@@ -100,6 +110,11 @@ const institutionCountryOptions = computed(() => {
 })
 const deletingInstitutionId = ref<string | null>(null)
 const institutionDeleteConfirmed = ref(false)
+const deletingInstitutionOpen = computed({
+  get: () => deletingInstitutionId.value !== null,
+  set: (open: boolean) => { if (!open) deletingInstitutionId.value = null },
+})
+const institutionGuard = useDirtyGuard(() => institutionForm)
 let institutionSequence = 0
 
 function safeError(error: unknown, fallback: string): string {
@@ -247,6 +262,7 @@ async function openInstitutionForm(institution?: InstitutionSummaryResponse): Pr
     region: detailedInstitution?.region ?? '',
     postal_code: detailedInstitution?.postal_code ?? '',
   })
+  institutionGuard.capture()
   showInstitutionForm.value = true
 }
 
@@ -339,7 +355,9 @@ onMounted(() => void loadAuthors())
         <button v-if="isAdmin" class="action-button action-button--create" type="button" data-test="add-author" @click="showAuthorForm = true">添加作者</button>
       </div>
       <p v-if="authorError" class="form-error" role="alert">{{ authorError }}</p>
-      <AuthorForm v-if="showAuthorForm" data-test="author-create-form" :submitting="authorBusy" @submit="saveAuthor" @cancel="showAuthorForm = false" />
+      <AppModal ref="authorModal" v-model="showAuthorForm" title="添加作者" description="填写作者身份资料，保存前请逐项核对。" width="720px" :busy="authorBusy" :dirty="() => authorDirty" :error="authorError">
+        <AuthorForm data-test="author-create-form" :submitting="authorBusy" @dirty-change="authorDirty = $event" @submit="saveAuthor" @cancel="authorModal?.requestClose()" />
+      </AppModal>
       <p v-if="authorLoading">正在加载作者…</p>
       <p v-else-if="!authorError && authors.length === 0">未找到作者。</p>
       <table v-else>
@@ -353,12 +371,19 @@ onMounted(() => void loadAuthors())
           </td>
         </tr></tbody>
       </table>
-      <section v-if="deletingAuthorId" class="confirmation-panel" aria-label="确认删除作者">
-        <p>确定软删除该作者吗？历史记录将保留，但该资料会从在用列表中移除。</p>
-        <label class="confirmation-control"><input v-model="authorDeleteConfirmed" data-test="author-delete-confirm" type="checkbox"> 我确认软删除该作者。</label>
-        <button class="action-button action-button--danger" type="button" :data-test="`confirm-delete-author-${deletingAuthorId}`" @click="confirmAuthorDelete">确认删除</button>
-        <button class="action-button action-button--neutral" type="button" @click="deletingAuthorId = null">取消</button>
-      </section>
+      <AppConfirmDialog
+        v-model="deletingAuthorOpen"
+        title="删除作者"
+        description="历史记录将保留，但该资料会从在用列表中移除。"
+        confirmation-text="我确认软删除该作者。"
+        :confirmed="authorDeleteConfirmed"
+        :confirm-test="`confirm-delete-author-${deletingAuthorId}`"
+        confirmation-test="author-delete-confirm"
+        :busy="authorBusy"
+        :error="authorError"
+        @update:confirmed="authorDeleteConfirmed = $event"
+        @confirm="confirmAuthorDelete"
+      />
       <nav class="pagination" aria-label="作者分页">
         <button class="action-button action-button--compact action-button--neutral" type="button" :disabled="authorQuery.page === 1 || authorLoading" @click="authorPage(authorQuery.page - 1)">上一页</button>
         <span>第 {{ authorQuery.page }} 页 · 共 {{ authorTotal }} 条</span>
@@ -374,20 +399,23 @@ onMounted(() => void loadAuthors())
         <button v-if="isAdmin" class="action-button action-button--create" type="button" data-test="add-institution" @click="openInstitutionForm()">添加单位</button>
       </div>
       <p v-if="institutionError" class="form-error" role="alert">{{ institutionError }}</p>
-      <form v-if="showInstitutionForm" data-test="institution-form" class="stacked-form" novalidate @submit.prevent="saveInstitution">
-        <h2>{{ editingInstitutionId ? '编辑单位' : '添加单位' }}</h2>
-        <div class="form-grid">
-          <label>名称<input v-model="institutionForm.name" data-test="institution-name" required maxlength="255"></label>
-          <label>类型<input v-model="institutionForm.institution_type" maxlength="32"></label>
-          <label>网站<input v-model="institutionForm.website_url" data-test="institution-website" type="url"></label>
-          <label>国家代码<select v-model="institutionForm.country_code" data-test="institution-country"><option value="">未设置</option><option v-for="option in institutionCountryOptions" :key="option.code" :value="option.code">{{ option.name }}（{{ option.code }}）</option></select></label>
-          <label>省<input v-model="institutionForm.region" data-test="institution-region" maxlength="128"></label>
-          <label>城市<input v-model="institutionForm.city" maxlength="128"></label>
-          <label>邮编<input v-model="institutionForm.postal_code" data-test="institution-postal-code" maxlength="32"></label>
-        </div>
-        <button class="action-button action-button--create" type="submit" :disabled="institutionBusy">保存单位</button>
-        <button class="action-button action-button--neutral" type="button" @click="showInstitutionForm = false">取消</button>
-      </form>
+      <AppModal ref="institutionModal" v-model="showInstitutionForm" :title="editingInstitutionId ? '编辑单位' : '添加单位'" description="维护单位基础信息与地区资料。" width="760px" :busy="institutionBusy" :dirty="() => institutionGuard.dirty.value" :error="institutionError">
+        <form data-test="institution-form" class="stacked-form" novalidate @submit.prevent="saveInstitution">
+          <div class="form-grid">
+            <label>名称<input v-model="institutionForm.name" data-test="institution-name" required maxlength="255"></label>
+            <label>类型<input v-model="institutionForm.institution_type" maxlength="32"></label>
+            <label>网站<input v-model="institutionForm.website_url" data-test="institution-website" type="url"></label>
+            <label>国家代码<select v-model="institutionForm.country_code" data-test="institution-country"><option value="">未设置</option><option v-for="option in institutionCountryOptions" :key="option.code" :value="option.code">{{ option.name }}（{{ option.code }}）</option></select></label>
+            <label>省<input v-model="institutionForm.region" data-test="institution-region" maxlength="128"></label>
+            <label>城市<input v-model="institutionForm.city" maxlength="128"></label>
+            <label>邮编<input v-model="institutionForm.postal_code" data-test="institution-postal-code" maxlength="32"></label>
+          </div>
+          <div class="form-actions">
+            <button class="action-button action-button--create" type="submit" :disabled="institutionBusy">保存单位</button>
+            <button class="action-button action-button--neutral" type="button" @click="institutionModal?.requestClose()">取消</button>
+          </div>
+        </form>
+      </AppModal>
       <p v-if="institutionLoading">正在加载单位…</p>
       <p v-else-if="!institutionError && institutions.length === 0">未找到单位。</p>
       <table v-else>
@@ -398,12 +426,19 @@ onMounted(() => void loadAuthors())
           <td v-if="isAdmin"><button class="action-button action-button--compact action-button--edit" type="button" :data-test="`edit-institution-${institution.id}`" @click="openInstitutionForm(institution)">编辑</button><button class="action-button action-button--compact action-button--danger" type="button" :data-test="`delete-institution-${institution.id}`" @click="requestInstitutionDelete(institution.id)">删除</button></td>
         </tr></tbody>
       </table>
-      <section v-if="deletingInstitutionId" class="confirmation-panel" aria-label="确认删除单位">
-        <p>确定软删除该单位吗？现有作者关联需另行管理。</p>
-        <label class="confirmation-control"><input v-model="institutionDeleteConfirmed" data-test="institution-delete-confirm" type="checkbox"> 我确认软删除该单位。</label>
-        <button class="action-button action-button--danger" type="button" :data-test="`confirm-delete-institution-${deletingInstitutionId}`" @click="confirmInstitutionDelete">确认删除</button>
-        <button class="action-button action-button--neutral" type="button" @click="deletingInstitutionId = null">取消</button>
-      </section>
+      <AppConfirmDialog
+        v-model="deletingInstitutionOpen"
+        title="删除单位"
+        description="单位将从在用列表中移除，现有作者关联需另行管理。"
+        confirmation-text="我确认软删除该单位。"
+        :confirmed="institutionDeleteConfirmed"
+        :confirm-test="`confirm-delete-institution-${deletingInstitutionId}`"
+        confirmation-test="institution-delete-confirm"
+        :busy="institutionBusy"
+        :error="institutionError"
+        @update:confirmed="institutionDeleteConfirmed = $event"
+        @confirm="confirmInstitutionDelete"
+      />
       <nav class="pagination" aria-label="单位分页">
         <button class="action-button action-button--compact action-button--neutral" type="button" :disabled="institutionQuery.page === 1 || institutionLoading" @click="institutionPage(institutionQuery.page - 1)">上一页</button>
         <span>第 {{ institutionQuery.page }} 页 · 共 {{ institutionTotal }} 条</span>

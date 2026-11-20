@@ -87,7 +87,7 @@ describe('ManuscriptDetailView', () => {
   function mountDetail() {
     return mount(ManuscriptDetailView, {
       props: { manuscriptId: 'm1' },
-      global: { stubs: { RouterLink: { template: '<a><slot /></a>' } } },
+      global: { stubs: { RouterLink: { template: '<a><slot /></a>' }, teleport: true, transition: false } },
     })
   }
 
@@ -174,6 +174,7 @@ describe('ManuscriptDetailView', () => {
     })
     const wrapper = mountDetail()
     await flushPromises()
+    await wrapper.get('[data-test="edit-metadata"]').trigger('click')
     const languageSelect = wrapper.get('[data-test="metadata-language"]')
     expect(languageSelect.element.tagName).toBe('SELECT')
     expect(languageSelect.findAll('option').map((option) => [option.attributes('value'), option.text()])).toEqual([
@@ -206,6 +207,7 @@ describe('ManuscriptDetailView', () => {
     })
     const wrapper = mountDetail()
     await flushPromises()
+    await wrapper.get('[data-test="edit-metadata"]').trigger('click')
     await wrapper.get('[data-test="metadata-title"]').setValue('Updated working title')
     await wrapper.get('[data-test="metadata-form"]').trigger('submit')
     await flushPromises()
@@ -221,7 +223,7 @@ describe('ManuscriptDetailView', () => {
     const secondManuscript = {
       ...manuscript,
       id: 'm2', internal_number: 'MS-2', owner_author_id: 'a2', title: 'Second working title',
-      current_version_id: null, authors: [secondOwner],
+      abstract: 'Second abstract', current_version_id: null, authors: [secondOwner],
     }
     const secondAuthorOption = {
       ...authorOptions[0], id: 'a2', display_name: 'Owner Two',
@@ -239,6 +241,7 @@ describe('ManuscriptDetailView', () => {
     })
     const wrapper = mountDetail()
     await flushPromises()
+    await wrapper.get('[data-test="edit-authorship"]').trigger('click')
     const staleEditor = wrapper.findComponent(AuthorshipEditor)
 
     await wrapper.setProps({ manuscriptId: 'm2' })
@@ -268,6 +271,7 @@ describe('ManuscriptDetailView', () => {
     })
     const wrapper = mountDetail()
     await flushPromises()
+    await wrapper.get('[data-test="edit-authorship"]').trigger('click')
     await wrapper.get('[data-test="authorship-confirm"]').setValue(true)
     await wrapper.get('[data-test="authorship-form"]').trigger('submit')
     await flushPromises()
@@ -286,6 +290,7 @@ describe('ManuscriptDetailView', () => {
     await flushPromises()
     adapter.mockClear()
 
+    await wrapper.get('[data-test="upload-file"]').trigger('click')
     wrapper.findComponent(FileFamilyUpload).vm.$emit('uploaded', file)
     await flushPromises()
 
@@ -309,7 +314,9 @@ describe('ManuscriptDetailView', () => {
     })
     const wrapper = mountDetail()
     await flushPromises()
+    await wrapper.get('[data-test="create-version"]').trigger('click')
     await wrapper.get('[data-test="version-label"]').setValue('Revision three')
+    await wrapper.get('[data-test="create-version"]').trigger('click')
     await wrapper.get('[data-test="version-form"]').trigger('submit')
     await flushPromises()
 
@@ -331,9 +338,11 @@ describe('ManuscriptDetailView', () => {
     })
     const wrapper = mountDetail()
     await flushPromises()
+    await wrapper.get('[data-test="edit-metadata"]').trigger('click')
     await wrapper.get('[data-test="metadata-title"]').setValue('Pending title')
     await wrapper.get('[data-test="metadata-form"]').trigger('submit')
 
+    await wrapper.get('[data-test="upload-file"]').trigger('click')
     wrapper.findComponent(FileFamilyUpload).vm.$emit('uploaded', file)
     await flushPromises()
     expect(wrapper.get('[data-test="metadata-form"] button[type="submit"]').attributes('disabled')).toBeUndefined()
@@ -389,8 +398,10 @@ describe('ManuscriptDetailView', () => {
     })
     const wrapper = mountDetail()
     await flushPromises()
+    await wrapper.get('[data-test="edit-metadata"]').trigger('click')
     await wrapper.get('[data-test="metadata-title"]').setValue('Updated working title')
     await wrapper.get('[data-test="metadata-form"]').trigger('submit')
+    await wrapper.get('[data-test="edit-authorship"]').trigger('click')
     await wrapper.get('[data-test="authorship-confirm"]').setValue(true)
     await wrapper.get('[data-test="authorship-form"]').trigger('submit')
 
@@ -439,11 +450,14 @@ describe('ManuscriptDetailView', () => {
     })
     const wrapper = mountDetail()
     await flushPromises()
+    await wrapper.get('[data-test="create-version"]').trigger('click')
     await wrapper.get('[data-test="version-form"]').trigger('submit')
 
     refreshed = true
+    await wrapper.get('[data-test="upload-file"]').trigger('click')
     wrapper.findComponent(FileFamilyUpload).vm.$emit('uploaded', file)
     await flushPromises()
+    await wrapper.get('[data-test="create-version"]').trigger('click')
     await wrapper.get('[data-test="version-form"]').trigger('submit')
     finishCreate()
     await flushPromises()
@@ -483,14 +497,61 @@ describe('ManuscriptDetailView', () => {
     })
     const wrapper = mountDetail()
     await flushPromises()
+    await wrapper.get('[data-test="create-version"]').trigger('click')
     await wrapper.get('[data-test="version-form"]').trigger('submit')
     await flushPromises()
 
+    await wrapper.get('[data-test="upload-file"]').trigger('click')
     wrapper.findComponent(FileFamilyUpload).vm.$emit('uploaded', file)
     finishStaleLoad()
     await flushPromises()
 
     expect(wrapper.text()).not.toContain('正在加载稿件工作区…')
+  })
+
+  it('keeps the upload dialog open with its error after an upload failure', async () => {
+    const wrapper = mountDetail()
+    await flushPromises()
+    adapter.mockImplementationOnce(async () => { throw new Error('upload failed') })
+    await wrapper.get('[data-test="upload-file"]').trigger('click')
+    await wrapper.get('[data-test="display-name"]').setValue('Failed upload')
+    const input = wrapper.get('[data-test="file-input"]')
+    Object.defineProperty(input.element, 'files', {
+      configurable: true,
+      value: [new File(['%PDF-1.4'], 'paper.pdf', { type: 'application/pdf' })],
+    })
+    await input.trigger('change')
+    await wrapper.get('[data-test="file-upload-form"]').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
+    expect(wrapper.get('[role="alert"]').text()).toContain('无法上传')
+  })
+
+  it('closes an in-flight upload when manage permission is revoked', async () => {
+    let finishUpload!: () => void
+    const wrapper = mountDetail()
+    await flushPromises()
+    adapter.mockImplementationOnce(async (config) => new Promise<AxiosResponse>((resolve) => {
+      finishUpload = () => resolve(success(config, file))
+    }))
+    await wrapper.get('[data-test="upload-file"]').trigger('click')
+    await wrapper.get('[data-test="display-name"]').setValue('Permission upload')
+    const input = wrapper.get('[data-test="file-input"]')
+    Object.defineProperty(input.element, 'files', {
+      configurable: true,
+      value: [new File(['%PDF-1.4'], 'paper.pdf', { type: 'application/pdf' })],
+    })
+    await input.trigger('change')
+    await wrapper.get('[data-test="file-upload-form"]').trigger('submit')
+    await vi.waitFor(() => expect(adapter.mock.calls.some(([config]) => config.method === 'post')).toBe(true))
+
+    useAuthStore().setSession({ ...operator, roles: [] }, 'csrf')
+    await flushPromises()
+
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+    finishUpload()
+    await flushPromises()
   })
 
   it('revokes Blob URLs and removes anchors after a DOM click exception', async () => {

@@ -25,7 +25,7 @@ const manuscript = {
   created_at: '2026-11-01T00:00:00Z', updated_at: '2026-11-01T00:00:00Z',
 }
 const emptyPage = { items: [], page: 1, page_size: 20, total: 0 }
-const stubs = { RouterLink: { template: '<a><slot /></a>' } }
+const stubs = { RouterLink: { template: '<a><slot /></a>' }, teleport: true, transition: false }
 
 describe('ManuscriptListView', () => {
   let adapter: ReturnType<typeof vi.fn<AxiosAdapter>>
@@ -80,6 +80,7 @@ describe('ManuscriptListView', () => {
     await flushPromises()
     await wrapper.get('[data-test="add-manuscript"]').trigger('click')
     await flushPromises()
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
     await wrapper.get('[data-test="owner-author"]').setValue('a1')
     await wrapper.get('[data-test="title"]').setValue('New manuscript')
     await wrapper.get('[data-test="abstract"]').setValue('A complete abstract')
@@ -110,6 +111,7 @@ describe('ManuscriptListView', () => {
     expect(payload.authors).toEqual([{ author_id: 'a1', position: 1, is_corresponding: true }])
     expect(JSON.stringify(payload)).not.toContain('display_name')
     expect(JSON.stringify(payload)).not.toContain('private-owner-orcid')
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
 
     const toast = document.body.querySelector<HTMLElement>('.el-message--success')
     expect(toast?.textContent).toContain('保存成功')
@@ -117,8 +119,9 @@ describe('ManuscriptListView', () => {
     await vi.advanceTimersByTimeAsync(999)
     expect(toast?.style.display).not.toBe('none')
     await vi.advanceTimersByTimeAsync(1)
+    await vi.advanceTimersByTimeAsync(300)
     await flushPromises()
-    expect(toast?.style.display).toBe('none')
+    expect(document.body.querySelector('.el-message--success')).toBeNull()
   })
 
   it('does not show an empty state when manuscript loading fails', async () => {

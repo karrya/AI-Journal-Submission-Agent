@@ -2,8 +2,15 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 from sqlalchemy.sql.elements import ColumnElement
 
-from app.models import Journal, JournalAlias, JournalIdentifier, Publisher, PublisherAlias
+from app.models import Journal, Publisher
 from app.services.authors import normalize_comparison
+
+
+def _alias_contains(column, normalized: str):
+    escaped = normalized.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return func.json_search(
+        column, "one", escaped, None, "$[*].normalized_alias"
+    ).is_not(None)
 
 
 class IdentificationRepository:
@@ -19,17 +26,12 @@ class IdentificationRepository:
             conditions.append(
                 or_(
                     Publisher.normalized_name == normalized,
-                    PublisherAlias.normalized_alias == normalized,
+                    _alias_contains(Publisher.aliases, normalized),
                 )
             )
         if domain:
             conditions.append(Publisher.primary_domain == domain)
-        statement = (
-            select(Publisher)
-            .outerjoin(PublisherAlias, PublisherAlias.publisher_id == Publisher.id)
-            .where(Publisher.deleted_at.is_(None), *conditions)
-            .distinct()
-        )
+        statement = select(Publisher).where(Publisher.deleted_at.is_(None), *conditions)
         total = self.db.scalar(
             select(func.count()).select_from(statement.subquery())
         ) or 0
@@ -53,48 +55,26 @@ class IdentificationRepository:
     ) -> tuple[list[tuple[Journal, str]], int]:
         identifier_conditions: list[ColumnElement[bool]] = []
         if issn:
-            identifier_conditions.append(
-                select(JournalIdentifier.id)
-                .where(
-                    JournalIdentifier.identifier_type == "ISSN",
-                    JournalIdentifier.identifier_value == issn,
-                    JournalIdentifier.journal_id == Journal.id,
-                )
-                .correlate(Journal)
-                .exists()
-            )
+            identifier_conditions.append(Journal.issn == issn)
         if eissn:
-            identifier_conditions.append(
-                select(JournalIdentifier.id)
-                .where(
-                    JournalIdentifier.identifier_type == "EISSN",
-                    JournalIdentifier.identifier_value == eissn,
-                    JournalIdentifier.journal_id == Journal.id,
-                )
-                .correlate(Journal)
-                .exists()
-            )
+            identifier_conditions.append(Journal.eissn == eissn)
         conditions: list[ColumnElement[bool]] = [Journal.deleted_at.is_(None)]
         if publisher_id:
             conditions.append(Journal.publisher_id == publisher_id)
         if identifier_conditions:
             conditions.extend(identifier_conditions)
-        else:
-            if name:
-                normalized = normalize_comparison(name)
-                conditions.append(
-                    or_(
-                        Journal.name == name,
-                        JournalAlias.normalized_alias == normalized,
-                    )
+        elif name:
+            normalized = normalize_comparison(name)
+            conditions.append(
+                or_(
+                    Journal.name == name,
+                    _alias_contains(Journal.aliases, normalized),
                 )
+            )
         statement = (
             select(Journal, Publisher.name)
             .join(Publisher, Publisher.id == Journal.publisher_id)
-            .outerjoin(JournalIdentifier, JournalIdentifier.journal_id == Journal.id)
-            .outerjoin(JournalAlias, JournalAlias.journal_id == Journal.id)
-            .where(Journal.deleted_at.is_(None), *conditions)
-            .distinct()
+            .where(*conditions)
         )
         total = self.db.scalar(select(func.count()).select_from(statement.subquery())) or 0
         records = self.db.execute(
@@ -102,7 +82,7 @@ class IdentificationRepository:
             .offset((page - 1) * page_size)
             .limit(page_size)
         ).all()
-        return [(journal, name) for journal, name in records], total
+        return [(journal, publisher_name) for journal, publisher_name in records], total
 
     def publisher_options(self, name: str | None, limit: int) -> list[tuple[str, str]]:
         statement = select(Publisher.id, Publisher.name).where(Publisher.deleted_at.is_(None))

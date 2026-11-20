@@ -12,18 +12,12 @@ from app.models import (
     AuthorAuthorization,
     Journal,
     JournalSubmissionPortal,
-    PlatformAdapter,
     Publisher,
-    PublisherAccount,
-    PublisherRegistrationSupport,
     RegistrationTask,
     utc_now,
 )
-from app.repositories.authorizations import AuthorizationRepository
 from app.repositories.registration import RegistrationRepository
 from app.schemas.registration import (
-    PlatformAdapterResponse,
-    PublisherAccountResponse,
     PublisherSupportResponse,
     RegistrationTaskCreate,
     RegistrationTaskPage,
@@ -38,18 +32,12 @@ def registration_records(db_session, operator):
     publisher = Publisher(
         name="Registration Publisher",
         normalized_name="registration publisher",
+        registration_code="REGISTRATION_PUBLISHER",
+        registration_support_status="SUPPORTED",
+        registration_support_level="V0_1",
+        registration_official_domains=["journal.example"],
     )
-    adapter = PlatformAdapter(
-        adapter_code="TEST_ADAPTER",
-        adapter_name="Test Adapter",
-        platform_type="TEST_PLATFORM",
-        adapter_version="1.0.0",
-        support_status="SUPPORTED",
-        allowed_domains=["journal.example"],
-        capability_config={"registration": True},
-        last_verified_at=now,
-    )
-    db_session.add_all([author, publisher, adapter])
+    db_session.add_all([author, publisher])
     db_session.flush()
     journal = Journal(
         publisher_id=publisher.id,
@@ -59,14 +47,6 @@ def registration_records(db_session, operator):
     )
     db_session.add(journal)
     db_session.flush()
-    support = PublisherRegistrationSupport(
-        publisher_id=publisher.id,
-        publisher_code="REGISTRATION_PUBLISHER",
-        display_name=publisher.name,
-        support_status="SUPPORTED",
-        support_level="V0_1",
-        official_domains=["journal.example"],
-    )
     portal = JournalSubmissionPortal(
         journal_id=journal.id,
         original_url="https://journal.example/register",
@@ -78,7 +58,13 @@ def registration_records(db_session, operator):
         confidence=1.0,
         evidence_summary=[],
         normalized_host="journal.example",
-        platform_adapter_id=adapter.id,
+        adapter_code="TEST_ADAPTER",
+        adapter_name="Test Adapter",
+        adapter_version="1.0.0",
+        adapter_support_status="SUPPORTED",
+        adapter_allowed_domains=["journal.example"],
+        adapter_capability_config={"registration": True},
+        adapter_last_verified_at=now,
         support_status="SUPPORTED",
     )
     grant = AuthorAuthorization(
@@ -88,7 +74,7 @@ def registration_records(db_session, operator):
         valid_from=now - timedelta(minutes=1),
         valid_to=now + timedelta(hours=1),
     )
-    db_session.add_all([support, portal, grant])
+    db_session.add_all([portal, grant])
     db_session.flush()
     task = RegistrationTask(
         author_id=author.id,
@@ -97,36 +83,23 @@ def registration_records(db_session, operator):
         portal_id=portal.id,
         authorization_id=grant.id,
         platform_code="TEST_PLATFORM",
-        adapter_code=adapter.adapter_code,
-        adapter_version=adapter.adapter_version,
+        adapter_code=portal.adapter_code,
+        adapter_version=portal.adapter_version,
         idempotency_key="registration-key-0001",
         task_status="PENDING",
         current_step="WAITING",
         retryable=False,
     )
-    account = PublisherAccount(
-        author_id=author.id,
-        publisher_id=publisher.id,
-        journal_id=journal.id,
-        platform_code="TEST_PLATFORM",
-        account_namespace="journal.example",
-        account_email="author@example.com",
-        normalized_email="author@example.com",
-        credential_ref="secret-credential-reference",
-        account_status="REGISTERED",
-    )
-    db_session.add_all([task, account])
+    db_session.add(task)
     db_session.commit()
     return SimpleNamespace(
         author=author,
         publisher=publisher,
         journal=journal,
-        adapter=adapter,
-        support=support,
+        support=publisher,
         portal=portal,
         grant=grant,
         task=task,
-        account=account,
         user=operator,
     )
 
@@ -179,31 +152,30 @@ def test_registration_create_rejects_extra_and_sensitive_fields(registration_rec
 
 def test_response_models_map_orm_without_exposing_credentials(registration_records):
     task = RegistrationTaskResponse.model_validate(registration_records.task)
-    account = PublisherAccountResponse.model_validate(registration_records.account)
-    support = PublisherSupportResponse.model_validate(registration_records.support)
-    adapter = PlatformAdapterResponse.model_validate(registration_records.adapter)
 
     assert str(task.id) == registration_records.task.id
-    assert str(account.id) == registration_records.account.id
-    assert str(support.publisher_id) == registration_records.publisher.id
-    assert str(adapter.id) == registration_records.adapter.id
-    assert "credential_ref" not in account.model_fields_set
-    assert "secret-credential-reference" not in account.model_dump_json()
+    assert "credential_ref" not in task.model_fields_set
     assert "verification_url" not in task.model_dump_json()
+    assert "capability_config" not in task.model_dump_json()
 
 
-def test_repository_finds_publisher_support_and_adapter(
-    db_session, registration_records
-):
+def test_support_response_rejects_incomplete_wide_row(db_session):
+    publisher = Publisher(name="Incomplete", normalized_name="incomplete")
+    db_session.add(publisher)
+    db_session.flush()
+
+    with pytest.raises(ValueError, match="注册支持配置不完整"):
+        PublisherSupportResponse.from_publisher(publisher)
+
+
+def test_repository_finds_publisher_support(db_session, registration_records):
     repository = RegistrationRepository(db_session)
 
     support = repository.publisher_support(registration_records.publisher.id)
-    adapter = repository.adapter(registration_records.adapter.id)
 
-    assert support.id == registration_records.support.id
-    assert adapter.id == registration_records.adapter.id
+    assert support is registration_records.publisher
+    assert support.registration_code == "REGISTRATION_PUBLISHER"
     assert repository.publisher_support(str(uuid4())) is None
-    assert repository.adapter(str(uuid4())) is None
 
 
 def test_publisher_support_excludes_soft_deleted_publisher(
@@ -223,7 +195,7 @@ def test_publisher_support_excludes_soft_deleted_publisher(
 def test_repository_finds_supported_portal(db_session, supported_portal):
     repository = RegistrationRepository(db_session)
     result = repository.supported_portal(supported_portal.id)
-    assert result.platform_adapter_id == supported_portal.platform_adapter_id
+    assert result.adapter_code == supported_portal.adapter_code
     assert repository.supported_portal(str(uuid4())) is None
 
 
@@ -312,97 +284,11 @@ def test_task_page_excludes_soft_deleted_master_data(
     assert total == 0
 
 
-def test_account_page_uses_current_user_authorization(db_session, registration_records):
+def test_task_page_enforces_page_size_limit(db_session, registration_records):
     repository = RegistrationRepository(db_session)
-
-    records, total = repository.account_page(
-        registration_records.user.id, page=1, page_size=20
-    )
-    other_records, other_total = repository.account_page(
-        str(uuid4()), page=1, page_size=20
-    )
-
-    assert [record.id for record in records] == [registration_records.account.id]
-    assert total == 1
-    assert other_records == []
-    assert other_total == 0
-
-
-@pytest.mark.parametrize(
-    "state",
-    [
-        "active",
-        "not_yet_active",
-        "expired",
-        "revoked",
-        "wrong_permission",
-        "disabled_user",
-        "deleted_user",
-        "inactive_author",
-        "deleted_author",
-    ],
-)
-def test_account_page_matches_task2_active_grant_semantics(
-    db_session, registration_records, state
-):
-    now = utc_now()
-    grant = registration_records.grant
-    if state == "not_yet_active":
-        grant.valid_from = now + timedelta(hours=1)
-        grant.valid_to = now + timedelta(hours=2)
-    elif state == "expired":
-        grant.valid_from = now - timedelta(hours=2)
-        grant.valid_to = now - timedelta(hours=1)
-    elif state == "revoked":
-        grant.revoked_at = now
-    elif state == "wrong_permission":
-        grant.permissions = ["manuscript:read"]
-    elif state == "disabled_user":
-        registration_records.user.status = "disabled"
-    elif state == "deleted_user":
-        registration_records.user.deleted_at = now
-    elif state == "inactive_author":
-        registration_records.author.status = "disabled"
-    elif state == "deleted_author":
-        registration_records.author.deleted_at = now
-    db_session.commit()
-
-    task2_allows = AuthorizationRepository(db_session).any_active(
-        user_id=registration_records.user.id,
-        author_id=registration_records.author.id,
-        permission="account:register",
-        now_utc=now,
-    )
-    records, total = RegistrationRepository(db_session).account_page(
-        registration_records.user.id, page=1, page_size=20
-    )
-
-    assert task2_allows is (state == "active")
-    assert (total == 1) is task2_allows
-    assert (len(records) == 1) is task2_allows
-
-
-@pytest.mark.parametrize("master_name", ["account", "author", "publisher", "journal"])
-def test_account_page_excludes_soft_deleted_records(
-    db_session, registration_records, master_name
-):
-    getattr(registration_records, master_name).deleted_at = utc_now()
-    db_session.commit()
-
-    records, total = RegistrationRepository(db_session).account_page(
-        registration_records.user.id, page=1, page_size=20
-    )
-    assert records == []
-    assert total == 0
-
-
-@pytest.mark.parametrize("method", ["task_page", "account_page"])
-def test_list_queries_enforce_page_size_limit(db_session, registration_records, method):
-    repository = RegistrationRepository(db_session)
-    args = ({},) if method == "task_page" else (registration_records.user.id,)
 
     with pytest.raises(ValueError, match="page_size"):
-        getattr(repository, method)(*args, page=1, page_size=101)
+        repository.task_page({}, page=1, page_size=101)
 
-    records, _ = getattr(repository, method)(*args, page=1, page_size=100)
+    records, _ = repository.task_page({}, page=1, page_size=100)
     assert len(records) == 1

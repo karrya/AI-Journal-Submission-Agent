@@ -16,10 +16,6 @@ from app.schemas.identification import (
 from app.schemas.journals import (
     JournalCreate,
     JournalPage,
-    JournalPlatformCreate,
-    JournalPlatformPage,
-    JournalPlatformResponse,
-    JournalPlatformUpdate,
     JournalResponse,
     JournalUpdate,
     PublisherCreate,
@@ -31,7 +27,7 @@ from app.services.identification import (
     JournalIdentificationService,
     PublisherIdentificationService,
 )
-from app.services.journals import JournalPlatformService, JournalService, PublisherService
+from app.services.journals import JournalService, PublisherService
 
 router = APIRouter(prefix="/api/v1", tags=["journals"])
 Order = Literal["asc", "desc"]
@@ -150,99 +146,6 @@ def delete_publisher(
     return Response(status_code=204)
 
 
-@router.get(
-    "/journal-platforms",
-    response_model=JournalPlatformPage,
-    response_model_exclude_none=True,
-)
-def list_platforms(
-    request: Request,
-    db: Annotated[Session, Depends(get_db)],
-    principal: Annotated[Principal, Depends(get_principal)],
-    page: Annotated[int, Query(ge=1)] = 1,
-    page_size: Annotated[int, Query(ge=1, le=100)] = 20,
-    code: str | None = None,
-    name: str | None = None,
-    status: Literal["active", "needs_review", "disabled"] | None = None,
-    sort: str = "code",
-    order: Order = "asc",
-) -> JournalPlatformPage:
-    return JournalPlatformService(
-        db, principal.user, request.state.request_id
-    ).list_page(
-        page=page,
-        page_size=page_size,
-        code=code,
-        name=name,
-        status=status,
-        sort=sort,
-        order=order,
-    )
-
-
-@router.post(
-    "/journal-platforms",
-    response_model=JournalPlatformResponse,
-    response_model_exclude_none=True,
-    status_code=201,
-)
-def create_platform(
-    request: Request,
-    payload: JournalPlatformCreate,
-    db: Annotated[Session, Depends(get_db)],
-    principal: Annotated[Principal, Depends(require_csrf)],
-) -> JournalPlatformResponse:
-    return JournalPlatformService(db, principal.user, request.state.request_id).create(
-        payload
-    )
-
-
-@router.get(
-    "/journal-platforms/{platform_id}",
-    response_model=JournalPlatformResponse,
-    response_model_exclude_none=True,
-)
-def get_platform(
-    request: Request,
-    platform_id: UUID,
-    db: Annotated[Session, Depends(get_db)],
-    principal: Annotated[Principal, Depends(get_principal)],
-) -> JournalPlatformResponse:
-    return JournalPlatformService(db, principal.user, request.state.request_id).get(
-        str(platform_id)
-    )
-
-
-@router.patch(
-    "/journal-platforms/{platform_id}",
-    response_model=JournalPlatformResponse,
-    response_model_exclude_none=True,
-)
-def update_platform(
-    request: Request,
-    platform_id: UUID,
-    payload: JournalPlatformUpdate,
-    db: Annotated[Session, Depends(get_db)],
-    principal: Annotated[Principal, Depends(require_csrf)],
-) -> JournalPlatformResponse:
-    return JournalPlatformService(db, principal.user, request.state.request_id).update(
-        str(platform_id), payload
-    )
-
-
-@router.delete("/journal-platforms/{platform_id}", status_code=204, response_model=None)
-def delete_platform(
-    request: Request,
-    platform_id: UUID,
-    db: Annotated[Session, Depends(get_db)],
-    principal: Annotated[Principal, Depends(require_csrf)],
-) -> Response:
-    JournalPlatformService(db, principal.user, request.state.request_id).delete(
-        str(platform_id)
-    )
-    return Response(status_code=204)
-
-
 @router.get("/journals", response_model=JournalPage, response_model_exclude_none=True)
 def list_journals(
     request: Request,
@@ -252,7 +155,7 @@ def list_journals(
     page_size: Annotated[int, Query(ge=1, le=100)] = 20,
     name: str | None = None,
     publisher_id: UUID | None = None,
-    platform_id: UUID | None = None,
+    platform_code: str | None = Query(None, max_length=64),
     issn: str | None = None,
     status: str | None = None,
     sort: str = "name",
@@ -263,7 +166,7 @@ def list_journals(
         page_size=page_size,
         name=name,
         publisher_id=str(publisher_id) if publisher_id else None,
-        platform_id=str(platform_id) if platform_id else None,
+        platform_code=str(platform_code) if platform_code else None,
         issn=issn,
         status=status,
         sort=sort,

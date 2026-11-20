@@ -36,7 +36,7 @@ cd "$PROJECT_ROOT/backend"
 ../.venv/bin/python -m alembic check
 ```
 
-完全迁移后的模式包含 31 张应用表和 1 张 `alembic_version` 表。模块 3 的初始迁移为 `0007_registration_foundation`，它新增 6 张表并扩展模块 2 的投稿入口表；`0008_registration_conflict_guard` 增加作者与投稿入口维度的数据库冲突唯一约束。升级前如已有相同作用域的未决任务，必须先人工核查并整理这些任务，不能靠删除或覆盖历史记录绕过冲突。
+完全迁移后的模式包含 23 张应用表和 1 张 `alembic_version` 表。`0010_domain_wide_tables` 将出版社注册支持、出版社/期刊别名和平台适配器配置合并到对应领域宽表，ISSN/EISSN 直接读取 `journals` 自有字段，并删除未投入使用的出版社账号、邮箱验证记录和平台目录。迁移先校验旧数据，再复制和核对，最后才删除 8 张旧表；升级前如已有相同作用域的未决任务，必须先人工核查并整理这些任务，不能靠删除或覆盖历史记录绕过冲突。
 
 ### 2.3 启动后端、两个 Worker 和前端
 
@@ -66,25 +66,21 @@ curl --fail --silent http://127.0.0.1:5173/ >/dev/null
 
 | 归属 | 表 | 关系与用途 |
 | --- | --- | --- |
-| 模块 2 身份基础 | `publishers`、`journals` | 出版社与期刊主记录；期刊通过 `publisher_id` 归属出版社。 |
-| 模块 2 身份证据 | `publisher_aliases`、`journal_aliases`、`journal_identifiers` | 分别关联出版社或期刊，保存别名及 ISSN/EISSN 等规范化身份标识。 |
+| 模块 2 出版社宽表 | `publishers` | 保存出版社身份、JSON 别名及 `registration_code`、`registration_support_status`、`registration_support_level` 等注册支持字段。 |
+| 模块 2 期刊宽表 | `journals` | 通过 `publisher_id` 归属出版社；直接保存 ISSN/EISSN、`platform_code` 和 JSON 别名，不再有重复标识子表。 |
 | 模块 2 识别任务 | `discovery_tasks` | 保存网络识别任务、幂等键、检查点、租约和重试状态，可关联期刊及作者。 |
 | 模块 2 识别证据 | `journal_source_snapshots`、`journal_discovery_logs` | 通过 `task_id` 关联识别任务，并可关联期刊；保存页面快照元数据和追加式发现日志。 |
-| 模块 2/3 共享边界 | `journal_submission_portals` | 必须关联 `journals`，可回溯 `discovery_tasks`；模块 3 增加规范化主机、适配器、支持状态、核验人和核验证据引用。 |
-| 模块 3 支持目录 | `publisher_registration_support` | 一对一关联 `publishers`；声明 V0.1 支持范围，不代表已获真实平台注册授权。 |
-| 模块 3 适配器目录 | `platform_adapters` | 保存适配器版本、支持状态、允许域名和能力元数据；由投稿入口引用。 |
-| 模块 3 账号元数据 | `publisher_accounts` | 关联作者、出版社和可选期刊；只保存账号状态及凭据引用，不向 API 暴露凭据。 |
-| 模块 3 注册任务 | `registration_tasks` | 关联作者、出版社、期刊、投稿入口、账号和 `author_authorizations`；保存授权 ID、幂等键、状态、检查点、租约及重试信息。 |
-| 模块 3 邮箱验证元数据 | `email_verification_records` | 关联账号和注册任务，仅为后续受控验证保留状态与证据引用；本阶段不读取真实邮箱。 |
-| 模块 3 一次性确认 | `registration_confirmations` | 关联注册任务和请求用户，只保存摘要哈希、Token 哈希、到期时间和消费时间。 |
+| 模块 2/3 共享边界 | `journal_submission_portals` | 必须关联 `journals`，可回溯 `discovery_tasks`；直接保存规范化主机、入口支持状态、核验信息及 `adapter_*` 适配器配置。 |
+| 模块 3 注册任务 | `registration_tasks` | 关联作者、出版社、期刊、投稿入口和 `author_authorizations`；保存授权 ID、幂等键、状态、检查点、租约及重试信息，不再关联出版社账号目录。 |
+| 模块 3 一次性确认 | `registration_confirmations` | 关联注册任务和请求用户，只保存摘要哈希、Token 哈希、到期时间和消费时间；保留多次挑战历史以防重放。 |
 
-注册授权还依赖既有身份表 `users`、`roles`、`user_roles`、`authors` 和 `author_authorizations`。外键均使用受控关联和 `RESTRICT` 删除策略；授权记录是注册任务不可缺少的一部分，而不是可由期刊或稿件读取权限替代的关系。
+注册授权还依赖既有身份表 `users`、`roles`、`user_roles`、`authors` 和 `author_authorizations`。外键均使用受控关联和 `RESTRICT` 删除策略；授权记录是注册任务不可缺少的一部分，而不是可由期刊或稿件读取权限替代的关系。`publisher_accounts`、`email_verification_records`、`publisher_registration_support`、`platform_adapters`、`journal_platforms`、`publisher_aliases`、`journal_aliases` 和 `journal_identifiers` 已在 `0010` 中删除，不再被当前代码使用。
 
 ## 4. 权限与准入规则
 
 ### 4.1 角色能力和作者授权必须同时成立
 
-- 注册相关操作要求登录会话；创建、取消和重试任务还要求 CSRF。出版社支持配置及投稿入口配置仅系统管理员可修改，并要求 CSRF。平台适配器目录仅系统管理员和投稿操作员可读取，响应不包含能力配置或内部验收说明。
+- 注册相关操作要求登录会话；创建、取消和重试任务还要求 CSRF。出版社支持字段及投稿入口/内联适配器配置仅系统管理员可修改，并要求 CSRF。入口响应不包含适配器能力配置或内部验收说明。
 - `account:register`、`email:verification:read` 和 `credential:use` 是三个独立权限，任何一个都不能由其他权限或 `manuscript:read` 替代。
 - 注册任务要求当前角色具备 `account:register` 能力，并且请求中的 `authorization_id` 对应当前用户、当前作者的有效 `author_authorizations` 记录。授权必须已生效、未到期、未撤销，且包含该权限。
 - 系统管理员也不能省略作者显式授权；只读角色即使持有授权记录也仍被角色能力拒绝。
@@ -95,8 +91,8 @@ curl --fail --silent http://127.0.0.1:5173/ >/dev/null
 1. 出版社属于 Springer Nature、Elsevier、Wiley、Taylor & Francis 或 SAGE 的 V0.1 支持集合，支持级别为 `V0_1` 且状态为 `SUPPORTED`。
 2. 期刊存在、未删除且确实属于该出版社。
 3. 投稿入口属于该期刊，`support_status=SUPPORTED` 且 `verification_status=VERIFIED`。
-4. 入口绑定的适配器为 `SUPPORTED`，适配器平台类型、入口平台代码与请求平台代码一致。
-5. 入口最终 URL 必须使用 HTTPS 和标准 TLS 端口（缺省或 443），其精确主机名与入口 `normalized_host` 一致，并位于该适配器的允许域名集合中；大小写和末尾点规范化不放宽主机匹配。
+4. 入口的 `adapter_support_status` 为 `SUPPORTED`，适配器代码和版本完整，入口平台代码与请求平台代码一致。
+5. 入口最终 URL 必须使用 HTTPS 和标准 TLS 端口（缺省或 443），其精确主机名与入口 `normalized_host` 一致，并位于入口 `adapter_allowed_domains` 集合中；大小写和末尾点规范化不放宽主机匹配。
 
 ## 5. 任务、Worker 恢复与确认防重放
 
@@ -172,9 +168,7 @@ git status --short
 已提交的 `docs/api/v0.1-openapi.json` 是以下路由的权威请求/响应契约：
 
 - `GET /api/v1/registration/publishers` 与 `GET /api/v1/registration/publishers/{publisher_id}/journals`：读取安全目录元数据；
-- `PUT /api/v1/registration/publishers/{publisher_id}/support`：管理员配置出版社支持；
-- `GET /api/v1/registration/platform-adapters`：读取适配器元数据；
-- `PATCH /api/v1/registration/submission-portals/{portal_id}`：管理员配置入口支持及适配器；
+- `PUT /api/v1/registration/publishers/{publisher_id}/support`：管理员配置出版社宽表中的注册支持字段；
+- `PATCH /api/v1/registration/submission-portals/{portal_id}`：管理员配置入口支持状态及内联 `adapter_*` 字段；
 - `POST/GET /api/v1/registration/tasks`、`GET /api/v1/registration/tasks/{task_id}`：创建和查询授权范围内任务；
-- `POST /api/v1/registration/tasks/{task_id}/cancel` 与 `/retry`：按状态机取消或重试；
-- `GET /api/v1/publisher-accounts`：读取当前操作者范围内、不含凭据的账号元数据。
+- `POST /api/v1/registration/tasks/{task_id}/cancel` 与 `/retry`：按状态机取消或重试。

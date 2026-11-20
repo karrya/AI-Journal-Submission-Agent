@@ -93,15 +93,15 @@ session = SessionLocal()
 try:
     names = set(inspect(session.bind).get_table_names())
     application_tables = names - {"alembic_version"}
-    assert len(application_tables) == 31, sorted(application_tables)
+    assert len(application_tables) == 23, sorted(application_tables)
     assert "alembic_version" in names
-    print("31 application tables plus alembic_version; migration head verified")
+    print("23 application tables plus alembic_version; migration head verified")
 finally:
     session.close()
 PY
 ```
 
-模式包含 31 张应用表；`alembic_version` 用于迁移簿记，因此完全迁移的 MySQL 模式共含 32 张表。模块 3 新增 6 张表并扩展模块 2 的 `journal_submission_portals`，具体关系和阶段一验收见[注册基础与阶段一验收](registration-foundation.md)。
+模式包含 23 张应用表；`alembic_version` 用于迁移簿记，因此完全迁移的 MySQL 模式共含 24 张表。`0010_domain_wide_tables` 将出版社注册支持、别名和入口适配器配置合并到领域宽表，直接复用期刊自身的 ISSN/EISSN，并删除未投入使用的账号、邮箱验证和平台目录表。原表只会在数据复制与校验通过后删除；模块 3 的表关系和阶段一验收见[注册基础与阶段一验收](registration-foundation.md)。
 
 ## 4. 隐藏输入创建管理员与首次登录
 

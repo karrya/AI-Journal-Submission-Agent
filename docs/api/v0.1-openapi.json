@@ -3738,404 +3738,6 @@
         }
       }
     },
-    "/api/v1/journal-platforms": {
-      "get": {
-        "tags": [
-          "journals"
-        ],
-        "summary": "获取期刊平台列表",
-        "operationId": "list_platforms_api_v1_journal_platforms_get",
-        "parameters": [
-          {
-            "name": "page",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "default": 1,
-              "title": "页码"
-            }
-          },
-          {
-            "name": "page_size",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "maximum": 100,
-              "minimum": 1,
-              "default": 20,
-              "title": "每页数量"
-            }
-          },
-          {
-            "name": "code",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "代码"
-            }
-          },
-          {
-            "name": "name",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "名称"
-            }
-          },
-          {
-            "name": "status",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "enum": [
-                    "active",
-                    "needs_review",
-                    "disabled"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "状态"
-            }
-          },
-          {
-            "name": "sort",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "default": "code",
-              "title": "排序字段"
-            }
-          },
-          {
-            "name": "order",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string",
-              "default": "asc",
-              "title": "排序方向"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "请求成功",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Page_JournalPlatformResponse_"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "请求参数校验失败",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "journals"
-        ],
-        "summary": "创建期刊平台",
-        "operationId": "create_platform_api_v1_journal_platforms_post",
-        "parameters": [
-          {
-            "name": "Origin",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "请求来源"
-            }
-          },
-          {
-            "name": "X-CSRF-Token",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "CSRF 防护令牌"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/JournalPlatformCreate"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "创建成功",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/JournalPlatformResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "请求参数校验失败",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/journal-platforms/{platform_id}": {
-      "get": {
-        "tags": [
-          "journals"
-        ],
-        "summary": "获取期刊平台详情",
-        "operationId": "get_platform_api_v1_journal_platforms__platform_id__get",
-        "parameters": [
-          {
-            "name": "platform_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "平台 ID"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "请求成功",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/JournalPlatformResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "请求参数校验失败",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "patch": {
-        "tags": [
-          "journals"
-        ],
-        "summary": "更新期刊平台",
-        "operationId": "update_platform_api_v1_journal_platforms__platform_id__patch",
-        "parameters": [
-          {
-            "name": "platform_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "平台 ID"
-            }
-          },
-          {
-            "name": "Origin",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "请求来源"
-            }
-          },
-          {
-            "name": "X-CSRF-Token",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "CSRF 防护令牌"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/JournalPlatformUpdate"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "请求成功",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/JournalPlatformResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "请求参数校验失败",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "delete": {
-        "tags": [
-          "journals"
-        ],
-        "summary": "删除期刊平台",
-        "operationId": "delete_platform_api_v1_journal_platforms__platform_id__delete",
-        "parameters": [
-          {
-            "name": "platform_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "平台 ID"
-            }
-          },
-          {
-            "name": "Origin",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "请求来源"
-            }
-          },
-          {
-            "name": "X-CSRF-Token",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "CSRF 防护令牌"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "操作成功，无返回内容"
-          },
-          "422": {
-            "description": "请求参数校验失败",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/v1/journals": {
       "get": {
         "tags": [
@@ -4201,20 +3803,20 @@
             }
           },
           {
-            "name": "platform_id",
+            "name": "platform_code",
             "in": "query",
             "required": false,
             "schema": {
               "anyOf": [
                 {
                   "type": "string",
-                  "format": "uuid"
+                  "maxLength": 64
                 },
                 {
                   "type": "null"
                 }
               ],
-              "title": "平台 ID"
+              "title": "平台代码"
             }
           },
           {
@@ -4931,37 +4533,6 @@
         }
       }
     },
-    "/api/v1/registration/platform-adapters": {
-      "get": {
-        "tags": [
-          "registration"
-        ],
-        "summary": "获取注册平台适配器",
-        "operationId": "list_registration_adapters_api_v1_registration_platform_adapters_get",
-        "responses": {
-          "200": {
-            "description": "请求成功",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PlatformAdapterListResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "请求参数校验失败",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/v1/registration/submission-portals/{portal_id}": {
       "patch": {
         "tags": [
@@ -5454,62 +5025,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/RegistrationTaskResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "请求参数校验失败"
-          }
-        }
-      }
-    },
-    "/api/v1/publisher-accounts": {
-      "get": {
-        "tags": [
-          "registration"
-        ],
-        "summary": "获取出版社账号列表",
-        "operationId": "list_publisher_accounts_api_v1_publisher_accounts_get",
-        "parameters": [
-          {
-            "name": "page",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "default": 1,
-              "title": "页码"
-            }
-          },
-          {
-            "name": "page_size",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "maximum": 100,
-              "minimum": 1,
-              "default": 20,
-              "title": "每页数量"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "请求成功",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PublisherAccountPage"
                 }
               }
             }
@@ -9648,17 +9163,18 @@
             "format": "uuid",
             "title": "出版商 ID"
           },
-          "platform_id": {
+          "platform_code": {
             "anyOf": [
               {
                 "type": "string",
-                "format": "uuid"
+                "maxLength": 64,
+                "minLength": 1
               },
               {
                 "type": "null"
               }
             ],
-            "title": "平台 ID"
+            "title": "平台代码"
           },
           "name": {
             "type": "string",
@@ -9883,158 +9399,6 @@
         ],
         "title": "期刊下拉选项响应"
       },
-      "JournalPlatformCreate": {
-        "properties": {
-          "code": {
-            "type": "string",
-            "maxLength": 64,
-            "minLength": 1,
-            "title": "代码"
-          },
-          "name": {
-            "type": "string",
-            "maxLength": 255,
-            "minLength": 1,
-            "title": "名称"
-          },
-          "description": {
-            "type": "string",
-            "title": "描述",
-            "default": ""
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "active",
-              "needs_review",
-              "disabled"
-            ],
-            "title": "状态",
-            "default": "active"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "code",
-          "name"
-        ],
-        "title": "期刊平台创建请求"
-      },
-      "JournalPlatformResponse": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "资源 ID"
-          },
-          "code": {
-            "type": "string",
-            "maxLength": 64,
-            "title": "代码"
-          },
-          "name": {
-            "type": "string",
-            "maxLength": 255,
-            "title": "名称"
-          },
-          "description": {
-            "type": "string",
-            "title": "描述"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "active",
-              "needs_review",
-              "disabled"
-            ],
-            "title": "状态"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "创建时间"
-          },
-          "updated_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "更新时间"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "id",
-          "code",
-          "name",
-          "description",
-          "status",
-          "created_at",
-          "updated_at"
-        ],
-        "title": "期刊平台响应"
-      },
-      "JournalPlatformUpdate": {
-        "properties": {
-          "code": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 64,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "代码"
-          },
-          "name": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 255,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "名称"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "描述"
-          },
-          "status": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "active",
-                  "needs_review",
-                  "disabled"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "状态"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "title": "期刊平台更新请求"
-      },
       "JournalRequirement": {
         "properties": {
           "key": {
@@ -10098,17 +9462,17 @@
             "format": "uuid",
             "title": "出版商 ID"
           },
-          "platform_id": {
+          "platform_code": {
             "anyOf": [
               {
                 "type": "string",
-                "format": "uuid"
+                "maxLength": 64
               },
               {
                 "type": "null"
               }
             ],
-            "title": "平台 ID"
+            "title": "平台代码"
           },
           "name": {
             "type": "string",
@@ -10251,7 +9615,7 @@
         "required": [
           "id",
           "publisher_id",
-          "platform_id",
+          "platform_code",
           "name",
           "issn",
           "eissn",
@@ -10315,17 +9679,18 @@
             ],
             "title": "出版商 ID"
           },
-          "platform_id": {
+          "platform_code": {
             "anyOf": [
               {
                 "type": "string",
-                "format": "uuid"
+                "maxLength": 64,
+                "minLength": 1
               },
               {
                 "type": "null"
               }
             ],
-            "title": "平台 ID"
+            "title": "平台代码"
           },
           "name": {
             "anyOf": [
@@ -11919,42 +11284,6 @@
         ],
         "title": "机构摘要分页响应"
       },
-      "Page_JournalPlatformResponse_": {
-        "properties": {
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/JournalPlatformResponse"
-            },
-            "type": "array",
-            "title": "记录列表"
-          },
-          "page": {
-            "type": "integer",
-            "minimum": 1.0,
-            "title": "页码"
-          },
-          "page_size": {
-            "type": "integer",
-            "maximum": 100.0,
-            "minimum": 1.0,
-            "title": "每页数量"
-          },
-          "total": {
-            "type": "integer",
-            "minimum": 0.0,
-            "title": "总记录数"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "items",
-          "page",
-          "page_size",
-          "total"
-        ],
-        "title": "期刊平台分页响应"
-      },
       "Page_JournalResponse_": {
         "properties": {
           "items": {
@@ -12170,267 +11499,6 @@
           "total"
         ],
         "title": "注册任务分页响应"
-      },
-      "PlatformAdapterListResponse": {
-        "properties": {
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/PlatformAdapterResponse"
-            },
-            "type": "array",
-            "title": "记录列表"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "items"
-        ],
-        "title": "平台适配器列表响应"
-      },
-      "PlatformAdapterResponse": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "资源 ID"
-          },
-          "adapter_code": {
-            "type": "string",
-            "title": "适配器代码"
-          },
-          "adapter_name": {
-            "type": "string",
-            "title": "适配器名称"
-          },
-          "platform_type": {
-            "type": "string",
-            "title": "平台类型"
-          },
-          "adapter_version": {
-            "type": "string",
-            "title": "适配器版本"
-          },
-          "support_status": {
-            "type": "string",
-            "title": "支持状态"
-          },
-          "allowed_domains": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "允许的域名列表"
-          },
-          "last_verified_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "最近验收时间"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "创建时间"
-          },
-          "updated_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "更新时间"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "id",
-          "adapter_code",
-          "adapter_name",
-          "platform_type",
-          "adapter_version",
-          "support_status",
-          "allowed_domains",
-          "last_verified_at",
-          "created_at",
-          "updated_at"
-        ],
-        "title": "平台适配器响应"
-      },
-      "PublisherAccountPage": {
-        "properties": {
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/PublisherAccountResponse"
-            },
-            "type": "array",
-            "title": "记录列表"
-          },
-          "page": {
-            "type": "integer",
-            "minimum": 1.0,
-            "title": "页码"
-          },
-          "page_size": {
-            "type": "integer",
-            "maximum": 100.0,
-            "minimum": 1.0,
-            "title": "每页数量"
-          },
-          "total": {
-            "type": "integer",
-            "minimum": 0.0,
-            "title": "总记录数"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "items",
-          "page",
-          "page_size",
-          "total"
-        ],
-        "title": "出版社账号分页响应"
-      },
-      "PublisherAccountResponse": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "资源 ID"
-          },
-          "author_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "作者 ID"
-          },
-          "publisher_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "出版商 ID"
-          },
-          "journal_id": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "uuid"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "期刊 ID"
-          },
-          "platform_code": {
-            "type": "string",
-            "title": "平台代码"
-          },
-          "account_namespace": {
-            "type": "string",
-            "title": "出版社账号命名空间"
-          },
-          "account_email": {
-            "type": "string",
-            "title": "出版社账号邮箱"
-          },
-          "platform_account_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "平台账号 ID"
-          },
-          "username": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "用户名"
-          },
-          "account_status": {
-            "type": "string",
-            "title": "出版社账号状态"
-          },
-          "email_verified_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "邮箱验证时间"
-          },
-          "registered_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "注册完成时间"
-          },
-          "last_checked_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "最近检查时间"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "创建时间"
-          },
-          "updated_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "更新时间"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "id",
-          "author_id",
-          "publisher_id",
-          "journal_id",
-          "platform_code",
-          "account_namespace",
-          "account_email",
-          "platform_account_id",
-          "username",
-          "account_status",
-          "email_verified_at",
-          "registered_at",
-          "last_checked_at",
-          "created_at",
-          "updated_at"
-        ],
-        "title": "出版社账号响应"
       },
       "PublisherCandidate": {
         "properties": {
@@ -12937,17 +12005,99 @@
       },
       "RegistrationPortalUpdate": {
         "properties": {
-          "platform_adapter_id": {
+          "adapter_code": {
             "anyOf": [
               {
                 "type": "string",
-                "format": "uuid"
+                "maxLength": 100,
+                "minLength": 1
               },
               {
                 "type": "null"
               }
             ],
-            "title": "平台适配器 ID"
+            "title": "适配器代码"
+          },
+          "adapter_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "适配器名称"
+          },
+          "adapter_version": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "适配器版本"
+          },
+          "adapter_support_status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "SUPPORTED",
+                  "TESTING",
+                  "DISABLED"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "适配器支持状态"
+          },
+          "adapter_allowed_domains": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "maxItems": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "适配器允许的域名列表"
+          },
+          "adapter_last_verified_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "适配器最近验收时间"
+          },
+          "adapter_verification_notes": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "适配器验收说明"
           },
           "support_status": {
             "anyOf": [
@@ -13150,17 +12300,75 @@
             "type": "string",
             "title": "平台代码"
           },
-          "platform_adapter_id": {
+          "adapter_code": {
             "anyOf": [
               {
-                "type": "string",
-                "format": "uuid"
+                "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "平台适配器 ID"
+            "title": "适配器代码"
+          },
+          "adapter_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "适配器名称"
+          },
+          "adapter_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "适配器版本"
+          },
+          "adapter_support_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "适配器支持状态"
+          },
+          "adapter_allowed_domains": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "适配器允许的域名列表"
+          },
+          "adapter_last_verified_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "适配器最近验收时间"
           },
           "support_status": {
             "type": "string",
@@ -13189,7 +12397,12 @@
           "verification_status",
           "access_status",
           "platform_code",
-          "platform_adapter_id",
+          "adapter_code",
+          "adapter_name",
+          "adapter_version",
+          "adapter_support_status",
+          "adapter_allowed_domains",
+          "adapter_last_verified_at",
           "support_status",
           "confidence",
           "evidence_summary"

@@ -6,19 +6,11 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
-from app.models import Journal, JournalPlatform, Publisher, User, utc_now
-from app.repositories.journals import (
-    JournalPlatformRepository,
-    JournalRepository,
-    PublisherRepository,
-)
+from app.models import Journal, Publisher, User, utc_now
+from app.repositories.journals import JournalRepository, PublisherRepository
 from app.schemas.journals import (
     JournalCreate,
     JournalPage,
-    JournalPlatformCreate,
-    JournalPlatformPage,
-    JournalPlatformResponse,
-    JournalPlatformUpdate,
     JournalResponse,
     JournalUpdate,
     PublisherCreate,
@@ -196,128 +188,11 @@ class PublisherService(JournalResourceService):
         self._commit()
 
 
-class JournalPlatformService(JournalResourceService):
-    def __init__(self, db: Session, user: User, request_id: str):
-        super().__init__(db, user, request_id)
-        self.repository = JournalPlatformRepository(db)
-
-    def _response(self, platform: JournalPlatform) -> JournalPlatformResponse:
-        return self._timestamped_response(
-            JournalPlatformResponse.model_validate(platform)
-        )
-
-    def list_page(
-        self,
-        *,
-        page: int,
-        page_size: int,
-        code: str | None,
-        name: str | None,
-        status: str | None,
-        sort: str,
-        order: str,
-    ) -> JournalPlatformPage:
-        self._require_reader()
-        self._validate_sort(self.repository, sort)
-        records, total = self.repository.list_page(
-            page=page,
-            page_size=page_size,
-            code=code,
-            name=normalize_display_name(name) if name else None,
-            status=status,
-            sort=sort,
-            order=order,
-        )
-        return JournalPlatformPage(
-            items=[self._response(record) for record in records],
-            page=page,
-            page_size=page_size,
-            total=total,
-        )
-
-    def get(self, platform_id: str) -> JournalPlatformResponse:
-        self._require_reader()
-        platform = self.repository.get(platform_id)
-        if platform is None:
-            raise _not_found()
-        return self._response(platform)
-
-    def create(self, payload: JournalPlatformCreate) -> JournalPlatformResponse:
-        self._require_admin()
-        values = payload.model_dump()
-        values["name"] = normalize_display_name(values["name"])
-        platform = self.repository.add(
-            JournalPlatform(**values, created_by=self.user.id)
-        )
-        self._flush()
-        self._business_audit(
-            action="journal_platform.create",
-            target_type="journal_platform",
-            target_id=platform.id,
-            after={
-                "code": platform.code,
-                "name": platform.name,
-                "status": platform.status,
-            },
-        )
-        self._commit()
-        return self._response(platform)
-
-    def update(
-        self, platform_id: str, payload: JournalPlatformUpdate
-    ) -> JournalPlatformResponse:
-        self._require_admin()
-        platform = self.repository.get(platform_id)
-        if platform is None:
-            raise _not_found()
-        values = payload.model_dump(exclude_unset=True)
-        for field in ("code", "name", "description", "status"):
-            if field in values and values[field] is None:
-                raise _validation(f"{field} 不能为空")
-        if "name" in values:
-            values["name"] = normalize_display_name(values["name"])
-        before = {
-            key: getattr(platform, key)
-            for key in ("code", "name", "status")
-            if key in values
-        }
-        for key, value in values.items():
-            setattr(platform, key, value)
-        self._flush()
-        self._business_audit(
-            action="journal_platform.update",
-            target_type="journal_platform",
-            target_id=platform.id,
-            before=before,
-            after={
-                key: values[key] for key in ("code", "name", "status") if key in values
-            },
-        )
-        self._commit()
-        return self._response(platform)
-
-    def delete(self, platform_id: str) -> None:
-        self._require_admin()
-        platform = self.repository.get(platform_id)
-        if platform is None:
-            raise _not_found()
-        platform.deleted_at = utc_now()
-        self._business_audit(
-            action="journal_platform.delete",
-            target_type="journal_platform",
-            target_id=platform.id,
-            before={"deleted": False},
-            after={"deleted": True},
-        )
-        self._commit()
-
-
 class JournalService(JournalResourceService):
     def __init__(self, db: Session, user: User, request_id: str):
         super().__init__(db, user, request_id)
         self.repository = JournalRepository(db)
         self.publishers = PublisherRepository(db)
-        self.platforms = JournalPlatformRepository(db)
 
     @staticmethod
     def _response(journal: Journal) -> JournalResponse:
@@ -357,11 +232,6 @@ class JournalService(JournalResourceService):
             if self.publishers.get(publisher_id) is None:
                 raise _not_found()
             values["publisher_id"] = publisher_id
-        if "platform_id" in values and values["platform_id"] is not None:
-            platform_id = str(values["platform_id"])
-            if self.platforms.get(platform_id) is None:
-                raise _not_found()
-            values["platform_id"] = platform_id
 
     def list_page(
         self,
@@ -370,7 +240,7 @@ class JournalService(JournalResourceService):
         page_size: int,
         name: str | None,
         publisher_id: str | None,
-        platform_id: str | None,
+        platform_code: str | None,
         issn: str | None,
         status: str | None,
         sort: str,
@@ -389,7 +259,7 @@ class JournalService(JournalResourceService):
             page_size=page_size,
             name=normalize_display_name(name) if name else None,
             publisher_id=publisher_id,
-            platform_id=platform_id,
+            platform_code=platform_code,
             issn=normalized_issn,
             status=status,
             sort=sort,
@@ -421,14 +291,13 @@ class JournalService(JournalResourceService):
         self._flush()
         identification = JournalIdentificationService(self.db, self.user, self.request_id)
         identification.replace_journal_aliases(journal, aliases)
-        identification.replace_journal_identifiers(journal)
         self._business_audit(
             action="journal.create",
             target_type="journal",
             target_id=journal.id,
             after={
                 "publisher_id": journal.publisher_id,
-                "platform_id": journal.platform_id,
+                "platform_code": journal.platform_code,
                 "name": journal.name,
                 "issn": journal.issn,
                 "eissn": journal.eissn,
@@ -458,14 +327,13 @@ class JournalService(JournalResourceService):
             values["name"] = normalize_display_name(values["name"])
         self._require_related(values)
         values = self._database_values(values)
-        safe_fields = ("publisher_id", "platform_id", "name", "issn", "eissn", "status")
+        safe_fields = ("publisher_id", "platform_code", "name", "issn", "eissn", "status")
         before = {key: getattr(journal, key) for key in safe_fields if key in values}
         for key, value in values.items():
             setattr(journal, key, value)
         identification = JournalIdentificationService(self.db, self.user, self.request_id)
         if aliases is not None:
             identification.replace_journal_aliases(journal, aliases)
-        identification.replace_journal_identifiers(journal)
         self._flush()
         self._business_audit(
             action="journal.update",

@@ -4,7 +4,7 @@ import time
 from datetime import UTC
 from uuid import UUID
 
-from sqlalchemy import delete, select
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from app.core.errors import AppError
@@ -12,11 +12,8 @@ from app.core.errors import AppError
 from app.models import (
     DiscoveryTask,
     Journal,
-    JournalAlias,
-    JournalIdentifier,
     JournalSubmissionPortal,
     Publisher,
-    PublisherAlias,
     utc_now,
 )
 from app.repositories.identification import IdentificationRepository
@@ -55,6 +52,24 @@ def _domain(value: str | None) -> str | None:
         raise AppError(422, "VALIDATION_ERROR", str(exc)) from None
 
 
+def _alias_records(aliases: list[str]) -> list[dict]:
+    return [
+        {
+            "alias": alias,
+            "normalized_alias": normalize_comparison(alias),
+            "source_url": None,
+            "verified_at": None,
+        }
+        for alias in dict.fromkeys(alias.strip() for alias in aliases if alias.strip())
+    ]
+
+
+def _has_alias(record: Publisher | Journal, normalized: str) -> bool:
+    return any(
+        item.get("normalized_alias") == normalized for item in record.aliases or []
+    )
+
+
 class PublisherIdentificationService(DomainService):
     def __init__(self, db, user, request_id):
         super().__init__(db, user, request_id)
@@ -90,19 +105,7 @@ class PublisherIdentificationService(DomainService):
     def replace_publisher_aliases(
         self, publisher: Publisher, aliases: list[str]
     ) -> None:
-        self.db.execute(
-            delete(PublisherAlias).where(PublisherAlias.publisher_id == publisher.id)
-        )
-        for alias in dict.fromkeys(
-            alias.strip() for alias in aliases if alias.strip()
-        ):
-            self.db.add(
-                PublisherAlias(
-                    publisher_id=publisher.id,
-                    alias=alias,
-                    normalized_alias=normalize_comparison(alias),
-                )
-            )
+        publisher.aliases = _alias_records(aliases)
         self._flush()
 
     def _candidate(
@@ -113,12 +116,7 @@ class PublisherIdentificationService(DomainService):
             normalized = normalize_comparison(name)
             if publisher.normalized_name == normalized:
                 reasons.append("名称精确匹配")
-            if self.db.scalar(
-                select(PublisherAlias).where(
-                    PublisherAlias.publisher_id == publisher.id,
-                    PublisherAlias.normalized_alias == normalized,
-                )
-            ):
+            if _has_alias(publisher, normalized):
                 reasons.append("别名精确匹配")
         if domain and publisher.primary_domain == domain:
             reasons.append("官方域名匹配")
@@ -208,55 +206,15 @@ class JournalIdentificationService(DomainService):
             issn=self._identifier(issn),
             eissn=self._identifier(eissn),
             identity_status="UNVERIFIED",
+            aliases=_alias_records(aliases),
             created_by=self.user.id,
         )
         self.db.add(journal)
         self.db.flush()
-        for identifier_type, value in (("ISSN", journal.issn), ("EISSN", journal.eissn)):
-            if value:
-                self.db.add(
-                    JournalIdentifier(
-                        journal_id=journal.id,
-                        identifier_type=identifier_type,
-                        identifier_value=value,
-                    )
-                )
-        for alias in dict.fromkeys(alias.strip() for alias in aliases if alias.strip()):
-            self.db.add(
-                JournalAlias(
-                    journal_id=journal.id,
-                    alias=alias,
-                    normalized_alias=normalize_comparison(alias),
-                )
-            )
-        self.db.flush()
         return journal
 
-    def replace_journal_identifiers(self, journal: Journal) -> None:
-        self.db.execute(
-            delete(JournalIdentifier).where(JournalIdentifier.journal_id == journal.id)
-        )
-        for identifier_type, value in (("ISSN", journal.issn), ("EISSN", journal.eissn)):
-            if value:
-                self.db.add(
-                    JournalIdentifier(
-                        journal_id=journal.id,
-                        identifier_type=identifier_type,
-                        identifier_value=value,
-                    )
-                )
-        self.db.flush()
-
     def replace_journal_aliases(self, journal: Journal, aliases: list[str]) -> None:
-        self.db.execute(delete(JournalAlias).where(JournalAlias.journal_id == journal.id))
-        for alias in dict.fromkeys(alias.strip() for alias in aliases if alias.strip()):
-            self.db.add(
-                JournalAlias(
-                    journal_id=journal.id,
-                    alias=alias,
-                    normalized_alias=normalize_comparison(alias),
-                )
-            )
+        journal.aliases = _alias_records(aliases)
         self.db.flush()
 
     def create_journal(
@@ -316,12 +274,7 @@ class JournalIdentificationService(DomainService):
             normalized = normalize_comparison(name)
             if normalize_comparison(journal.name) == normalized:
                 reasons.append("名称精确匹配")
-            if self.db.scalar(
-                select(JournalAlias).where(
-                    JournalAlias.journal_id == journal.id,
-                    JournalAlias.normalized_alias == normalized,
-                )
-            ):
+            if _has_alias(journal, normalized):
                 reasons.append("别名精确匹配")
         return JournalCandidate(
             id=UUID(journal.id),
@@ -340,14 +293,9 @@ class JournalIdentificationService(DomainService):
 
     def _name_or_alias_matches(self, journal: Journal, name: str) -> bool:
         normalized = normalize_comparison(name)
-        if normalize_comparison(journal.name) == normalized:
-            return True
-        return self.db.scalar(
-            select(JournalAlias.id).where(
-                JournalAlias.journal_id == journal.id,
-                JournalAlias.normalized_alias == normalized,
-            )
-        ) is not None
+        return normalize_comparison(journal.name) == normalized or _has_alias(
+            journal, normalized
+        )
 
     def _candidates(
         self,
@@ -695,11 +643,12 @@ class JournalIdentificationService(DomainService):
                     verification_status=record.verification_status,
                     access_status=record.access_status,
                     platform_code=record.platform_code,
-                    platform_adapter_id=(
-                        UUID(record.platform_adapter_id)
-                        if record.platform_adapter_id
-                        else None
-                    ),
+                    adapter_code=record.adapter_code,
+                    adapter_name=record.adapter_name,
+                    adapter_version=record.adapter_version,
+                    adapter_support_status=record.adapter_support_status,
+                    adapter_allowed_domains=record.adapter_allowed_domains,
+                    adapter_last_verified_at=record.adapter_last_verified_at,
                     support_status=record.support_status,
                     confidence=record.confidence,
                     evidence_summary=record.evidence_summary,
@@ -726,16 +675,13 @@ class JournalIdentificationService(DomainService):
         self.db.flush()
 
     def _has_duplicate_identifiers(self, journal: Journal) -> bool:
-        for identifier_type, value in (("ISSN", journal.issn), ("EISSN", journal.eissn)):
+        for column, value in ((Journal.issn, journal.issn), (Journal.eissn, journal.eissn)):
             if not value:
                 continue
             other = self.db.scalar(
-                select(JournalIdentifier)
-                .join(Journal, Journal.id == JournalIdentifier.journal_id)
-                .where(
-                    JournalIdentifier.identifier_type == identifier_type,
-                    JournalIdentifier.identifier_value == value,
-                    JournalIdentifier.journal_id != journal.id,
+                select(Journal.id).where(
+                    column == value,
+                    Journal.id != journal.id,
                     Journal.deleted_at.is_(None),
                 )
             )

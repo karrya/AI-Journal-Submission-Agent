@@ -1,6 +1,6 @@
 import re
 from datetime import UTC, datetime
-from typing import Annotated, Literal
+from typing import Annotated
 from uuid import UUID
 
 from pydantic import AfterValidator, Field, field_validator, model_validator
@@ -60,38 +60,6 @@ class PublisherResponse(OutputModel):
 PublisherPage = Page[PublisherResponse]
 
 
-class JournalPlatformCreate(InputModel):
-    code: str = Field(min_length=1, max_length=64)
-    name: str = Field(min_length=1, max_length=255)
-    description: str = ""
-    status: Literal["active", "needs_review", "disabled"] = "active"
-
-
-class JournalPlatformUpdate(InputModel):
-    code: str | None = Field(default=None, min_length=1, max_length=64)
-    name: str | None = Field(default=None, min_length=1, max_length=255)
-    description: str | None = None
-    status: Literal["active", "needs_review", "disabled"] | None = None
-
-    @model_validator(mode="after")
-    def require_change(self):
-        require_update_fields(self)
-        return self
-
-
-class JournalPlatformResponse(OutputModel):
-    id: UUID
-    code: str = Field(max_length=64)
-    name: str = Field(max_length=255)
-    description: str
-    status: Literal["active", "needs_review", "disabled"]
-    created_at: datetime
-    updated_at: datetime
-
-
-JournalPlatformPage = Page[JournalPlatformResponse]
-
-
 class JournalRequirement(InputModel):
     key: str = Field(min_length=1)
     value: str | int | float | bool = Field(allow_inf_nan=False)
@@ -116,7 +84,7 @@ class JournalRequirement(InputModel):
 
 class JournalCreate(InputModel):
     publisher_id: UUID
-    platform_id: UUID | None = None
+    platform_code: str | None = Field(default=None, min_length=1, max_length=64)
     name: str = Field(min_length=1, max_length=500)
     issn: Issn | None = None
     eissn: Issn | None = None
@@ -135,7 +103,7 @@ class JournalCreate(InputModel):
 
 class JournalUpdate(InputModel):
     publisher_id: UUID | None = None
-    platform_id: UUID | None = None
+    platform_code: str | None = Field(default=None, min_length=1, max_length=64)
     name: str | None = Field(default=None, min_length=1, max_length=500)
     issn: Issn | None = None
     eissn: Issn | None = None
@@ -160,7 +128,7 @@ class JournalUpdate(InputModel):
 class JournalResponse(OutputModel):
     id: UUID
     publisher_id: UUID
-    platform_id: UUID | None
+    platform_code: str | None = Field(max_length=64)
     name: str = Field(max_length=500)
     issn: Issn | None
     eissn: Issn | None

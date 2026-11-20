@@ -3,7 +3,7 @@ from datetime import UTC, timedelta
 from pathlib import Path
 from uuid import UUID
 
-from sqlalchemy import delete, or_, select, update
+from sqlalchemy import or_, select, update
 from sqlalchemy.sql.elements import ColumnElement
 
 from app.core.config import get_settings
@@ -13,10 +13,7 @@ from app.crawlers.url_security import SafeHttpClient, UrlSecurityError
 from app.models import (
     DiscoveryTask,
     Journal,
-    JournalAlias,
     JournalDiscoveryLog,
-    JournalIdentifier,
-    JournalPlatform,
     JournalSourceSnapshot,
     JournalSubmissionPortal,
     Publisher,
@@ -405,13 +402,10 @@ class NetworkIdentificationService:
         for journal in journals:
             if normalize_comparison(journal.name) == normalized_name:
                 continue
-            alias = self.session.scalar(
-                select(JournalAlias.id).where(
-                    JournalAlias.journal_id == journal.id,
-                    JournalAlias.normalized_alias == normalized_name,
-                )
-            )
-            if alias is None:
+            if not any(
+                item.get("normalized_alias") == normalized_name
+                for item in journal.aliases or []
+            ):
                 return True
         return False
 
@@ -465,21 +459,7 @@ class NetworkIdentificationService:
         journal.identity_status = "VERIFIED"
         journal.verified_at = utc_now()
         if candidate.platform_code and candidate.platform_code != "UNKNOWN":
-            platform = self.session.scalar(
-                select(JournalPlatform).where(JournalPlatform.code == candidate.platform_code)
-            )
-            if platform:
-                journal.platform_id = platform.id
-        self.session.execute(
-            delete(JournalIdentifier).where(JournalIdentifier.journal_id == journal.id)
-        )
-        for identifier_type, value in (("ISSN", journal.issn), ("EISSN", journal.eissn)):
-            if value:
-                self.session.add(JournalIdentifier(
-                    journal_id=journal.id,
-                    identifier_type=identifier_type,
-                    identifier_value=value,
-                ))
+            journal.platform_code = candidate.platform_code
         if candidate.submission_url:
             portal = JournalSubmissionPortal(
                 journal_id=journal.id,

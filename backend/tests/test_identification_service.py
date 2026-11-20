@@ -6,7 +6,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
-from app.models import DiscoveryTask, Journal, OperationLog, PublisherAlias
+from app.models import DiscoveryTask, Journal, OperationLog, Publisher
 from app.schemas.identification import ConfirmIdentityRequest, IdentifyRequest
 from app.services.identification import (
     JournalIdentificationService,
@@ -34,10 +34,25 @@ def test_create_publisher_deduplicates_aliases(db_session, admin):
     publisher = service.create_publisher(
         name="Publisher Aliases", website_url=None, aliases=["One", "One", " ", "Two"]
     )
-    rows = db_session.scalars(
-        select(PublisherAlias).where(PublisherAlias.publisher_id == publisher.id)
-    ).all()
-    assert {row.normalized_alias for row in rows} == {"one", "two"}
+    stored = db_session.get(Publisher, publisher.id)
+    assert {item["normalized_alias"] for item in stored.aliases} == {"one", "two"}
+
+
+def test_alias_search_treats_like_wildcards_as_literal_characters(db_session, admin):
+    service = PublisherIdentificationService(db_session, admin, "request-alias-wildcards")
+    publisher = service.create_publisher(
+        name="Wildcard Publisher",
+        website_url=None,
+        aliases=["foo_bar", "100%real", "slash\\name"],
+    )
+
+    for alias in ("foo_bar", "100%real", "slash\\name"):
+        result = service.search(name=alias, website_url=None, page=1, page_size=20)
+        assert [str(item.id) for item in result.items] == [publisher.id], alias
+    for non_exact in ("%", "fooXbar", "100-real"):
+        result = service.search(name=non_exact, website_url=None, page=1, page_size=20)
+        assert result.items == []
+        assert result.total == 0
 
 
 def test_publisher_search_rejects_unauthorized_role(db_session, operator):

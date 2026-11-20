@@ -160,6 +160,8 @@ class FakeConnection:
         statement = str(query)
         if statement == "SELECT DATABASE()":
             return self.database.name
+        if statement == "SELECT version_num FROM alembic_version":
+            return self.database.version
         if statement.startswith("SELECT COUNT(*) FROM `"):
             table = statement.removeprefix("SELECT COUNT(*) FROM `").removesuffix("`")
             return self.database.tables.get(table)
@@ -184,9 +186,10 @@ class FakeEngine:
 
 
 class FakeDatabase:
-    def __init__(self, name, tables=None):
+    def __init__(self, name, tables=None, version="0009"):
         self.name = name
         self.tables = dict(tables or {})
+        self.version = version
 
 
 def test_restore_refuses_development_target():
@@ -602,6 +605,88 @@ def test_non_utf8_dump_cleans_decrypted_extraction(tmp_path, age_identity):
     with pytest.raises(RestoreFailed):
         extract_verified_backup(archive, key_file, destination)
     assert not destination.exists()
+
+
+@pytest.mark.parametrize("source_contains_legacy", [True, False])
+def test_restore_allows_only_documented_consolidated_tables_to_disappear(
+    tmp_path, age_identity, source_contains_legacy
+):
+    archive, key_file = make_sql_archive(tmp_path, age_identity, b"")
+    source_tables = {
+        "authors": 1,
+        "auth_sessions": 30,
+        "alembic_version": 1,
+    }
+    if source_contains_legacy:
+        source_tables["publisher_aliases"] = 2
+    source = FakeDatabase("academic_submission_agent", source_tables)
+    target = FakeDatabase("academic_submission_agent_restore_test")
+    engines = {source.name: FakeEngine(source), target.name: FakeEngine(target)}
+
+    def mysql_runner(*args):
+        target.tables.update(
+            {"authors": 1, "publisher_aliases": 2, "alembic_version": 1}
+        )
+
+    def migration_runner(url):
+        target.tables.pop("publisher_aliases")
+        target.tables["auth_sessions"] = 0
+        target.version = "0010"
+
+    verification = restore_backup(
+        archive,
+        "mysql+pymysql://asa_app:unit-only-password@127.0.0.1/academic_submission_agent",
+        "mysql+pymysql://asa_test:target-unit-password@127.0.0.1/academic_submission_agent_restore_test",
+        tmp_path / "restored-storage",
+        confirmation="RESTORE",
+        age_secret_key_file=key_file,
+        live_storage=tmp_path / "live-storage",
+        engine_factory=lambda url: engines[make_url(url).database],
+        mysql_runner=mysql_runner,
+        migration_runner=migration_runner,
+    )
+
+    assert verification.compared_row_counts == 2
+    assert verification.table_count == 3
+
+
+def test_restore_rejects_consolidated_difference_without_0009_upgrade(
+    tmp_path, age_identity
+):
+    archive, key_file = make_sql_archive(tmp_path, age_identity, b"")
+    source = FakeDatabase(
+        "academic_submission_agent",
+        {
+            "authors": 1,
+            "publisher_aliases": 2,
+            "auth_sessions": 30,
+            "alembic_version": 1,
+        },
+        version="0009",
+    )
+    target = FakeDatabase("academic_submission_agent_restore_test")
+    engines = {source.name: FakeEngine(source), target.name: FakeEngine(target)}
+
+    def mysql_runner(*args):
+        target.tables.update({"authors": 1, "alembic_version": 1})
+        target.version = "0010"
+
+    def migration_runner(url):
+        target.tables["auth_sessions"] = 0
+
+    with pytest.raises(RestoreFailed, match="0009.*0010"):
+        restore_backup(
+            archive,
+            "mysql+pymysql://asa_app:unit-only-password@127.0.0.1/academic_submission_agent",
+            "mysql+pymysql://asa_test:target-unit-password@127.0.0.1/academic_submission_agent_restore_test",
+            tmp_path / "restored-storage",
+            confirmation="RESTORE",
+            age_secret_key_file=key_file,
+            live_storage=tmp_path / "live-storage",
+            engine_factory=lambda url: engines[make_url(url).database],
+            mysql_runner=mysql_runner,
+            migration_runner=migration_runner,
+        )
 
 
 def test_keyboard_interrupt_during_file_copy_cleans_and_propagates(

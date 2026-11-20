@@ -6,7 +6,7 @@ from urllib.parse import urlsplit
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
-from app.models import Journal, JournalSubmissionPortal, PlatformAdapter, Publisher
+from app.models import Journal, JournalSubmissionPortal, Publisher
 from app.repositories.registration import RegistrationRepository
 
 V01_PUBLISHER_CODES = frozenset(
@@ -19,7 +19,6 @@ class AdmissionResult:
     publisher: Publisher
     journal: Journal
     portal: JournalSubmissionPortal
-    adapter: PlatformAdapter
 
 
 def require_supported_registration_target(
@@ -30,12 +29,12 @@ def require_supported_registration_target(
     platform_code: str,
 ) -> AdmissionResult:
     repository = RegistrationRepository(db)
-    support = repository.publisher_support(publisher_id)
+    publisher = repository.publisher_support(publisher_id)
     if (
-        support is None
-        or support.publisher_code not in V01_PUBLISHER_CODES
-        or support.support_level != "V0_1"
-        or support.support_status != "SUPPORTED"
+        publisher is None
+        or publisher.registration_code not in V01_PUBLISHER_CODES
+        or publisher.registration_support_level != "V0_1"
+        or publisher.registration_support_status != "SUPPORTED"
     ):
         raise AppError(
             403, "PUBLISHER_NOT_IN_V01_WHITELIST", "出版社不在 V0.1 支持范围"
@@ -55,15 +54,13 @@ def require_supported_registration_target(
     if portal.verification_status != "VERIFIED":
         raise AppError(409, "JOURNAL_ENDPOINT_NOT_VERIFIED", "期刊入口尚未核验")
 
-    adapter = (
-        repository.adapter(portal.platform_adapter_id)
-        if portal.platform_adapter_id is not None
-        else None
-    )
-    if adapter is None or adapter.support_status != "SUPPORTED":
+    if (
+        not portal.adapter_code
+        or not portal.adapter_version
+        or portal.adapter_support_status != "SUPPORTED"
+        or portal.platform_code != platform_code
+    ):
         raise AppError(409, "PLATFORM_ADAPTER_NOT_SUPPORTED", "平台适配器尚未验收")
-    if portal.platform_code != platform_code or adapter.platform_type != portal.platform_code:
-        raise AppError(409, "PLATFORM_ADAPTER_NOT_SUPPORTED", "平台代码与入口不一致")
 
     try:
         parsed = urlsplit(portal.final_url)
@@ -75,7 +72,7 @@ def require_supported_registration_target(
         ) from None
     normalized_host = (portal.normalized_host or "").lower().rstrip(".")
     allowed_domains = {
-        str(domain).lower().rstrip(".") for domain in adapter.allowed_domains or []
+        str(domain).lower().rstrip(".") for domain in portal.adapter_allowed_domains or []
     }
     if (
         parsed.scheme.lower() != "https"
@@ -86,8 +83,4 @@ def require_supported_registration_target(
     ):
         raise AppError(403, "PLATFORM_DOMAIN_NOT_ALLOWED", "目标域名不在适配器白名单")
 
-    publisher = db.get(Publisher, publisher_id)
-    assert publisher is not None
-    return AdmissionResult(
-        publisher=publisher, journal=journal, portal=portal, adapter=adapter
-    )
+    return AdmissionResult(publisher=publisher, journal=journal, portal=portal)

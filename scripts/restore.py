@@ -23,6 +23,18 @@ from sqlalchemy.engine import Engine, make_url
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 BACKEND_DIR = PROJECT_ROOT / "backend"
 DEVELOPMENT_DATABASE = "academic_submission_agent"
+CONSOLIDATED_TABLES = frozenset(
+    {
+        "publisher_registration_support",
+        "publisher_aliases",
+        "journal_aliases",
+        "journal_identifiers",
+        "journal_platforms",
+        "platform_adapters",
+        "publisher_accounts",
+        "email_verification_records",
+    }
+)
 DATABASE_NAME = re.compile(r"^[A-Za-z][A-Za-z0-9_]*_test$")
 SAFE_NAME = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")
 
@@ -425,6 +437,17 @@ def _database_snapshot(engine: Engine, expected_database: str) -> dict[str, int]
         return snapshot
 
 
+def _alembic_version(engine: Engine, expected_database: str) -> str:
+    with engine.connect() as connection:
+        actual_database = connection.scalar(text("SELECT DATABASE()"))
+        if actual_database != expected_database:
+            raise RestoreFailed("已连接数据库与请求的目标不一致")
+        version = connection.scalar(text("SELECT version_num FROM alembic_version"))
+        if not isinstance(version, str):
+            raise RestoreFailed("无法确认转储的 Alembic 版本")
+        return version
+
+
 def _run_mysql_restore(
     command: Sequence[str], environment: dict[str, str], dump_path: Path
 ) -> None:
@@ -588,10 +611,15 @@ def restore_backup(
                 for table, count in source_before.items()
                 if table != "auth_sessions"
             }
-            if dumped_tables != expected_dump:
+            dump_differences = set(dumped_tables).symmetric_difference(expected_dump)
+            if not dump_differences.issubset(CONSOLIDATED_TABLES) or any(
+                dumped_tables[table] != expected_dump[table]
+                for table in set(dumped_tables).intersection(expected_dump)
+            ):
                 raise RestoreFailed(
                     "恢复后的导出表或数据行与源数据库不一致"
                 )
+            migration_version = _alembic_version(target_engine, target_url.database)
             migration_runner(target_database_url)
 
             if target.exists() and any(target.iterdir()):
@@ -614,10 +642,17 @@ def restore_backup(
                 "恢复期间开发数据库的表名或行数发生变化"
             )
         target_after = _database_snapshot(target_engine, target_url.database)
-        if not set(source_before).issubset(target_after):
-            raise RestoreFailed("迁移后缺少源数据库中的表")
+        consolidated = set(source_before) - set(target_after)
+        if dump_differences or consolidated:
+            final_version = _alembic_version(target_engine, target_url.database)
+            if migration_version != "0009" or final_version != "0010":
+                raise RestoreFailed("合并表差异只允许在 0009 升级到 0010 时发生")
+        if not consolidated.issubset(CONSOLIDATED_TABLES):
+            raise RestoreFailed("迁移后缺少未声明合并的源数据库表")
         compared = 0
         for table, source_count in source_before.items():
+            if table in consolidated:
+                continue
             if table == "auth_sessions":
                 if target_after[table] != 0:
                     raise RestoreFailed("不得恢复会话数据")

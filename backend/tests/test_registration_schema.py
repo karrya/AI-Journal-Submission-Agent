@@ -5,9 +5,7 @@ import pytest
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import CHAR, inspect, text
-from sqlalchemy.exc import IntegrityError
-
-from app.models import Base, utc_now
+from app.models import Base
 from conftest import BACKEND_DIR
 
 
@@ -43,55 +41,24 @@ def unique_column_sets(table):
     }
 
 
-def test_registration_schema_is_at_0009(db_engine):
-    from sqlalchemy import inspect, text
-
+def test_registration_schema_is_at_0010(db_engine):
     with db_engine.connect() as connection:
-        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0009"
-    expected = {
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0010"
+    table_names = set(inspect(db_engine).get_table_names())
+    assert len(table_names - {"alembic_version"}) == 23
+    assert {"registration_tasks", "registration_confirmations"} <= table_names
+    assert {
         "publisher_registration_support",
         "platform_adapters",
         "publisher_accounts",
-        "registration_tasks",
         "email_verification_records",
-        "registration_confirmations",
-    }
-    assert expected <= set(inspect(db_engine).get_table_names())
-
-
-def test_completed_registration_preserves_account_namespace_and_active_email():
-    from app.models import PublisherAccount
-
-    columns = PublisherAccount.__table__.c
-    assert columns.account_namespace.nullable is False
-    assert columns.normalized_email.nullable is False
-    assert columns.active_account_email.computed is not None
+    }.isdisjoint(table_names)
 
 
 def test_registration_uniqueness_and_generated_column_match_the_contract():
-    from app.models import (
-        PlatformAdapter,
-        PublisherAccount,
-        PublisherRegistrationSupport,
-        RegistrationConfirmation,
-        RegistrationTask,
-    )
+    from app.models import Publisher, RegistrationConfirmation, RegistrationTask
 
-    assert ("publisher_id",) in unique_column_sets(PublisherRegistrationSupport.__table__)
-    assert ("publisher_code",) in unique_column_sets(PublisherRegistrationSupport.__table__)
-    assert ("adapter_code", "adapter_version") in unique_column_sets(
-        PlatformAdapter.__table__
-    )
-    assert (
-        "platform_code",
-        "account_namespace",
-        "active_account_email",
-    ) in unique_column_sets(PublisherAccount.__table__)
-    active_email = PublisherAccount.__table__.c.active_account_email
-    assert active_email.computed.persisted is True
-    assert active_email.computed.sqltext.text == (
-        "IF(deleted_at IS NULL, normalized_email, NULL)"
-    )
+    assert ("registration_code",) in unique_column_sets(Publisher.__table__)
     assert ("idempotency_key",) in unique_column_sets(RegistrationTask.__table__)
     assert (
         "author_id",
@@ -145,7 +112,7 @@ def test_registration_initialization_is_idempotent_and_preserves_publisher_ids(
         ),
         {
             "id": existing_id,
-            "name": "Existing Elsevier",
+            "name": "Elsevier",
             "normalized_name": "elsevier",
         },
     )
@@ -199,59 +166,3 @@ def test_registration_initialization_is_idempotent_and_preserves_publisher_ids(
     assert {
         row["publisher_code"]: row["publisher_id"] for row in second_rows
     } == first_ids
-
-
-def test_soft_deleted_account_releases_active_email_uniqueness(db_session):
-    from app.models import Author, Publisher, PublisherAccount
-
-    author = Author(display_name="Registration Schema Author", alternate_names=[])
-    publisher = Publisher(
-        name="Registration Schema Publisher",
-        normalized_name="registration schema publisher",
-    )
-    db_session.add_all([author, publisher])
-    db_session.flush()
-    account = PublisherAccount(
-        author_id=author.id,
-        publisher_id=publisher.id,
-        platform_code="TEST_PLATFORM",
-        account_namespace="test.example",
-        account_email="Author@Example.com",
-        normalized_email="author@example.com",
-    )
-    db_session.add(account)
-    db_session.commit()
-    account_id = account.id
-    db_session.refresh(account)
-    assert account.active_account_email == "author@example.com"
-
-    db_session.add(
-        PublisherAccount(
-            author_id=author.id,
-            publisher_id=publisher.id,
-            platform_code="TEST_PLATFORM",
-            account_namespace="test.example",
-            account_email="author@example.com",
-            normalized_email="author@example.com",
-        )
-    )
-    with pytest.raises(IntegrityError):
-        db_session.commit()
-    db_session.rollback()
-
-    account = db_session.get(PublisherAccount, account_id)
-    account.deleted_at = utc_now()
-    replacement = PublisherAccount(
-        author_id=author.id,
-        publisher_id=publisher.id,
-        platform_code="TEST_PLATFORM",
-        account_namespace="test.example",
-        account_email="author@example.com",
-        normalized_email="author@example.com",
-    )
-    db_session.add(replacement)
-    db_session.commit()
-    db_session.refresh(account)
-    db_session.refresh(replacement)
-    assert account.active_account_email is None
-    assert replacement.active_account_email == "author@example.com"

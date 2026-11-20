@@ -1,37 +1,23 @@
-"""Persistence queries for registration targets, tasks, and accounts."""
+"""Persistence queries for registration targets and tasks."""
 
 from collections.abc import Mapping
 
 from sqlalchemy import ColumnElement, func, select
 from sqlalchemy.orm import Session
 
-from app.models import (
-    Author,
-    Journal,
-    JournalSubmissionPortal,
-    PlatformAdapter,
-    Publisher,
-    PublisherAccount,
-    PublisherRegistrationSupport,
-    RegistrationTask,
-    utc_now,
-)
-from app.repositories.authorizations import AuthorizationRepository
+from app.models import Author, Journal, JournalSubmissionPortal, Publisher, RegistrationTask
 
 
 class RegistrationRepository:
     def __init__(self, db: Session):
         self.db = db
 
-    def publisher_support(
-        self, publisher_id: str
-    ) -> PublisherRegistrationSupport | None:
+    def publisher_support(self, publisher_id: str) -> Publisher | None:
         return self.db.scalar(
-            select(PublisherRegistrationSupport)
-            .join(Publisher, Publisher.id == PublisherRegistrationSupport.publisher_id)
-            .where(
-                PublisherRegistrationSupport.publisher_id == publisher_id,
+            select(Publisher).where(
+                Publisher.id == publisher_id,
                 Publisher.deleted_at.is_(None),
+                Publisher.registration_code.is_not(None),
             )
         )
 
@@ -45,11 +31,6 @@ class RegistrationRepository:
                 Journal.deleted_at.is_(None),
                 Publisher.deleted_at.is_(None),
             )
-        )
-
-    def adapter(self, adapter_id: str) -> PlatformAdapter | None:
-        return self.db.scalar(
-            select(PlatformAdapter).where(PlatformAdapter.id == adapter_id)
         )
 
     def task_by_idempotency(self, key: str) -> RegistrationTask | None:
@@ -94,45 +75,6 @@ class RegistrationRepository:
         records = self.db.scalars(
             statement.order_by(
                 RegistrationTask.created_at.desc(), RegistrationTask.id.asc()
-            )
-            .offset((page - 1) * page_size)
-            .limit(page_size)
-        )
-        return list(records), total
-
-    def account_page(
-        self, user_id: str, page: int, page_size: int
-    ) -> tuple[list[PublisherAccount], int]:
-        if page_size > 100:
-            raise ValueError("page_size must be less than or equal to 100")
-        now = utc_now()
-        authorized = (
-            AuthorizationRepository.active_grant_query(
-                user_id=user_id,
-                author_id=PublisherAccount.author_id,
-                permission="account:register",
-                now_utc=now,
-            )
-            .correlate(PublisherAccount)
-            .exists()
-        )
-        statement = (
-            select(PublisherAccount)
-            .join(Publisher, Publisher.id == PublisherAccount.publisher_id)
-            .outerjoin(Journal, Journal.id == PublisherAccount.journal_id)
-            .where(
-                PublisherAccount.deleted_at.is_(None),
-                Publisher.deleted_at.is_(None),
-                PublisherAccount.journal_id.is_(None) | Journal.deleted_at.is_(None),
-                authorized,
-            )
-        )
-        total = (
-            self.db.scalar(select(func.count()).select_from(statement.subquery())) or 0
-        )
-        records = self.db.scalars(
-            statement.order_by(
-                PublisherAccount.created_at.desc(), PublisherAccount.id.asc()
             )
             .offset((page - 1) * page_size)
             .limit(page_size)

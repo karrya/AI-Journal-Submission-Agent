@@ -8,9 +8,7 @@ from app.models import (
     AuthorAuthorization,
     Journal,
     JournalSubmissionPortal,
-    PlatformAdapter,
     Publisher,
-    PublisherRegistrationSupport,
     RegistrationTask,
     utc_now,
 )
@@ -29,17 +27,15 @@ from app.workers.run_registration_worker import default_worker_id
 def registration_records(db_session, operator):
     now = utc_now()
     author = Author(display_name="Worker Author", alternate_names=[])
-    publisher = Publisher(name="Elsevier", normalized_name="elsevier")
-    adapter = PlatformAdapter(
-        adapter_code="TEST_ADAPTER",
-        adapter_name="Test Adapter",
-        platform_type="TEST_PLATFORM",
-        adapter_version="1.2.3",
-        support_status="SUPPORTED",
-        allowed_domains=["register.example"],
-        last_verified_at=now,
+    publisher = Publisher(
+        name="Elsevier",
+        normalized_name="elsevier",
+        registration_code="ELSEVIER",
+        registration_support_status="SUPPORTED",
+        registration_support_level="V0_1",
+        registration_official_domains=["register.example"],
     )
-    db_session.add_all([author, publisher, adapter])
+    db_session.add_all([author, publisher])
     db_session.flush()
     journal = Journal(
         publisher_id=publisher.id,
@@ -49,14 +45,6 @@ def registration_records(db_session, operator):
     )
     db_session.add(journal)
     db_session.flush()
-    support = PublisherRegistrationSupport(
-        publisher_id=publisher.id,
-        publisher_code="ELSEVIER",
-        display_name=publisher.name,
-        support_status="SUPPORTED",
-        support_level="V0_1",
-        official_domains=["register.example"],
-    )
     portal = JournalSubmissionPortal(
         journal_id=journal.id,
         original_url="https://register.example/start",
@@ -68,7 +56,12 @@ def registration_records(db_session, operator):
         confidence=1.0,
         evidence_summary=[],
         normalized_host="register.example",
-        platform_adapter_id=adapter.id,
+        adapter_code="TEST_ADAPTER",
+        adapter_name="Test Adapter",
+        adapter_version="1.2.3",
+        adapter_support_status="SUPPORTED",
+        adapter_allowed_domains=["register.example"],
+        adapter_last_verified_at=now,
         support_status="SUPPORTED",
     )
     grant = AuthorAuthorization(
@@ -78,14 +71,13 @@ def registration_records(db_session, operator):
         valid_from=now - timedelta(minutes=1),
         valid_to=now + timedelta(hours=1),
     )
-    db_session.add_all([support, portal, grant])
+    db_session.add_all([portal, grant])
     db_session.commit()
     return SimpleNamespace(
         author=author,
         publisher=publisher,
         journal=journal,
-        adapter=adapter,
-        support=support,
+        support=publisher,
         portal=portal,
         grant=grant,
         user=operator,

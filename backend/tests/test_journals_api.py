@@ -14,13 +14,8 @@ def publisher(db_session):
 
 
 @pytest.fixture
-def platform(db_session):
-    from app.models import JournalPlatform
-
-    record = JournalPlatform(code="EXISTING", name="Existing Platform")
-    db_session.add(record)
-    db_session.commit()
-    return record
+def platform():
+    return "EXISTING"
 
 
 @pytest.fixture
@@ -29,7 +24,7 @@ def journal(db_session, publisher, platform):
 
     record = Journal(
         publisher_id=publisher.id,
-        platform_id=platform.id,
+        platform_code=platform,
         name="Existing Journal",
         issn="03785955",
         requirements=[
@@ -50,7 +45,7 @@ def journal(db_session, publisher, platform):
 def journal_payload(publisher, platform=None, **overrides):
     payload = {
         "publisher_id": publisher.id,
-        "platform_id": platform.id if platform else None,
+        "platform_code": platform,
         "name": "New Journal",
         "issn": "0378-5955",
         "eissn": "2434-561X",
@@ -110,29 +105,15 @@ def test_publisher_crud_filtering_and_soft_delete(client, admin_context):
     assert client.get("/api/v1/publishers").json()["total"] == 0
 
 
-def test_platform_crud_filtering_and_soft_delete(client, admin_context):
-    created = client.post(
-        "/api/v1/journal-platforms",
-        json={"code": "OJS", "name": "Open Journal Systems", "status": "active"},
+def test_platform_catalog_routes_are_removed(client, admin_context):
+    assert client.get("/api/v1/journal-platforms").status_code == 404
+    assert (
+        client.post(
+            "/api/v1/journal-platforms",
+            json={"code": "OJS", "name": "Open Journal Systems"},
+        ).status_code
+        == 404
     )
-    assert created.status_code == 201, created.text
-    platform_id = created.json()["id"]
-
-    listed = client.get(
-        "/api/v1/journal-platforms", params={"code": "OJS", "status": "active"}
-    )
-    assert listed.status_code == 200
-    assert listed.json()["total"] == 1
-
-    updated = client.patch(
-        f"/api/v1/journal-platforms/{platform_id}",
-        json={"status": "needs_review", "description": "Review configuration"},
-    )
-    assert updated.status_code == 200
-    assert updated.json()["status"] == "needs_review"
-    assert client.get(f"/api/v1/journal-platforms/{platform_id}").status_code == 200
-    assert client.delete(f"/api/v1/journal-platforms/{platform_id}").status_code == 204
-    assert client.get(f"/api/v1/journal-platforms/{platform_id}").status_code == 404
 
 
 def test_journal_crud_normalizes_issn_and_preserves_provenance(
@@ -152,7 +133,7 @@ def test_journal_crud_normalizes_issn_and_preserves_provenance(
         params={
             "name": "new",
             "publisher_id": publisher.id,
-            "platform_id": platform.id,
+            "platform_code": platform,
             "issn": "0378-5955",
             "status": "active",
         },
@@ -164,14 +145,14 @@ def test_journal_crud_normalizes_issn_and_preserves_provenance(
         f"/api/v1/journals/{body['id']}",
         json={
             "name": "Updated Journal",
-            "platform_id": None,
+            "platform_code": None,
             "issn": None,
             "eissn": None,
         },
     )
     assert updated.status_code == 200, updated.text
     assert updated.json()["name"] == "Updated Journal"
-    assert "platform_id" not in updated.json() or updated.json()["platform_id"] is None
+    assert "platform_code" not in updated.json() or updated.json()["platform_code"] is None
     assert "issn" not in updated.json() or updated.json()["issn"] is None
     assert "eissn" not in updated.json() or updated.json()["eissn"] is None
     assert client.delete(f"/api/v1/journals/{body['id']}").status_code == 204
@@ -211,7 +192,7 @@ def test_journal_requirement_offsets_are_normalized_to_utc_before_storage_and_re
 
 @pytest.mark.parametrize("role", ["system_admin", "submission_operator", "reviewer"])
 @pytest.mark.parametrize(
-    "path", ["/api/v1/publishers", "/api/v1/journal-platforms", "/api/v1/journals"]
+    "path", ["/api/v1/publishers", "/api/v1/journals"]
 )
 def test_business_roles_can_read_journal_resources(
     client, user_factory, auth_context_factory, publisher, platform, journal, role, path
@@ -224,7 +205,7 @@ def test_business_roles_can_read_journal_resources(
 
 @pytest.mark.parametrize("role", ["auditor", "author"])
 @pytest.mark.parametrize(
-    "path", ["/api/v1/publishers", "/api/v1/journal-platforms", "/api/v1/journals"]
+    "path", ["/api/v1/publishers", "/api/v1/journals"]
 )
 def test_auditor_and_author_cannot_read_journal_resources(
     client, user_factory, auth_context_factory, role, path
@@ -248,12 +229,6 @@ def test_only_system_admin_can_create_journal_resources(
         == 403
     )
     assert (
-        client.post(
-            "/api/v1/journal-platforms", json={"code": "DENIED", "name": "Denied"}
-        ).status_code
-        == 403
-    )
-    assert (
         client.post("/api/v1/journals", json=journal_payload(publisher)).status_code
         == 403
     )
@@ -264,8 +239,6 @@ def test_non_admin_cannot_update_or_delete_journal_resources(
 ):
     assert client.patch(f"/api/v1/publishers/{publisher.id}", json={"name": "X"}).status_code == 403
     assert client.delete(f"/api/v1/publishers/{publisher.id}").status_code == 403
-    assert client.patch(f"/api/v1/journal-platforms/{platform.id}", json={"name": "X"}).status_code == 403
-    assert client.delete(f"/api/v1/journal-platforms/{platform.id}").status_code == 403
     assert client.patch(f"/api/v1/journals/{journal.id}", json={"name": "X"}).status_code == 403
     assert client.delete(f"/api/v1/journals/{journal.id}").status_code == 403
 
@@ -320,18 +293,18 @@ def test_local_development_http_url_is_allowed(client, admin_context):
     assert response.status_code == 201
 
 
-def test_journal_rejects_missing_or_deleted_related_resources(
-    client, admin_context, publisher, platform
+def test_journal_rejects_missing_or_deleted_publisher(
+    client, admin_context, publisher
 ):
     missing = client.post(
         "/api/v1/journals", json=journal_payload(publisher, publisher_id=str(uuid4()))
     )
     assert missing.status_code == 404
-    assert client.delete(f"/api/v1/journal-platforms/{platform.id}").status_code == 204
-    deleted_platform = client.post(
-        "/api/v1/journals", json=journal_payload(publisher, platform)
+    assert client.delete(f"/api/v1/publishers/{publisher.id}").status_code == 204
+    deleted_publisher = client.post(
+        "/api/v1/journals", json=journal_payload(publisher)
     )
-    assert deleted_platform.status_code == 404
+    assert deleted_publisher.status_code == 404
 
 
 def test_duplicate_publisher_name_returns_flat_conflict(client, admin_context, publisher):
@@ -345,7 +318,6 @@ def test_duplicate_publisher_name_returns_flat_conflict(client, admin_context, p
     ("path", "payload"),
     [
         ("/api/v1/publishers", {}),
-        ("/api/v1/journal-platforms", {}),
         ("/api/v1/journals", {}),
     ],
 )
@@ -363,7 +335,7 @@ def test_patch_rejects_empty_and_null_required_fields(
 
 
 @pytest.mark.parametrize(
-    "path", ["/api/v1/publishers", "/api/v1/journal-platforms", "/api/v1/journals"]
+    "path", ["/api/v1/publishers", "/api/v1/journals"]
 )
 def test_lists_reject_unsupported_sort_fields(client, admin_context, path):
     response = client.get(path, params={"sort": "created_by"})

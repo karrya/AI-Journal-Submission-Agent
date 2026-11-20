@@ -50,7 +50,6 @@ EXPECTED_ROUTES = {
     ("GET", "/registration/publishers", "PublisherSupportListResponse"),
     ("GET", "/registration/publishers/{publisher_id}/journals", "JournalOptionsResponse"),
     ("PUT", "/registration/publishers/{publisher_id}/support", "PublisherSupportResponse"),
-    ("GET", "/registration/platform-adapters", "PlatformAdapterListResponse"),
     ("POST", "/registration/tasks", "RegistrationTaskResponse"),
     ("GET", "/registration/tasks", "RegistrationTaskPage"),
     ("GET", "/registration/tasks/{task_id}", "RegistrationTaskResponse"),
@@ -61,7 +60,6 @@ EXPECTED_ROUTES = {
         "/registration/submission-portals/{portal_id}",
         "SubmissionPortalResponse",
     ),
-    ("GET", "/publisher-accounts", "PublisherAccountPage"),
     ("GET", "/users", "UserPage"),
     ("POST", "/users", "ManagedUserResponse"),
     ("GET", "/users/{user_id}", "ManagedUserResponse"),
@@ -135,11 +133,6 @@ EXPECTED_ROUTES = {
     ("GET", "/publishers/{publisher_id}", "PublisherResponse"),
     ("PATCH", "/publishers/{publisher_id}", "PublisherResponse"),
     ("DELETE", "/publishers/{publisher_id}", "None"),
-    ("GET", "/journal-platforms", "JournalPlatformPage"),
-    ("POST", "/journal-platforms", "JournalPlatformResponse"),
-    ("GET", "/journal-platforms/{platform_id}", "JournalPlatformResponse"),
-    ("PATCH", "/journal-platforms/{platform_id}", "JournalPlatformResponse"),
-    ("DELETE", "/journal-platforms/{platform_id}", "None"),
     ("GET", "/journals", "JournalPage"),
     ("POST", "/journals", "JournalResponse"),
     ("GET", "/journals/{journal_id}", "JournalResponse"),
@@ -182,10 +175,7 @@ def test_concrete_manifest_responses_match_openapi_success_schemas():
     document = app.openapi()
     components = document["components"]["schemas"]
     for contract in CONTRACTS:
-        if not (
-            contract.path.startswith("/registration/")
-            or contract.path == "/publisher-accounts"
-        ):
+        if not contract.path.startswith("/registration/"):
             continue
         if contract.response_schema not in components:
             continue

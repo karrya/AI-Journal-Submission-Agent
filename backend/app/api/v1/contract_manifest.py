@@ -36,7 +36,6 @@ CONTRACTS: tuple[RouteContract, ...] = (
     RouteContract(
         "PUT", "/registration/publishers/{publisher_id}/support", "PublisherSupportResponse"
     ),
-    RouteContract("GET", "/registration/platform-adapters", "PlatformAdapterListResponse"),
     RouteContract("POST", "/registration/tasks", "RegistrationTaskResponse"),
     RouteContract("GET", "/registration/tasks", "RegistrationTaskPage"),
     RouteContract("GET", "/registration/tasks/{task_id}", "RegistrationTaskResponse"),
@@ -51,7 +50,6 @@ CONTRACTS: tuple[RouteContract, ...] = (
         "/registration/submission-portals/{portal_id}",
         "SubmissionPortalResponse",
     ),
-    RouteContract("GET", "/publisher-accounts", "PublisherAccountPage"),
     RouteContract("GET", "/users", "UserPage"),
     RouteContract("POST", "/users", "ManagedUserResponse"),
     RouteContract("GET", "/users/{user_id}", "ManagedUserResponse"),
@@ -125,13 +123,6 @@ CONTRACTS: tuple[RouteContract, ...] = (
     RouteContract("GET", "/publishers/{publisher_id}", "PublisherResponse"),
     RouteContract("PATCH", "/publishers/{publisher_id}", "PublisherResponse"),
     RouteContract("DELETE", "/publishers/{publisher_id}", "None"),
-    RouteContract("GET", "/journal-platforms", "JournalPlatformPage"),
-    RouteContract("POST", "/journal-platforms", "JournalPlatformResponse"),
-    RouteContract("GET", "/journal-platforms/{platform_id}", "JournalPlatformResponse"),
-    RouteContract(
-        "PATCH", "/journal-platforms/{platform_id}", "JournalPlatformResponse"
-    ),
-    RouteContract("DELETE", "/journal-platforms/{platform_id}", "None"),
     RouteContract("GET", "/journals", "JournalPage"),
     RouteContract("POST", "/journals", "JournalResponse"),
     RouteContract("GET", "/journals/{journal_id}", "JournalResponse"),

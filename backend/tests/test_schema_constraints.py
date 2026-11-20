@@ -33,21 +33,13 @@ EXPECTED_TABLES = {
     "file_families",
     "manuscript_files",
     "publishers",
-    "journal_platforms",
     "journals",
     "operation_logs",
-    "publisher_aliases",
-    "journal_aliases",
-    "journal_identifiers",
     "journal_submission_portals",
     "journal_source_snapshots",
     "journal_discovery_logs",
     "discovery_tasks",
-    "publisher_registration_support",
-    "platform_adapters",
-    "publisher_accounts",
     "registration_tasks",
-    "email_verification_records",
     "registration_confirmations",
 }
 
@@ -58,21 +50,13 @@ NEW_MODELS = {
     "FileFamily",
     "ManuscriptFile",
     "Publisher",
-    "JournalPlatform",
     "Journal",
     "OperationLog",
-    "PublisherAlias",
-    "JournalAlias",
-    "JournalIdentifier",
     "JournalSubmissionPortal",
     "JournalSourceSnapshot",
     "JournalDiscoveryLog",
     "DiscoveryTask",
-    "PublisherRegistrationSupport",
-    "PlatformAdapter",
-    "PublisherAccount",
     "RegistrationTask",
-    "EmailVerificationRecord",
     "RegistrationConfirmation",
 }
 
@@ -170,18 +154,14 @@ EXPECTED_NEW_COLUMNS = {
         "status",
         "source_url",
         "verified_at",
+        "aliases",
+        "registration_code",
+        "registration_support_status",
+        "registration_support_level",
+        "registration_official_domains",
+        "registration_notes",
+        "registration_updated_by",
         "active_normalized_name",
-        "created_at",
-        "updated_at",
-        "created_by",
-        "deleted_at",
-    },
-    "journal_platforms": {
-        "id",
-        "code",
-        "name",
-        "description",
-        "status",
         "created_at",
         "updated_at",
         "created_by",
@@ -190,7 +170,7 @@ EXPECTED_NEW_COLUMNS = {
     "journals": {
         "id",
         "publisher_id",
-        "platform_id",
+        "platform_code",
         "name",
         "issn",
         "eissn",
@@ -210,39 +190,13 @@ EXPECTED_NEW_COLUMNS = {
         "identity_status",
         "source_url",
         "verified_at",
+        "aliases",
         "active_issn",
         "active_eissn",
         "created_at",
         "updated_at",
         "created_by",
         "deleted_at",
-    },
-    "publisher_aliases": {
-        "id",
-        "publisher_id",
-        "alias",
-        "normalized_alias",
-        "source_url",
-        "verified_at",
-        "created_at",
-    },
-    "journal_aliases": {
-        "id",
-        "journal_id",
-        "alias",
-        "normalized_alias",
-        "source_url",
-        "verified_at",
-        "created_at",
-    },
-    "journal_identifiers": {
-        "id",
-        "journal_id",
-        "identifier_type",
-        "identifier_value",
-        "source_url",
-        "verified_at",
-        "created_at",
     },
     "discovery_tasks": {
         "id",
@@ -273,7 +227,10 @@ EXPECTED_NEW_COLUMNS = {
     "journal_submission_portals": {
         "id", "journal_id", "task_id", "original_url", "final_url",
         "redirect_chain", "verification_status", "access_status", "platform_code",
-        "confidence", "evidence_summary", "normalized_host", "platform_adapter_id",
+        "confidence", "evidence_summary", "normalized_host", "adapter_code",
+        "adapter_name", "adapter_version", "adapter_support_status",
+        "adapter_allowed_domains", "adapter_capability_config",
+        "adapter_last_verified_at", "adapter_verification_notes",
         "support_status", "verified_by", "verification_evidence_ref", "last_checked_at",
         "disabled_reason", "created_at", "updated_at", "created_by",
     },
@@ -286,25 +243,8 @@ EXPECTED_NEW_COLUMNS = {
         "id", "task_id", "journal_id", "actor_user_id", "event_type", "message",
         "details", "created_at",
     },
-    "publisher_registration_support": {
-        "id", "publisher_id", "publisher_code", "display_name", "support_status",
-        "support_level", "official_domains", "notes", "created_at", "updated_at",
-        "created_by", "updated_by",
-    },
-    "platform_adapters": {
-        "id", "adapter_code", "adapter_name", "platform_type", "adapter_version",
-        "support_status", "allowed_domains", "capability_config", "last_verified_at",
-        "verification_notes", "created_at", "updated_at", "created_by",
-    },
-    "publisher_accounts": {
-        "id", "author_id", "publisher_id", "journal_id", "platform_code",
-        "account_namespace", "account_email", "normalized_email", "platform_account_id",
-        "username", "credential_ref", "account_status", "email_verified_at",
-        "registered_at", "last_checked_at", "active_account_email", "created_at",
-        "updated_at", "created_by", "deleted_at",
-    },
     "registration_tasks": {
-        "id", "account_id", "author_id", "publisher_id", "journal_id", "portal_id",
+        "id", "author_id", "publisher_id", "journal_id", "portal_id",
         "authorization_id", "platform_code", "adapter_code",
         "adapter_version", "task_status", "current_step", "retry_count", "worker_id",
         "lease_expires_at", "available_at", "last_heartbeat_at", "retryable",
@@ -313,12 +253,6 @@ EXPECTED_NEW_COLUMNS = {
         "blocking_scope", "started_at", "last_activity_at", "completed_at",
         "created_at", "updated_at",
         "created_by",
-    },
-    "email_verification_records": {
-        "id", "account_id", "task_id", "email_address", "email_message_id",
-        "sender_address", "subject", "received_at", "link_domain", "verification_ref",
-        "verification_status", "confirmed_by", "confirmed_at", "verified_at",
-        "expires_at", "created_at", "updated_at",
     },
     "registration_confirmations": {
         "id", "task_id", "action_type", "summary_hash", "token_hash", "requested_by",
@@ -501,9 +435,11 @@ def test_column_types_json_and_immutable_timestamps_match_the_contract():
         ("journal_submission_portals", "redirect_chain"),
         ("journal_submission_portals", "evidence_summary"),
         ("journal_discovery_logs", "details"),
-        ("publisher_registration_support", "official_domains"),
-        ("platform_adapters", "allowed_domains"),
-        ("platform_adapters", "capability_config"),
+        ("publishers", "aliases"),
+        ("publishers", "registration_official_domains"),
+        ("journals", "aliases"),
+        ("journal_submission_portals", "adapter_allowed_domains"),
+        ("journal_submission_portals", "adapter_capability_config"),
     }
     actual_json_columns = {
         (table_name, column.name)
@@ -682,7 +618,7 @@ def test_mig_01_empty_upgrade_head_is_cleanly_repeatable(db_engine):
             name: inspect(db_engine).get_table_options(name) for name in EXPECTED_TABLES
         } == first_options
         with db_engine.connect() as connection:
-            assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0009"
+            assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0010"
             assert connection.scalar(text("SELECT COUNT(*) FROM alembic_version")) == 1
     finally:
         command.upgrade(config, "head")
@@ -796,7 +732,7 @@ def test_invalid_legacy_issn_aborts_before_any_ddl(db_engine, db_session):
     db_session.commit()
     command.upgrade(Config(str(BACKEND_DIR / "alembic.ini")), "head")
     with db_engine.connect() as connection:
-        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0009"
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0010"
     if previous_url is None:
         os.environ.pop("ALEMBIC_DATABASE_URL", None)
     else:

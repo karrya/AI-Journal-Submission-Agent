@@ -16,10 +16,7 @@ from app.models import (
     AuthorAuthorization,
     Journal,
     JournalSubmissionPortal,
-    PlatformAdapter,
     Publisher,
-    PublisherAccount,
-    PublisherRegistrationSupport,
     RegistrationTask,
     User,
     utc_now,
@@ -33,17 +30,15 @@ from app.services.registration_workflow import RegistrationWorkflowService
 def registration_records(db_session, operator):
     now = utc_now()
     author = Author(display_name="Task Author", alternate_names=[])
-    publisher = Publisher(name="Elsevier", normalized_name="elsevier")
-    adapter = PlatformAdapter(
-        adapter_code="TEST_ADAPTER",
-        adapter_name="Test Adapter",
-        platform_type="TEST_PLATFORM",
-        adapter_version="1.2.3",
-        support_status="SUPPORTED",
-        allowed_domains=["register.example"],
-        last_verified_at=now,
+    publisher = Publisher(
+        name="Elsevier",
+        normalized_name="elsevier",
+        registration_code="ELSEVIER",
+        registration_support_status="SUPPORTED",
+        registration_support_level="V0_1",
+        registration_official_domains=["register.example"],
     )
-    db_session.add_all([author, publisher, adapter])
+    db_session.add_all([author, publisher])
     db_session.flush()
     journal = Journal(
         publisher_id=publisher.id,
@@ -53,14 +48,6 @@ def registration_records(db_session, operator):
     )
     db_session.add(journal)
     db_session.flush()
-    support = PublisherRegistrationSupport(
-        publisher_id=publisher.id,
-        publisher_code="ELSEVIER",
-        display_name=publisher.name,
-        support_status="SUPPORTED",
-        support_level="V0_1",
-        official_domains=["register.example"],
-    )
     portal = JournalSubmissionPortal(
         journal_id=journal.id,
         original_url="https://register.example/start",
@@ -72,7 +59,12 @@ def registration_records(db_session, operator):
         confidence=1.0,
         evidence_summary=[],
         normalized_host="register.example",
-        platform_adapter_id=adapter.id,
+        adapter_code="TEST_ADAPTER",
+        adapter_name="Test Adapter",
+        adapter_version="1.2.3",
+        adapter_support_status="SUPPORTED",
+        adapter_allowed_domains=["register.example"],
+        adapter_last_verified_at=now,
         support_status="SUPPORTED",
     )
     grant = AuthorAuthorization(
@@ -82,14 +74,13 @@ def registration_records(db_session, operator):
         valid_from=now - timedelta(minutes=1),
         valid_to=now + timedelta(hours=1),
     )
-    db_session.add_all([support, portal, grant])
+    db_session.add_all([portal, grant])
     db_session.commit()
     return SimpleNamespace(
         author=author,
         publisher=publisher,
         journal=journal,
-        adapter=adapter,
-        support=support,
+        support=publisher,
         portal=portal,
         grant=grant,
         user=operator,
@@ -148,17 +139,6 @@ def test_create_binds_verified_portal_and_adapter_without_client_url(
 def test_create_skips_unsupported_newer_portal_for_supported_older_portal(
     db_session, operator, approved_input, registration_records
 ):
-    newer_adapter = PlatformAdapter(
-        adapter_code="NEWER_ADAPTER",
-        adapter_name="Newer Test Adapter",
-        platform_type="TEST_PLATFORM",
-        adapter_version="9.9.9",
-        support_status="SUPPORTED",
-        allowed_domains=["register.example"],
-        last_verified_at=utc_now(),
-    )
-    db_session.add(newer_adapter)
-    db_session.flush()
     db_session.add(
         JournalSubmissionPortal(
             journal_id=registration_records.journal.id,
@@ -171,7 +151,12 @@ def test_create_skips_unsupported_newer_portal_for_supported_older_portal(
             confidence=1.0,
             evidence_summary=[],
             normalized_host="register.example",
-            platform_adapter_id=newer_adapter.id,
+            adapter_code="NEWER_ADAPTER",
+            adapter_name="Newer Test Adapter",
+            adapter_version="9.9.9",
+            adapter_support_status="SUPPORTED",
+            adapter_allowed_domains=["register.example"],
+            adapter_last_verified_at=utc_now(),
             support_status="TESTING",
             created_at=registration_records.portal.created_at + timedelta(minutes=1),
         )
@@ -296,25 +281,12 @@ def test_get_and_list_only_return_tasks_with_current_consent(
     assert_app_error(caught, 403, "PERMISSION_DENIED")
 
 
-def test_cancel_stops_future_actions_without_deleting_external_account(
-    db_session, operator, task, registration_records
+def test_cancel_stops_future_actions_without_deleting_external_evidence(
+    db_session, operator, task
 ):
-    account = PublisherAccount(
-        author_id=task.author_id,
-        publisher_id=task.publisher_id,
-        journal_id=task.journal_id,
-        platform_code=task.platform_code,
-        account_namespace="register.example",
-        account_email="author@example.com",
-        normalized_email="author@example.com",
-        account_status="REGISTERED",
-    )
-    db_session.add(account)
-    task.account_id = None
     task.task_status = "SUBMITTED"
-    db_session.commit()
-    db_session.flush()
-    task.account_id = account.id
+    task.last_external_action = "SUBMIT"
+    task.external_evidence_ref = "controlled-platform-evidence"
     db_session.commit()
 
     cancelled = RegistrationService(
@@ -325,7 +297,8 @@ def test_cancel_stops_future_actions_without_deleting_external_account(
     assert cancelled.cancel_requested is True
     assert cancelled.current_step == "停止后续外部动作"
     assert cancelled.last_activity_at is not None
-    assert db_session.get(PublisherAccount, account.id) is not None
+    assert cancelled.last_external_action == "SUBMIT"
+    assert cancelled.external_evidence_ref == "controlled-platform-evidence"
 
 
 def test_cancelled_or_completed_task_can_be_restarted(db_session, operator, task):

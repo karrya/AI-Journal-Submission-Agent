@@ -86,7 +86,12 @@ class SubmissionPortalResponse(OutputModel):
     verification_status: str
     access_status: str
     platform_code: str
-    platform_adapter_id: UUID | None
+    adapter_code: str | None
+    adapter_name: str | None
+    adapter_version: str | None
+    adapter_support_status: str | None
+    adapter_allowed_domains: list[str] | None
+    adapter_last_verified_at: datetime | None
     support_status: str
     confidence: float
     evidence_summary: list[EvidenceSummary]

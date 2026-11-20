@@ -5,14 +5,7 @@ from uuid import uuid4
 import pytest
 
 from app.core.errors import AppError
-from app.models import (
-    Journal,
-    JournalSubmissionPortal,
-    PlatformAdapter,
-    Publisher,
-    PublisherRegistrationSupport,
-    utc_now,
-)
+from app.models import Journal, JournalSubmissionPortal, Publisher, utc_now
 from app.services.registration_admission import require_supported_registration_target
 
 
@@ -26,17 +19,12 @@ def publisher(db_session):
 
 @pytest.fixture
 def support(db_session, publisher):
-    record = PublisherRegistrationSupport(
-        publisher_id=publisher.id,
-        publisher_code="ELSEVIER",
-        display_name=publisher.name,
-        support_status="SUPPORTED",
-        support_level="V0_1",
-        official_domains=["example.com"],
-    )
-    db_session.add(record)
+    publisher.registration_code = "ELSEVIER"
+    publisher.registration_support_status = "SUPPORTED"
+    publisher.registration_support_level = "V0_1"
+    publisher.registration_official_domains = ["example.com"]
     db_session.flush()
-    return record
+    return publisher
 
 
 @pytest.fixture
@@ -71,23 +59,7 @@ def other_journal(db_session):
 
 
 @pytest.fixture
-def adapter(db_session):
-    record = PlatformAdapter(
-        adapter_code="TEST_ADAPTER",
-        adapter_name="Test Adapter",
-        platform_type="TEST_PLATFORM",
-        adapter_version="1.0.0",
-        support_status="SUPPORTED",
-        allowed_domains=["example.com"],
-        last_verified_at=utc_now(),
-    )
-    db_session.add(record)
-    db_session.flush()
-    return record
-
-
-@pytest.fixture
-def portal(db_session, journal, support, adapter):
+def portal(db_session, journal, support):
     record = JournalSubmissionPortal(
         journal_id=journal.id,
         original_url="https://example.com/register",
@@ -99,7 +71,12 @@ def portal(db_session, journal, support, adapter):
         confidence=1.0,
         evidence_summary=[],
         normalized_host="example.com",
-        platform_adapter_id=adapter.id,
+        adapter_code="TEST_ADAPTER",
+        adapter_name="Test Adapter",
+        adapter_version="1.0.0",
+        adapter_support_status="SUPPORTED",
+        adapter_allowed_domains=["example.com"],
+        adapter_last_verified_at=utc_now(),
         support_status="SUPPORTED",
     )
     db_session.add(record)
@@ -124,9 +101,7 @@ def assert_admission_error(
     assert caught.value.code == expected_code
 
 
-def test_supported_target_returns_bound_records(
-    db_session, publisher, journal, portal, adapter
-):
+def test_supported_target_returns_bound_records(db_session, publisher, journal, portal):
     result = require_supported_registration_target(
         db_session, publisher.id, journal.id, portal.id, portal.platform_code
     )
@@ -134,12 +109,12 @@ def test_supported_target_returns_bound_records(
     assert result.publisher is publisher
     assert result.journal is journal
     assert result.portal is portal
-    assert result.adapter is adapter
+    assert result.portal.adapter_code == "TEST_ADAPTER"
 
 
 @pytest.mark.parametrize(
     ("field", "value"),
-    [("support_status", "DISABLED"), ("support_level", "V0_2")],
+    [("registration_support_status", "DISABLED"), ("registration_support_level", "V0_2")],
 )
 def test_unsupported_publisher_is_rejected(
     db_session, publisher, journal, portal, support, field, value
@@ -162,15 +137,9 @@ def test_sixth_publisher_is_rejected_even_with_supported_record(db_session):
     publisher = Publisher(name="Sixth Publisher", normalized_name="sixth publisher")
     db_session.add(publisher)
     db_session.flush()
-    db_session.add(
-        PublisherRegistrationSupport(
-            publisher_id=publisher.id,
-            publisher_code="MDPI",
-            display_name=publisher.name,
-            support_status="SUPPORTED",
-            support_level="V0_1",
-        )
-    )
+    publisher.registration_code = "MDPI"
+    publisher.registration_support_status = "SUPPORTED"
+    publisher.registration_support_level = "V0_1"
     db_session.commit()
 
     assert_admission_error(
@@ -267,10 +236,8 @@ def test_unverified_portal_is_rejected(db_session, publisher, journal, portal):
     )
 
 
-def test_disabled_adapter_version_is_rejected(
-    db_session, publisher, journal, portal, adapter
-):
-    adapter.support_status = "DISABLED"
+def test_disabled_adapter_version_is_rejected(db_session, publisher, journal, portal):
+    portal.adapter_support_status = "DISABLED"
     db_session.commit()
 
     assert_admission_error(
@@ -332,23 +299,6 @@ def test_hostname_matching_normalizes_case_and_trailing_dot(
     )
 
     assert result.portal is portal
-
-
-def test_adapter_platform_type_must_match_portal(
-    db_session, publisher, journal, portal, adapter
-):
-    adapter.platform_type = "OTHER_PLATFORM"
-    db_session.commit()
-
-    assert_admission_error(
-        db_session,
-        publisher.id,
-        journal.id,
-        portal.id,
-        portal.platform_code,
-        409,
-        "PLATFORM_ADAPTER_NOT_SUPPORTED",
-    )
 
 
 @pytest.mark.parametrize(

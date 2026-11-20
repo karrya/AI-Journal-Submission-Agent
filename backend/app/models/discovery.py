@@ -75,9 +75,18 @@ class JournalSubmissionPortal(UUIDPrimaryKeyMixin, CreatedUpdatedByMixin, Base):
     confidence: Mapped[float] = mapped_column(Float, default=0, nullable=False)
     evidence_summary: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
     normalized_host: Mapped[str | None] = mapped_column(VARCHAR(255), nullable=True)
-    platform_adapter_id: Mapped[str | None] = mapped_column(
-        CHAR(36), ForeignKey("platform_adapters.id", ondelete="RESTRICT"), nullable=True
+    adapter_code: Mapped[str | None] = mapped_column(VARCHAR(100), nullable=True)
+    adapter_name: Mapped[str | None] = mapped_column(VARCHAR(255), nullable=True)
+    adapter_version: Mapped[str | None] = mapped_column(VARCHAR(64), nullable=True)
+    adapter_support_status: Mapped[str | None] = mapped_column(
+        VARCHAR(32), nullable=True
     )
+    adapter_allowed_domains: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    adapter_capability_config: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    adapter_last_verified_at: Mapped[datetime | None] = mapped_column(
+        DATETIME(fsp=6), nullable=True
+    )
+    adapter_verification_notes: Mapped[str | None] = mapped_column(TEXT, nullable=True)
     support_status: Mapped[str] = mapped_column(
         VARCHAR(32), default="TESTING", nullable=False
     )

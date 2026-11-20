@@ -15,23 +15,9 @@ from app.models.discovery import (
     JournalSubmissionPortal,
 )
 from app.models.files import FileFamily, ManuscriptFile
-from app.models.journals import (
-    Journal,
-    JournalAlias,
-    JournalIdentifier,
-    JournalPlatform,
-    Publisher,
-    PublisherAlias,
-)
+from app.models.journals import Journal, Publisher
 from app.models.manuscripts import Manuscript, ManuscriptAuthor, ManuscriptVersion
-from app.models.registration import (
-    EmailVerificationRecord,
-    PlatformAdapter,
-    PublisherAccount,
-    PublisherRegistrationSupport,
-    RegistrationConfirmation,
-    RegistrationTask,
-)
+from app.models.registration import RegistrationConfirmation, RegistrationTask
 
 __all__ = [
     "Author",
@@ -41,26 +27,18 @@ __all__ = [
     "AuthSession",
     "Base",
     "DiscoveryTask",
-    "EmailVerificationRecord",
     "FileFamily",
     "Institution",
     "Journal",
-    "JournalAlias",
     "JournalDiscoveryLog",
-    "JournalIdentifier",
     "JournalSourceSnapshot",
     "JournalSubmissionPortal",
-    "JournalPlatform",
     "Manuscript",
     "ManuscriptAuthor",
     "ManuscriptFile",
     "ManuscriptVersion",
     "OperationLog",
-    "PlatformAdapter",
     "Publisher",
-    "PublisherAccount",
-    "PublisherAlias",
-    "PublisherRegistrationSupport",
     "RegistrationConfirmation",
     "RegistrationTask",
     "Role",

@@ -1,11 +1,15 @@
 """Typed, credential-free contracts for registration resources."""
 
 from datetime import datetime
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from pydantic import Field
 
 from app.schemas.common import InputModel, OutputModel, Page
+
+if TYPE_CHECKING:
+    from app.models import Publisher
 
 
 class RegistrationTaskCreate(InputModel):
@@ -44,45 +48,26 @@ class PublisherSupportResponse(OutputModel):
     created_at: datetime
     updated_at: datetime
 
+    @classmethod
+    def from_publisher(cls, publisher: "Publisher") -> "PublisherSupportResponse":
+        code = publisher.registration_code
+        status = publisher.registration_support_status
+        level = publisher.registration_support_level
+        if code is None or status is None or level is None:
+            raise ValueError("注册支持配置不完整")
+        return cls(
+            id=UUID(publisher.id),
+            publisher_id=UUID(publisher.id),
+            publisher_code=code,
+            display_name=publisher.name,
+            support_status=status,
+            support_level=level,
+            official_domains=publisher.registration_official_domains,
+            notes=publisher.registration_notes,
+            created_at=publisher.created_at,
+            updated_at=publisher.updated_at,
+        )
+
 
 class PublisherSupportListResponse(OutputModel):
     items: list[PublisherSupportResponse]
-
-
-class PlatformAdapterResponse(OutputModel):
-    id: UUID
-    adapter_code: str
-    adapter_name: str
-    platform_type: str
-    adapter_version: str
-    support_status: str
-    allowed_domains: list[str]
-    last_verified_at: datetime | None
-    created_at: datetime
-    updated_at: datetime
-
-
-class PlatformAdapterListResponse(OutputModel):
-    items: list[PlatformAdapterResponse]
-
-
-class PublisherAccountResponse(OutputModel):
-    id: UUID
-    author_id: UUID
-    publisher_id: UUID
-    journal_id: UUID | None
-    platform_code: str
-    account_namespace: str
-    account_email: str
-    platform_account_id: str | None
-    username: str | None
-    account_status: str
-    email_verified_at: datetime | None
-    registered_at: datetime | None
-    last_checked_at: datetime | None
-    created_at: datetime
-    updated_at: datetime
-
-
-class PublisherAccountPage(Page[PublisherAccountResponse]):
-    pass

@@ -93,9 +93,20 @@ describe('ManuscriptListView', () => {
       ['zh', '中文'],
     ])
     await languageSelect.setValue('zh')
-    for (const [field, value] of Object.entries(extendedMetadata)) {
+    await wrapper.get('[data-test="funding-number"]').setValue(extendedMetadata.funding_number)
+    await wrapper.get('[data-test="funding-name"]').setValue(extendedMetadata.funding_name)
+    await wrapper.get('[data-test="clinical-trial-number"]').setValue(extendedMetadata.clinical_trial_number)
+    await wrapper.get('[data-test="create-step-next"]').trigger('click')
+    expect(wrapper.find('[data-test="create-step-declarations"]').exists()).toBe(true)
+    for (const [field, value] of Object.entries({
+      publication_statement: extendedMetadata.publication_statement,
+      acknowledgements: extendedMetadata.acknowledgements,
+      author_contributions: extendedMetadata.author_contributions,
+    })) {
       await wrapper.get(`[data-test="${field.replace(/_/g, '-')}"]`).setValue(value)
     }
+    await wrapper.get('[data-test="create-step-next"]').trigger('click')
+    expect(wrapper.find('[data-test="create-step-authors"]').exists()).toBe(true)
     await wrapper.get('[data-test="authorship-confirm"]').setValue(true)
     await wrapper.get('[data-test="create-authorship-form"]').trigger('submit')
     await flushPromises()
@@ -122,6 +133,27 @@ describe('ManuscriptListView', () => {
     await vi.advanceTimersByTimeAsync(300)
     await flushPromises()
     expect(document.body.querySelector('.el-message--success')).toBeNull()
+  })
+
+  it('shows all fields in separate creation steps instead of one clipped long form', async () => {
+    adapter.mockImplementation(async (config) => {
+      if (config.url === '/authors') return success(config, { ...emptyPage, items: [owner], total: 1 })
+      return success(config, emptyPage)
+    })
+    const wrapper = mount(ManuscriptListView, { global: { stubs } })
+    await flushPromises()
+    await wrapper.get('[data-test="add-manuscript"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="create-step-basic"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="create-step-declarations"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="create-step-authors"]').exists()).toBe(false)
+    await wrapper.get('[data-test="create-step-next"]').trigger('click')
+    expect(wrapper.find('[data-test="create-step-declarations"]').exists()).toBe(true)
+    await wrapper.get('[data-test="create-step-next"]').trigger('click')
+    expect(wrapper.find('[data-test="create-step-authors"]').exists()).toBe(true)
+    await wrapper.get('[data-test="create-step-prev"]').trigger('click')
+    expect(wrapper.find('[data-test="create-step-declarations"]').exists()).toBe(true)
   })
 
   it('does not show an empty state when manuscript loading fails', async () => {

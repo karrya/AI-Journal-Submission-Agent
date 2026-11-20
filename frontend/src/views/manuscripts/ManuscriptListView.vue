@@ -39,6 +39,7 @@ const query = reactive({
 let loadSequence = 0
 
 const showCreate = ref(false)
+const createStep = ref<1 | 2 | 3>(1)
 const createModal = ref<InstanceType<typeof AppModal> | null>(null)
 const creating = ref(false)
 const createError = ref('')
@@ -100,6 +101,7 @@ function changePage(page: number): void {
 async function openCreate(): Promise<void> {
   if (!canCreate.value) return
   showCreate.value = true
+  createStep.value = 1
   createError.value = ''
   if (authorOptionsLoaded.value) return
   try {
@@ -159,6 +161,7 @@ async function saveCreate(authorship: ManuscriptAuthorsUpdate): Promise<void> {
       authors: authorship.authors,
     })
     showCreate.value = false
+    createStep.value = 1
     ownerAuthorId.value = ''
     createAuthors.value = []
     Object.assign(metadata, {
@@ -217,44 +220,63 @@ onMounted(() => void load())
     <p v-if="errorMessage" class="form-error" role="alert">{{ errorMessage }}</p>
 
     <AppModal ref="createModal" v-model="showCreate" title="创建稿件" description="填写工作元数据并确认作者名单，保存后生成稿件工作区。" width="960px" wide :busy="creating" :dirty="() => createGuard.dirty.value" :error="createError">
-      <div class="stacked-form">
-        <label>所有者作者
-          <select v-model="ownerAuthorId" data-test="owner-author" required @change="ownerChanged">
-            <option value="">请选择已授权的所有者</option>
-            <option v-for="author in authorOptions" :key="author.id" :value="author.id">{{ author.display_name }}</option>
-          </select>
-        </label>
-        <div class="form-grid">
-          <label>标题<input v-model="metadata.title" data-test="title" maxlength="1000" required></label>
-          <label>文章类型<input v-model="metadata.article_type" data-test="article-type" maxlength="100" required></label>
-          <label>语言<select v-model="metadata.language" data-test="language" required><option value="en">英语</option><option value="zh">中文</option></select></label>
-          <label>学科领域<input v-model="metadata.subject_field" maxlength="255"></label>
-          <label>关键词（以逗号分隔）<input v-model="metadata.keywords" data-test="keywords"></label>
-          <label>基金编号<input v-model="metadata.funding_number" data-test="funding-number" maxlength="255"></label>
-          <label>基金名称<input v-model="metadata.funding_name" data-test="funding-name" maxlength="255"></label>
-          <label>临床实验编号（医学）<input v-model="metadata.clinical_trial_number" data-test="clinical-trial-number" maxlength="255"></label>
+      <ol class="create-stepper" aria-label="创建稿件步骤">
+        <li :class="{ active: createStep === 1 }">1 · 基本信息</li>
+        <li :class="{ active: createStep === 2 }">2 · 声明与备注</li>
+        <li :class="{ active: createStep === 3 }">3 · 作者名单</li>
+      </ol>
+
+      <section v-if="createStep === 1" class="create-step" data-test="create-step-basic">
+        <div class="stacked-form">
+          <label>所有者作者
+            <select v-model="ownerAuthorId" data-test="owner-author" required @change="ownerChanged">
+              <option value="">请选择已授权的所有者</option>
+              <option v-for="author in authorOptions" :key="author.id" :value="author.id">{{ author.display_name }}</option>
+            </select>
+          </label>
+          <div class="form-grid">
+            <label>标题<input v-model="metadata.title" data-test="title" maxlength="1000" required></label>
+            <label>文章类型<input v-model="metadata.article_type" data-test="article-type" maxlength="100" required></label>
+            <label>语言<select v-model="metadata.language" data-test="language" required><option value="en">英语</option><option value="zh">中文</option></select></label>
+            <label>学科领域<input v-model="metadata.subject_field" maxlength="255"></label>
+            <label>关键词（以逗号分隔）<input v-model="metadata.keywords" data-test="keywords"></label>
+            <label>基金编号<input v-model="metadata.funding_number" data-test="funding-number" maxlength="255"></label>
+            <label>基金名称<input v-model="metadata.funding_name" data-test="funding-name" maxlength="255"></label>
+            <label>临床实验编号（医学）<input v-model="metadata.clinical_trial_number" data-test="clinical-trial-number" maxlength="255"></label>
+          </div>
+          <label>摘要<textarea v-model="metadata.abstract" data-test="abstract" rows="6" required></textarea></label>
         </div>
-        <label>摘要<textarea v-model="metadata.abstract" data-test="abstract" rows="6" required></textarea></label>
+      </section>
+
+      <section v-else-if="createStep === 2" class="create-step declarations-grid" data-test="create-step-declarations">
         <label>基金声明<textarea v-model="metadata.funding_statement" rows="3"></textarea></label>
         <label>出版声明<textarea v-model="metadata.publication_statement" data-test="publication-statement" rows="3"></textarea></label>
         <label>致谢<textarea v-model="metadata.acknowledgements" data-test="acknowledgements" rows="3"></textarea></label>
         <label>作者贡献<textarea v-model="metadata.author_contributions" data-test="author-contributions" rows="3"></textarea></label>
-        <label>利益冲突声明<textarea v-model="metadata.conflict_of_interest_statement" rows="3"></textarea></label>
-        <label>伦理声明<textarea v-model="metadata.ethics_statement" rows="3"></textarea></label>
-        <label>数据可用性声明<textarea v-model="metadata.data_availability_statement" rows="3"></textarea></label>
-        <label>备注<textarea v-model="metadata.notes" rows="3"></textarea></label>
-      </div>
-      <AuthorshipEditor
-        v-if="ownerAuthorId"
-        data-test="create-authorship-form"
-        :model-value="createAuthors"
-        :owner-author-id="ownerAuthorId"
-        :available-authors="authorOptions"
-        :submitting="creating"
-        @submit="saveCreate"
-      />
+        <label>利益冲突声明<textarea v-model="metadata.conflict_of_interest_statement" data-test="conflict-of-interest-statement" rows="3"></textarea></label>
+        <label>伦理声明<textarea v-model="metadata.ethics_statement" data-test="ethics-statement" rows="3"></textarea></label>
+        <label>数据可用性声明<textarea v-model="metadata.data_availability_statement" data-test="data-availability-statement" rows="3"></textarea></label>
+        <label>备注<textarea v-model="metadata.notes" data-test="notes" rows="3"></textarea></label>
+      </section>
+
+      <section v-else class="create-step" data-test="create-step-authors">
+        <AuthorshipEditor
+          v-if="ownerAuthorId"
+          data-test="create-authorship-form"
+          :model-value="createAuthors"
+          :owner-author-id="ownerAuthorId"
+          :available-authors="authorOptions"
+          :submitting="creating"
+          @submit="saveCreate"
+        />
+        <p v-else>请先返回基本信息并选择所有者作者。</p>
+      </section>
       <p v-if="createError" class="form-error" role="alert">{{ createError }}</p>
-      <button class="action-button action-button--compact action-button--neutral" type="button" :disabled="creating" @click="createModal?.requestClose()">取消</button>
+      <div class="create-step-actions">
+        <button class="action-button action-button--neutral" type="button" :disabled="creating" @click="createModal?.requestClose()">取消</button>
+        <button v-if="createStep > 1" class="action-button action-button--neutral" data-test="create-step-prev" type="button" :disabled="creating" @click="createStep -= 1">上一步</button>
+        <button v-if="createStep < 3" class="action-button action-button--create" data-test="create-step-next" type="button" :disabled="creating" @click="createStep += 1">下一步</button>
+      </div>
     </AppModal>
 
     <p v-if="loading">正在加载稿件…</p>

@@ -43,11 +43,11 @@ def unique_column_sets(table):
     }
 
 
-def test_registration_schema_is_at_0008(db_engine):
+def test_registration_schema_is_at_0009(db_engine):
     from sqlalchemy import inspect, text
 
     with db_engine.connect() as connection:
-        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0008"
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0009"
     expected = {
         "publisher_registration_support",
         "platform_adapters",

@@ -170,6 +170,7 @@ EXPECTED_NEW_COLUMNS = {
         "status",
         "source_url",
         "verified_at",
+        "active_normalized_name",
         "created_at",
         "updated_at",
         "created_by",
@@ -681,7 +682,7 @@ def test_mig_01_empty_upgrade_head_is_cleanly_repeatable(db_engine):
             name: inspect(db_engine).get_table_options(name) for name in EXPECTED_TABLES
         } == first_options
         with db_engine.connect() as connection:
-            assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0008"
+            assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0009"
             assert connection.scalar(text("SELECT COUNT(*) FROM alembic_version")) == 1
     finally:
         command.upgrade(config, "head")
@@ -795,7 +796,7 @@ def test_invalid_legacy_issn_aborts_before_any_ddl(db_engine, db_session):
     db_session.commit()
     command.upgrade(Config(str(BACKEND_DIR / "alembic.ini")), "head")
     with db_engine.connect() as connection:
-        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0008"
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0009"
     if previous_url is None:
         os.environ.pop("ALEMBIC_DATABASE_URL", None)
     else:

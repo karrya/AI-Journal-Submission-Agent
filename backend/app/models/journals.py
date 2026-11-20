@@ -26,7 +26,7 @@ from app.models.base import (
 class Publisher(UUIDPrimaryKeyMixin, CreatedUpdatedByMixin, SoftDeleteMixin, Base):
     __tablename__ = "publishers"
     __table_args__ = (
-        UniqueConstraint("normalized_name", name="uq_publishers_normalized_name"),
+        UniqueConstraint("active_normalized_name", name="uq_publishers_active_normalized_name"),
         Index("ix_publishers_domain", "primary_domain"),
         MYSQL_TABLE_OPTIONS,
     )
@@ -45,6 +45,11 @@ class Publisher(UUIDPrimaryKeyMixin, CreatedUpdatedByMixin, SoftDeleteMixin, Bas
     status: Mapped[str] = mapped_column(VARCHAR(30), default="ACTIVE", nullable=False)
     source_url: Mapped[str | None] = mapped_column(VARCHAR(2048), nullable=True)
     verified_at: Mapped[datetime | None] = mapped_column(DATETIME(fsp=6), nullable=True)
+    active_normalized_name: Mapped[str | None] = mapped_column(
+        VARCHAR(255),
+        Computed("IF(deleted_at IS NULL, normalized_name, NULL)", persisted=True),
+        nullable=True,
+    )
 
 
 class JournalPlatform(

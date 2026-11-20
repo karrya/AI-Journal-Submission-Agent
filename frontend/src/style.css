@@ -1459,11 +1459,16 @@ pre {
 }
 
 .app-dialog .el-dialog__body {
+  flex: 1 1 auto;
+  min-height: 0;
   padding: 0;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .app-dialog__body {
+  min-height: 0;
   padding: 22px 26px;
   overflow-x: hidden;
   overflow-y: auto;

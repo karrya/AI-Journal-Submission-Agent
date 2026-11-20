@@ -41,7 +41,7 @@ bash scripts/dev_frontend.sh
 
 网络识别的 Provider、Kimi、Chromium 和证据配置见[自动化期刊网络识别](docs/network-discovery.md)。注册阶段一的表、权限、任务恢复和验收边界见[注册基础与阶段一验收](docs/registration-foundation.md)。注册 Worker 的默认执行器只进行准入复核并转入人工复核，不执行真实注册、邮箱读取或外部提交。
 
-后端监听 `127.0.0.1:8000`；前端地址为 `http://127.0.0.1:5173`。默认 `ALLOWED_ORIGINS` 同时信任该地址和 `http://localhost:5173`，因此可在文档所列地址正常登录并执行受 CSRF 保护的密码修改。Vite 的 `/api` 代理保留浏览器源，并将请求转发至后端。健康检查地址为 `http://127.0.0.1:8000/api/v1/health`。
+后端监听 `127.0.0.1:8000`；前端地址为 `http://127.0.0.1:5173`。默认 `ALLOWED_ORIGINS` 同时信任 `http://localhost:5173` 及 Vite 端口被占用时的 `127.0.0.1:5174`、`localhost:5174`，因此可在文档所列地址正常登录并执行受 CSRF 保护的密码修改。Vite 的 `/api` 代理保留浏览器源，并将请求转发至后端。健康检查地址为 `http://127.0.0.1:8000/api/v1/health`。
 
 使用以下命令运行全部后端、接口契约、前端、覆盖率、OpenAPI/Newman 和生产构建检查：
 

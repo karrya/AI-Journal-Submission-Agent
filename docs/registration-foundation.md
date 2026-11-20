@@ -60,7 +60,7 @@ curl --fail --silent http://127.0.0.1:8000/api/v1/health
 curl --fail --silent http://127.0.0.1:5173/ >/dev/null
 ```
 
-前端为 `http://127.0.0.1:5173`，后端仅监听 `127.0.0.1:8000`。三个长期服务的日志分别位于 `storage/logs/backend.*.log`、`storage/logs/worker.*.log` 和 `storage/logs/registration-worker.*.log`。需要停止时使用 `bash scripts/dev_services.sh stop`；该命令不停止前端终端。
+前端为 `http://127.0.0.1:5173`，后端仅监听 `127.0.0.1:8000`。三个长期服务的日志分别位于 `storage/logs/backend.*.log`、`storage/logs/worker.*.log` 和 `storage/logs/registration-worker.*.log`。需要停止时使用 `bash scripts/dev_services.sh stop`；该命令不停止前端终端。默认 `ALLOWED_ORIGINS` 同时允许 `127.0.0.1:5173`、`localhost:5173`、`127.0.0.1:5174` 和 `localhost:5174`，因此 Vite 端口被占用后自动递增到 5174 时也可正常登录。
 
 ## 3. 模块 2 与模块 3 的表关系
 

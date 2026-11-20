@@ -28,6 +28,10 @@ services = {
 for name, script in services.items():
     label = f"com.academic-submission-agent.{name}"
     log_root = root / "storage" / "logs"
+    allowed_origins = os.environ.get(
+        "ALLOWED_ORIGINS",
+        '["http://127.0.0.1:5173","http://localhost:5173","http://127.0.0.1:5174","http://localhost:5174"]',
+    )
     payload = {
         "Label": label,
         "ProgramArguments": ["/bin/bash", str(script)],
@@ -36,7 +40,10 @@ for name, script in services.items():
         "KeepAlive": True,
         "ThrottleInterval": 5,
         "ProcessType": "Background",
-        "EnvironmentVariables": {"PYTHONUNBUFFERED": "1"},
+        "EnvironmentVariables": {
+            "PYTHONUNBUFFERED": "1",
+            "ALLOWED_ORIGINS": allowed_origins,
+        },
         "StandardOutPath": str(log_root / f"{name}.out.log"),
         "StandardErrorPath": str(log_root / f"{name}.error.log"),
     }

@@ -570,7 +570,7 @@ onMounted(() => {
       {{ catalogError }} <button type="button" class="text-button" @click="loadCatalogs">重试选项加载</button>
     </p>
 
-    <AppModal v-model="showCreate" title="创建注册任务" description="选择已授权、已支持的出版社与投稿平台，创建前逐项核对只读摘要。" width="960px" :busy="creating" :dirty="() => createGuard.dirty.value" :error="authorDataError || taskError">
+    <AppModal v-model="showCreate" title="创建注册任务" description="选择已授权、已支持的出版社与投稿平台，创建前逐项核对只读摘要。" width="960px" wide :busy="creating" :dirty="() => createGuard.dirty.value" :error="authorDataError || taskError">
       <section class="workbench-panel target-panel" aria-labelledby="registration-target-title">
       <div class="section-heading">
         <div><p class="section-kicker">01 · 目标任务</p><h2 id="registration-target-title">选择作者、出版社、期刊与平台</h2></div>

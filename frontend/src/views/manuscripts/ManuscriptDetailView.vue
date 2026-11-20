@@ -390,7 +390,7 @@ watch(() => props.manuscriptId, () => {
 
       <section aria-labelledby="working-metadata-title">
         <h2 id="working-metadata-title">工作元数据</h2>
-        <AppModal ref="metadataModal" v-model="showMetadata" title="编辑工作元数据" description="修改当前工作元数据，不会改变已有不可变快照。" width="960px" :busy="metadataBusy" :dirty="() => metadataGuard.dirty.value" :error="metadataError">
+        <AppModal ref="metadataModal" v-model="showMetadata" title="编辑工作元数据" description="修改当前工作元数据，不会改变已有不可变快照。" width="960px" wide :busy="metadataBusy" :dirty="() => metadataGuard.dirty.value" :error="metadataError">
           <form data-test="metadata-form" class="stacked-form" novalidate @submit.prevent="saveMetadata">
           <div class="form-grid">
             <label>标题<input v-model="metadata.title" data-test="metadata-title" maxlength="1000" required></label>

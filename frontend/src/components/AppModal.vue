@@ -7,12 +7,14 @@ const props = withDefaults(defineProps<{
   title: string
   description?: string
   width?: string
+  wide?: boolean
   busy?: boolean | (() => boolean)
   dirty?: boolean | (() => boolean)
   error?: string
 }>(), {
   description: '',
   width: '640px',
+  wide: false,
   busy: false,
   dirty: false,
   error: '',
@@ -87,6 +89,7 @@ watch(() => props.modelValue, (open) => {
   <el-dialog
     v-if="modelValue"
     class="app-dialog"
+    :class="{ 'app-dialog--wide': wide }"
     :model-value="modelValue"
     :title="title"
     :width="width"
@@ -111,6 +114,7 @@ watch(() => props.modelValue, (open) => {
     </template>
 
     <div class="app-dialog__body">
+      <p v-if="wide" class="app-dialog__scroll-hint">表单较长时可滚动查看全部内容</p>
       <p v-if="error" class="form-error app-dialog__error" role="alert">{{ error }}</p>
       <slot />
     </div>

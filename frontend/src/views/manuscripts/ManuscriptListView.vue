@@ -216,7 +216,7 @@ onMounted(() => void load())
 
     <p v-if="errorMessage" class="form-error" role="alert">{{ errorMessage }}</p>
 
-    <AppModal ref="createModal" v-model="showCreate" title="创建稿件" description="填写工作元数据并确认作者名单，保存后生成稿件工作区。" width="960px" :busy="creating" :dirty="() => createGuard.dirty.value" :error="createError">
+    <AppModal ref="createModal" v-model="showCreate" title="创建稿件" description="填写工作元数据并确认作者名单，保存后生成稿件工作区。" width="960px" wide :busy="creating" :dirty="() => createGuard.dirty.value" :error="createError">
       <div class="stacked-form">
         <label>所有者作者
           <select v-model="ownerAuthorId" data-test="owner-author" required @change="ownerChanged">

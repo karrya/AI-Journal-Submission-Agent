@@ -431,7 +431,7 @@ onMounted(() => void loadPublishers())
         <label>顺序<select v-model="journalQuery.order" @change="journalSortChanged"><option value="asc">升序</option><option value="desc">降序</option></select></label>
         <button v-if="isAdmin" class="action-button action-button--create" type="button" data-test="add-journal" @click="openJournalForm()">添加期刊</button>
       </div>
-      <AppModal ref="journalModal" v-model="showJournalForm" :title="editingJournalId ? '编辑期刊' : '添加期刊'" description="维护期刊身份、平台、网址与投稿要求。" width="960px" :busy="busy" :dirty="() => journalGuard.dirty.value" :error="errorMessage">
+      <AppModal ref="journalModal" v-model="showJournalForm" :title="editingJournalId ? '编辑期刊' : '添加期刊'" description="维护期刊身份、平台、网址与投稿要求。" width="960px" wide :busy="busy" :dirty="() => journalGuard.dirty.value" :error="errorMessage">
         <form data-test="journal-form" class="stacked-form" novalidate @submit.prevent="saveJournal">
         <div class="form-grid">
           <label>出版商<select v-model="journalForm.publisher_id" data-test="journal-publisher" required><option value="" disabled>请选择出版商</option><option v-for="option in publisherOptions" :key="option.id" :value="option.id">{{ option.name ?? option.id }}</option></select></label>

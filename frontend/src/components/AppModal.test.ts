@@ -93,6 +93,13 @@ describe('AppModal', () => {
     expect(document.activeElement).toBe(trigger)
   })
 
+  it('supports a tall two-column layout for long forms', async () => {
+    const wrapper = await mountModal({ wide: true })
+
+    expect(wrapper.get('.el-dialog.app-dialog').classes()).toContain('app-dialog--wide')
+    expect(wrapper.text()).toContain('表单较长时可滚动查看全部内容')
+  })
+
   it('shows the request error inside the dialog', async () => {
     const wrapper = await mountModal({ error: '无法保存，请求 ID：req-1' })
 

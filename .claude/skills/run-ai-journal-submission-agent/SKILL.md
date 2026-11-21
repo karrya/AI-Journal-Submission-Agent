@@ -30,7 +30,7 @@ node .claude/skills/run-ai-journal-submission-agent/driver.mjs
 ASA_RUN_URL=http://127.0.0.1:5174 ASA_RUN_OUTPUT=/tmp/ai-journal-submission-agent-run-self-start node .claude/skills/run-ai-journal-submission-agent/driver.mjs
 ```
 
-驱动打开“创建稿件”，验证遮罩挂载与视口边界、正文滚动、步骤 `1 → 2 → 3 → 2 → 1 → 3`、输入保留及 390px 移动端布局；随后在 1000px 高视口检查“添加作者”“添加期刊”“创建注册任务”按内容确定高度并垂直居中。默认截图和 `result.json` 写入 `/tmp/ai-journal-submission-agent-run/`；独立端口示例写入 `/tmp/ai-journal-submission-agent-run-self-start/`。必须查看截图，不能只依赖退出码。
+驱动打开“创建稿件”，验证遮罩挂载与视口边界、正文滚动、步骤 `1 → 2 → 3 → 2 → 1 → 3`、输入保留及 390px 移动端布局；随后在 1000px 高视口检查“添加作者”“添加期刊”“创建注册任务”按内容确定高度并垂直居中，最后复现“编辑授权”过期时间错误并用真实滚轮确认保存按钮可达。默认截图和 `result.json` 写入 `/tmp/ai-journal-submission-agent-run/`；独立端口示例写入 `/tmp/ai-journal-submission-agent-run-self-start/`。必须查看截图，不能只依赖退出码。
 
 ## Build and test
 

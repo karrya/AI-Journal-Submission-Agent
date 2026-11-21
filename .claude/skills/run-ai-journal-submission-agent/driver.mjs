@@ -39,6 +39,22 @@ const publisher = {
   created_at: '2026-11-01T00:00:00Z',
   updated_at: '2026-11-01T00:00:00Z',
 }
+const authorization = {
+  id: 'browser-authorization',
+  author_id: owner.id,
+  user_id: user.id,
+  permissions: ['author:profile:read'],
+  valid_from: '2026-11-01T00:00:00Z',
+  valid_to: '2099-11-02T00:00:00Z',
+  evidence_ref: null,
+  notes: null,
+  revoked_at: null,
+  reviewed_by: user.id,
+  reviewed_at: '2026-11-01T00:00:00Z',
+  created_at: '2026-11-01T00:00:00Z',
+  updated_at: '2026-11-01T00:00:00Z',
+  validity_status: 'active',
+}
 const emptyPage = { items: [], page: 1, page_size: 20, total: 0 }
 
 let vite = null
@@ -118,7 +134,13 @@ async function mockApi(page) {
     if (request.method() === 'GET' && path === '/api/v1/registration/publishers') return fulfill(route, { items: [] })
     if (request.method() === 'GET' && path === '/api/v1/registration/tasks') return fulfill(route, emptyPage)
     if (request.method() === 'GET' && path === '/api/v1/author-authorizations/options') {
-      return fulfill(route, { authors: [], users: [] })
+      return fulfill(route, {
+        authors: [{ id: owner.id, display_name: owner.display_name }],
+        users: [{ id: user.id, username: user.username, display_name: user.display_name }],
+      })
+    }
+    if (request.method() === 'GET' && path === '/api/v1/author-authorizations') {
+      return fulfill(route, { ...emptyPage, items: [authorization], total: 1 })
     }
     return fulfill(route, { detail: `Unexpected browser-check request: ${request.method()} ${path}` }, 500)
   })
@@ -152,6 +174,74 @@ async function checkCenteredModal(page, { path, trigger, title, screenshot, befo
   assert(Math.abs(metrics.top - (metrics.viewportHeight - metrics.bottom)) <= 1, `${title} is not vertically centered`)
   await page.screenshot({ path: resolve(outputDir, screenshot) })
   return metrics
+}
+
+async function checkAuthorizationErrorRecovery(page) {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto(`${baseUrl}/authorizations`)
+  await page.locator(`[data-test="edit-authorization-${authorization.id}"]`).click()
+  await page.getByRole('dialog', { name: '编辑授权' }).waitFor()
+  await waitForDialogAnimation(page)
+
+  const measure = () => page.evaluate(() => {
+    const dialog = document.querySelector('.el-dialog.app-dialog')
+    const outer = dialog.querySelector('.el-dialog__body')
+    const inner = dialog.querySelector('.app-dialog__body')
+    const button = dialog.querySelector('button[type="submit"]')
+    const dialogRect = dialog.getBoundingClientRect()
+    const outerRect = outer.getBoundingClientRect()
+    const buttonRect = button.getBoundingClientRect()
+    const containerMetrics = (element) => ({
+      clientHeight: element.clientHeight,
+      scrollHeight: element.scrollHeight,
+      scrollTop: element.scrollTop,
+      overflowY: getComputedStyle(element).overflowY,
+    })
+    return {
+      dialog: { top: dialogRect.top, bottom: dialogRect.bottom, height: dialogRect.height },
+      outer: containerMetrics(outer),
+      inner: containerMetrics(inner),
+      button: {
+        top: buttonRect.top,
+        bottom: buttonRect.bottom,
+        visible: buttonRect.top >= outerRect.top && buttonRect.bottom <= outerRect.bottom,
+      },
+    }
+  })
+
+  const before = await measure()
+  const settle = () => page.evaluate(() => new Promise((resolveFrame) => {
+    requestAnimationFrame(() => requestAnimationFrame(resolveFrame))
+  }))
+  await page.locator('[data-test="valid-from"]').fill('2019-01-01T00:00')
+  await page.locator('[data-test="valid-to"]').fill('2020-01-01T00:00')
+  await page.locator('[data-test="authorization-form"] button[type="submit"]').click()
+  await page.locator('.app-dialog__error').filter({ hasText: '结束时间必须晚于当前时间' }).waitFor()
+  await settle()
+  const afterError = await measure()
+
+  await page.evaluate(() => {
+    document.activeElement?.blur()
+    document.querySelector('.app-dialog .el-dialog__body').scrollTop = 0
+    document.querySelector('.app-dialog__body').scrollTop = 0
+  })
+  await settle()
+  const beforeWheel = await measure()
+  await page.screenshot({ path: resolve(outputDir, 'edit-authorization-error.png') })
+  const inner = page.locator('.app-dialog__body')
+  const innerBox = await inner.boundingBox()
+  await page.mouse.move(innerBox.x + innerBox.width / 2, innerBox.y + innerBox.height / 2)
+  await page.mouse.wheel(0, 800)
+  await page.waitForFunction(() => (
+    document.querySelector('.app-dialog .el-dialog__body').scrollTop > 0
+    || document.querySelector('.app-dialog__body').scrollTop > 0
+  ), null, { timeout: 1500 }).catch(() => {})
+  await settle()
+  const afterWheel = await measure()
+  await page.screenshot({ path: resolve(outputDir, 'edit-authorization-error-scrolled.png') })
+  assert(afterWheel.outer.scrollTop > 0 || afterWheel.inner.scrollTop > 0, 'Mouse wheel should scroll the dialog after an error appears')
+  assert(afterWheel.button.visible, 'Save button should be reachable by mouse wheel after an error appears')
+  return { before, afterError, beforeWheel, afterWheel }
 }
 
 async function runBrowserCheck() {
@@ -262,6 +352,7 @@ async function runBrowserCheck() {
       path: '/registration', trigger: '[data-test="open-create-registration"]', title: '创建注册任务', screenshot: 'create-registration.png', viewportHeight: 1000,
     }),
   }
+  const authorizationError = await checkAuthorizationErrorRecovery(page)
   assert.deepEqual(errors, [])
 
   const result = {
@@ -273,6 +364,7 @@ async function runBrowserCheck() {
     steps: '1 → 2 → 3 → 2 → 1 → 3',
     mobile,
     additionalModals,
+    authorizationError,
     consoleErrors: errors,
     screenshots: outputDir,
   }

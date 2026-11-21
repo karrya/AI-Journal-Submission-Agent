@@ -47,6 +47,7 @@ function confirmAction(): void {
     v-if="modelValue"
     class="app-dialog app-confirm"
     :model-value="modelValue"
+    append-to-body
     :title="title"
     width="480px"
     top="12vh"

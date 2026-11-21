@@ -1466,7 +1466,7 @@ pre {
   flex-direction: column;
   max-width: calc(100vw - 40px);
   max-height: 88vh;
-  margin: 0 auto;
+  margin: auto;
   overflow: hidden;
   background: rgb(255 255 255 / 98%);
   border: 1px solid rgb(255 255 255 / 85%);
@@ -1545,10 +1545,7 @@ pre {
 }
 
 .el-dialog.app-dialog.app-dialog--wide {
-  top: 0;
   width: min(1200px, calc(100vw - 40px));
-  height: 100vh;
-  max-height: 100vh;
 }
 
 .app-dialog--wide .app-dialog__body > .stacked-form {

@@ -102,6 +102,8 @@ curl --fail --silent http://127.0.0.1:5173/ >/dev/null
 
 注册 Worker 原子认领待执行任务，并记录 Worker ID、心跳和租约。过期租约可由存活 Worker 重新认领；失去租约的旧 Worker 不能覆盖新所有者的检查点或结果。可重试失败使用带配置上限、最大次数和有界随机抖动的指数退避，耗尽后进入 `NEEDS_MANUAL_REVIEW`。如果过期任务已记录提交标记，Worker 会在同一事务中将其恢复为 `SUBMISSION_UNKNOWN`、清除所有权并审计，不会调用执行器。任务创建、配置、取消、重试、Worker 认领、结果、取消、失败和恢复均复用 `operation_logs`，只写显式白名单摘要。
 
+浏览器自动化执行器只在预检通过后打开可见浏览器，从数据库读取作者资料并使用 Keychain 中的凭据。每个确定性步骤写入检查点；robots 禁止、无适配器、CAPTCHA、MFA、页面变化或结果未知时保留 handoff ID 并转人工，不继续自动点击。APEC 的 robots 为 `Disallow: /`，只打开官方人工页面。人工接管查询与恢复复用原任务和幂等键，不重复创建任务，不在日志、截图或响应中保存秘密。
+
 确认挑战与任务、动作、请求用户和规范化摘要哈希绑定，默认十分钟到期。数据库只保存 Token 哈希和摘要哈希。消费时锁定任务并同时校验预期动作与合法当前状态，再使用带全部绑定条件的原子更新；只有一个并发请求能成功。重放返回 `CONFIRMATION_CONSUMED`，过期返回 `CONFIRMATION_EXPIRED`，跨动作、任务、用户、Token 或摘要不匹配返回 `CONFIRMATION_INVALID`，已取消或其他非法状态返回 `INVALID_TASK_STATE`。拒绝路径显式回滚，不保留部分消费。
 
 ## 6. 阶段一自动化验收
@@ -170,5 +172,8 @@ git status --short
 - `GET /api/v1/registration/publishers` 与 `GET /api/v1/registration/publishers/{publisher_id}/journals`：读取安全目录元数据；
 - `PUT /api/v1/registration/publishers/{publisher_id}/support`：管理员配置出版社宽表中的注册支持字段；
 - `PATCH /api/v1/registration/submission-portals/{portal_id}`：管理员配置入口支持状态及内联 `adapter_*` 字段；
+- `POST /api/v1/journals/{journal_id}/submission-portals`：管理员在受控人工流程中核验并补录入口。请求必须包含明确的人工核验确认、适配器版本、精确域名白名单和核验说明；服务端仅做 URL 字符串校验、重复检查及审计，不访问目标网站，不创建注册任务，并派生 `VERIFIED`、`MANUALLY_VERIFIED` 和核验时间；
 - `POST/GET /api/v1/registration/tasks`、`GET /api/v1/registration/tasks/{task_id}`：创建和查询授权范围内任务；
+- `GET /api/v1/registration/tasks/{task_id}/handoff`：查询当前人工接管原因、官方人工页面和 handoff ID；
+- `POST /api/v1/registration/tasks/{task_id}/resume`：人工处理后恢复原任务，必须满足 CSRF、作者授权和状态限制；
 - `POST /api/v1/registration/tasks/{task_id}/cancel` 与 `/retry`：按状态机取消或重试。

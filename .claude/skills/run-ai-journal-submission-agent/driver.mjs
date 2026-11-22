@@ -39,6 +39,45 @@ const publisher = {
   created_at: '2026-11-01T00:00:00Z',
   updated_at: '2026-11-01T00:00:00Z',
 }
+const registrationPublisher = {
+  id: 'browser-registration-support',
+  publisher_id: 'browser-publisher',
+  publisher_code: 'ELSEVIER',
+  display_name: 'Synthetic Publisher',
+  support_status: 'SUPPORTED',
+  support_level: 'V0_1',
+  official_domains: ['register.example'],
+  notes: null,
+  created_at: '2026-11-01T00:00:00Z',
+  updated_at: '2026-11-01T00:00:00Z',
+}
+const registrationJournal = {
+  id: 'browser-journal',
+  publisher_id: 'browser-publisher',
+  name: 'Synthetic Journal',
+  issn: null,
+  eissn: null,
+  website_url: null,
+}
+const manualPortal = {
+  id: 'browser-manual-portal',
+  journal_id: 'browser-journal',
+  original_url: 'https://register.example/start',
+  final_url: 'https://register.example/start',
+  redirect_chain: [],
+  verification_status: 'VERIFIED',
+  access_status: 'MANUALLY_VERIFIED',
+  platform_code: 'EM',
+  confidence: 1,
+  adapter_code: 'EM_ADAPTER',
+  adapter_name: 'Editorial Manager',
+  adapter_version: '1.0.0',
+  adapter_support_status: 'SUPPORTED',
+  adapter_allowed_domains: ['register.example'],
+  adapter_last_verified_at: '2026-11-22T00:00:00Z',
+  support_status: 'SUPPORTED',
+  evidence_summary: [],
+}
 const authorization = {
   id: 'browser-authorization',
   author_id: owner.id,
@@ -56,6 +95,25 @@ const authorization = {
   validity_status: 'active',
 }
 const emptyPage = { items: [], page: 1, page_size: 20, total: 0 }
+const handoffTask = {
+  id: 'browser-handoff-task',
+  author_id: owner.id,
+  publisher_id: registrationPublisher.publisher_id,
+  journal_id: registrationJournal.id,
+  platform_code: 'WILEY_RESEARCH_EXCHANGE',
+  task_status: 'NEEDS_MANUAL_REVIEW',
+  current_step: 'HANDOFF_ROBOTS',
+  retryable: false,
+  created_at: '2026-11-22T00:00:00Z',
+}
+const registrationHandoff = {
+  task_id: handoffTask.id,
+  reason: '目标站点禁止自动访问，请使用官方人工页面',
+  manual_url: 'https://wiley.atyponrex.com/journal/APEC',
+  browser_handoff_id: 'browser-handoff-1',
+  current_step: 'HANDOFF_ROBOTS',
+}
+let registrationTasks = []
 
 let vite = null
 let viteExited = false
@@ -131,8 +189,27 @@ async function mockApi(page) {
       return fulfill(route, { ...emptyPage, items: [publisher], total: 1 })
     }
     if (request.method() === 'GET' && path === '/api/v1/journals') return fulfill(route, emptyPage)
-    if (request.method() === 'GET' && path === '/api/v1/registration/publishers') return fulfill(route, { items: [] })
-    if (request.method() === 'GET' && path === '/api/v1/registration/tasks') return fulfill(route, emptyPage)
+    if (request.method() === 'GET' && path === '/api/v1/registration/publishers') return fulfill(route, { items: [registrationPublisher] })
+    if (request.method() === 'GET' && path === '/api/v1/registration/publishers/browser-publisher/journals') {
+      return fulfill(route, { items: [registrationJournal] })
+    }
+    if (request.method() === 'GET' && path === '/api/v1/journals/browser-journal/submission-portals') {
+      return fulfill(route, { items: [] })
+    }
+    if (request.method() === 'POST' && path === '/api/v1/journals/browser-journal/submission-portals') {
+      return fulfill(route, manualPortal, 201)
+    }
+    if (request.method() === 'GET' && path === '/api/v1/registration/tasks') {
+      return fulfill(route, { ...emptyPage, items: registrationTasks, total: registrationTasks.length })
+    }
+    if (request.method() === 'GET' && path === '/api/v1/registration/tasks/browser-handoff-task/handoff') {
+      return fulfill(route, registrationHandoff)
+    }
+    if (request.method() === 'POST' && path === '/api/v1/registration/tasks/browser-handoff-task/resume') {
+      handoffTask.task_status = 'PENDING'
+      handoffTask.current_step = 'HANDOFF_RESUMED'
+      return fulfill(route, handoffTask)
+    }
     if (request.method() === 'GET' && path === '/api/v1/author-authorizations/options') {
       return fulfill(route, {
         authors: [{ id: owner.id, display_name: owner.display_name }],
@@ -174,6 +251,45 @@ async function checkCenteredModal(page, { path, trigger, title, screenshot, befo
   assert(Math.abs(metrics.top - (metrics.viewportHeight - metrics.bottom)) <= 1, `${title} is not vertically centered`)
   await page.screenshot({ path: resolve(outputDir, screenshot) })
   return metrics
+}
+
+async function checkManualPortal(page) {
+  await page.setViewportSize({ width: 1440, height: 1000 })
+  await page.goto(`${baseUrl}/registration`)
+  await page.locator('[data-test="open-create-registration"]').click()
+  await page.locator('[data-test="registration-publisher"]').selectOption(registrationPublisher.publisher_id)
+  await page.locator(`[data-test="registration-journal"] option[value="${registrationJournal.id}"]`).waitFor({ state: 'attached' })
+  await page.locator('[data-test="registration-journal"]').selectOption(registrationJournal.id)
+  await page.locator('[data-test="manual-portal-toggle"]').click()
+  await page.locator('[data-test="manual-portal-url"]').fill(manualPortal.final_url)
+  await page.locator('[data-test="manual-platform-code"]').fill(manualPortal.platform_code)
+  await page.locator('[data-test="manual-adapter-code"]').fill(manualPortal.adapter_code)
+  await page.locator('[data-test="manual-adapter-name"]').fill(manualPortal.adapter_name)
+  await page.locator('[data-test="manual-adapter-version"]').fill(manualPortal.adapter_version)
+  await page.locator('[data-test="manual-allowed-domains"]').fill('register.example')
+  await page.locator('[data-test="manual-verification-notes"]').fill('Verified manually without automated page access')
+  await page.locator('[data-test="manual-portal-form"] button[type="submit"]').click()
+  await page.locator('[data-test="manual-portal-error"]').waitFor()
+  await page.locator('[data-test="manual-portal-confirm"]').check()
+  await page.locator('[data-test="manual-portal-form"] button[type="submit"]').click()
+  await page.locator('[data-test="manual-portal-form"]').waitFor({ state: 'detached' })
+  assert.equal(await page.locator('[data-test="registration-platform"]').inputValue(), manualPortal.id)
+  await page.screenshot({ path: resolve(outputDir, 'manual-portal-verified.png') })
+  return { portalId: manualPortal.id, selectedAfterManualVerification: true }
+}
+
+async function checkRegistrationHandoff(page) {
+  registrationTasks = [handoffTask]
+  await page.goto(`${baseUrl}/registration`)
+  await page.getByRole('dialog', { name: '需要人工接管' }).waitFor()
+  await waitForDialogAnimation(page)
+  assert.equal(await page.locator('[data-test="manual-portal-form"]').count(), 0)
+  await page.screenshot({ path: resolve(outputDir, 'registration-handoff.png') })
+  await page.locator('[data-test="resume-registration"]').click()
+  await page.getByRole('dialog', { name: '需要人工接管' }).waitFor({ state: 'detached' })
+  assert.equal(handoffTask.task_status, 'PENDING')
+  registrationTasks = []
+  return { handoffShown: true, automaticApecClick: false, resumedTaskId: handoffTask.id }
 }
 
 async function checkAuthorizationErrorRecovery(page) {
@@ -352,6 +468,8 @@ async function runBrowserCheck() {
       path: '/registration', trigger: '[data-test="open-create-registration"]', title: '创建注册任务', screenshot: 'create-registration.png', viewportHeight: 1000,
     }),
   }
+  const manualPortalVerification = await checkManualPortal(page)
+  const registrationHandoffResult = await checkRegistrationHandoff(page)
   const authorizationError = await checkAuthorizationErrorRecovery(page)
   assert.deepEqual(errors, [])
 
@@ -364,6 +482,8 @@ async function runBrowserCheck() {
     steps: '1 → 2 → 3 → 2 → 1 → 3',
     mobile,
     additionalModals,
+    manualPortalVerification,
+    registrationHandoff: registrationHandoffResult,
     authorizationError,
     consoleErrors: errors,
     screenshots: outputDir,

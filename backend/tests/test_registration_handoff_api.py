@@ -1,10 +1,12 @@
 from uuid import uuid4
 
 import pytest
-from test_registration_api import registration_records
+from test_registration_api import registration_records as registration_records_fixture
 
 from app.schemas.registration import RegistrationTaskCreate
 from app.services.registration import RegistrationService
+
+registration_records = registration_records_fixture
 
 
 @pytest.fixture

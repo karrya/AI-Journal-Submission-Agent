@@ -161,3 +161,18 @@ def test_options_validation_errors_use_standard_error_schema():
         assert response["content"]["application/json"]["schema"] == {
             "$ref": "#/components/schemas/ErrorResponse"
         }
+
+
+def test_manual_portal_create_contract_binds_request_and_response_schemas():
+    operation = app.openapi()["paths"]["/api/v1/journals/{journal_id}/submission-portals"]["post"]
+
+    assert operation["summary"] == "人工核验并创建投稿入口"
+    assert operation["requestBody"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/RegistrationPortalCreate"
+    }
+    assert operation["responses"]["201"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/SubmissionPortalResponse"
+    }
+    assert operation["responses"]["422"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/ErrorResponse"
+    }

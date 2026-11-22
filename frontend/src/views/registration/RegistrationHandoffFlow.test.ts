@@ -50,7 +50,7 @@ describe('Registration handoff flow', () => {
     await vi.advanceTimersByTimeAsync(2000)
     await flushPromises()
 
-    expect(wrapper.get('[data-test="registration-handoff-dialog"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="registration-handoff-dialog"]').exists()).toBe(true)
     await wrapper.get('[data-test="open-manual-page"]').trigger('click')
     expect(window.open).toHaveBeenCalledWith(handoff.manual_url, '_blank', 'noopener,noreferrer')
     await wrapper.get('[data-test="resume-registration"]').trigger('click')

@@ -1,3 +1,4 @@
+import os
 from urllib.parse import urlsplit
 from uuid import uuid4
 
@@ -18,7 +19,10 @@ class VisibleRegistrationBrowser:
         if self._page is not None:
             return
         self._playwright = sync_playwright().start()
-        self._browser = self._playwright.chromium.launch(headless=self.headless)
+        self._browser = self._playwright.chromium.launch(
+            headless=self.headless,
+            channel=os.environ.get("PLAYWRIGHT_CHROMIUM_CHANNEL", "chrome"),
+        )
         self._page = self._browser.new_page()
 
     def _assert_allowed(self, url):

@@ -1,5 +1,6 @@
 from uuid import uuid4
 
+from app.automation.registration_browser import VisibleRegistrationBrowser
 from app.automation.registration_adapters import LabelFormRegistrationAdapter
 from app.automation.registration_contracts import RegistrationAutomationError, RegistrationData
 
@@ -105,3 +106,33 @@ def test_missing_labels_become_manual_form_handoff():
     assert result.checkpoint["current_step"] == "HANDOFF_FORM_CHANGED"
     assert result.checkpoint["browser_handoff_id"]
     assert browser.submit_calls == 0
+
+
+def test_browser_uses_configured_chrome_channel(monkeypatch):
+    monkeypatch.setenv("PLAYWRIGHT_CHROMIUM_CHANNEL", "chrome")
+    launches = []
+
+    class FakeBrowser:
+        def new_page(self):
+            return object()
+
+    class FakeChromium:
+        def launch(self, **kwargs):
+            launches.append(kwargs)
+            return FakeBrowser()
+
+    class FakePlaywright:
+        chromium = FakeChromium()
+
+    class FakePlaywrightManager:
+        def start(self):
+            return FakePlaywright()
+
+    monkeypatch.setattr(
+        "app.automation.registration_browser.sync_playwright",
+        lambda: FakePlaywrightManager(),
+    )
+    browser = VisibleRegistrationBrowser(allowed_hosts=("register.example",))
+    browser._start()
+
+    assert launches == [{"headless": False, "channel": "chrome"}]

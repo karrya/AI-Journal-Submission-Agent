@@ -3,6 +3,8 @@ from types import SimpleNamespace
 
 import pytest
 
+from app.automation.registration_contracts import RegistrationData, RegistrationReceipt
+from app.automation.registration_executor import RegistrationAutomationExecutor
 from app.models import (
     Author,
     AuthorAuthorization,
@@ -408,3 +410,59 @@ def test_recovered_task_with_submission_action_is_not_executed(
     assert recovered.worker_id is None
     assert recovered.lease_expires_at is None
     assert recovered.retryable is False
+
+
+def test_executor_saves_steps_and_never_replays_unknown_result(db_session, task):
+    checkpoints = []
+
+    class FakeProvider:
+        def load(self, claimed, session):
+            return RegistrationData(
+                task_id=claimed.id,
+                login_name="synthetic-login",
+                secret="classified-secret",
+                profile={"given_name": "Ada", "family_name": "Lovelace"},
+                portal_url="https://register.example/start",
+                allowed_hosts=("register.example",),
+                adapter_code="TEST_ADAPTER",
+                adapter_version="1.2.3",
+            )
+
+    class UnknownAdapter:
+        def execute(self, data, browser, checkpoint):
+            return RegistrationReceipt(
+                "NEEDS_MANUAL_REVIEW",
+                {"current_step": "SUBMISSION_UNKNOWN"},
+            )
+
+    class UnknownRegistry:
+        def __init__(self):
+            self.submit_calls = 0
+
+        def get(self, code, version):
+            self.submit_calls += 1
+            return UnknownAdapter()
+
+    registry = UnknownRegistry()
+
+    class AllowPreflight:
+        def evaluate(self, portal):
+            return registry.get(portal.adapter_code, portal.adapter_version)
+
+    class FakeBrowser:
+        def close(self):
+            pass
+
+    executor = RegistrationAutomationExecutor(
+        preflight=AllowPreflight(),
+        provider=FakeProvider(),
+        adapters=registry,
+        browser_factory=lambda **kwargs: FakeBrowser(),
+    )
+    result = executor.execute(task, db_session, checkpoints.append)
+
+    assert result.status == "NEEDS_MANUAL_REVIEW"
+    assert result.checkpoint["current_step"] == "SUBMISSION_UNKNOWN"
+    assert registry.submit_calls == 1
+    assert "secret" not in result.checkpoint
+    assert "classified-secret" not in str(result.checkpoint)

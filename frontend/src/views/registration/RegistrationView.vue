@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import {
   getAuthorizationOptions,
   listAuthorizations,
@@ -9,6 +9,7 @@ import {
 } from '../../api/authors'
 import { getSafeRequestId } from '../../api/client'
 import {
+  createSubmissionPortal,
   getSubmissionPortals,
   type JournalOption,
   type SubmissionPortal,
@@ -17,15 +18,23 @@ import {
   cancelRegistrationTask,
   createRegistrationTask,
   getRegistrationJournals,
+  getRegistrationHandoff,
   getRegistrationPublishers,
   getRegistrationTasks,
+  resumeRegistrationTask,
   retryRegistrationTask,
+  type RegistrationHandoff,
   type RegistrationPublisher,
   type RegistrationTask,
 } from '../../api/registration'
 import AppModal from '../../components/AppModal.vue'
 import AppConfirmDialog from '../../components/AppConfirmDialog.vue'
+import RegistrationHandoffDialog from '../../components/RegistrationHandoffDialog.vue'
 import { useDirtyGuard } from '../../composables/useDirtyGuard'
+import { useAuthStore } from '../../stores/auth'
+
+const auth = useAuthStore()
+const isAdmin = computed(() => auth.user?.roles.includes('system_admin') ?? false)
 
 const TASK_STATUS_LABELS: Record<string, string> = {
   PENDING: '待执行',
@@ -88,7 +97,23 @@ const filters = reactive({
   created_to: '',
 })
 const selectedTaskId = ref('')
+const handoff = ref<RegistrationHandoff | null>(null)
+const handoffBusy = ref(false)
+let handoffTimer: ReturnType<typeof setInterval> | undefined
 const showCreate = ref(false)
+const showManualPortal = ref(false)
+const manualPortalSaving = ref(false)
+const manualPortalError = ref('')
+const manualPortal = reactive({
+  final_url: '',
+  platform_code: '',
+  adapter_code: '',
+  adapter_name: '',
+  adapter_version: '',
+  allowed_domains: '',
+  verification_notes: '',
+  confirmed: false,
+})
 const createGuard = useDirtyGuard(() => target)
 const cancelTargetId = ref<string | null>(null)
 const cancelDialogOpen = computed({
@@ -284,6 +309,8 @@ async function onPublisherChange(): Promise<void> {
 
 async function onJournalChange(): Promise<void> {
   const sequence = ++platformLoadSequence
+  showManualPortal.value = false
+  manualPortalError.value = ''
   target.portal_id = ''
   journalPortals.value = []
   authorDataError.value = ''
@@ -301,6 +328,39 @@ async function onJournalChange(): Promise<void> {
     }
   } finally {
     if (sequence === platformLoadSequence) platformsLoading.value = false
+  }
+}
+
+async function saveManualPortal(): Promise<void> {
+  if (manualPortalSaving.value || !target.journal_id) return
+  manualPortalError.value = ''
+  if (!manualPortal.confirmed) {
+    manualPortalError.value = '请确认已人工核验该入口及适配器配置。'
+    return
+  }
+  manualPortalSaving.value = true
+  try {
+    const created = await createSubmissionPortal(target.journal_id, {
+      final_url: manualPortal.final_url.trim(),
+      platform_code: manualPortal.platform_code.trim(),
+      adapter_code: manualPortal.adapter_code.trim(),
+      adapter_name: manualPortal.adapter_name.trim(),
+      adapter_version: manualPortal.adapter_version.trim(),
+      adapter_allowed_domains: manualPortal.allowed_domains.split(/[,，\s]+/).filter(Boolean),
+      adapter_verification_notes: manualPortal.verification_notes.trim(),
+      verification_confirmed: true,
+    })
+    journalPortals.value = [...journalPortals.value.filter((item) => item.id !== created.id), created]
+    target.portal_id = created.id
+    showManualPortal.value = false
+    Object.assign(manualPortal, {
+      final_url: '', platform_code: '', adapter_code: '', adapter_name: '', adapter_version: '',
+      allowed_domains: '', verification_notes: '', confirmed: false,
+    })
+  } catch (error) {
+    manualPortalError.value = safeError(error, '无法保存人工核验入口。')
+  } finally {
+    manualPortalSaving.value = false
   }
 }
 
@@ -357,6 +417,31 @@ async function loadTasks(): Promise<void> {
   }
 }
 
+async function refreshHandoff(): Promise<void> {
+  const task = selectedTask.value
+  if (!task || !(task.current_step ?? '').startsWith('HANDOFF_')) {
+    handoff.value = null
+    return
+  }
+  try {
+    handoff.value = await getRegistrationHandoff(task.id)
+  } catch {
+    handoff.value = null
+  }
+}
+
+async function resumeHandoff(taskId: string): Promise<void> {
+  if (handoffBusy.value) return
+  handoffBusy.value = true
+  try {
+    await resumeRegistrationTask(taskId)
+    handoff.value = null
+    await loadTasks()
+  } finally {
+    handoffBusy.value = false
+  }
+}
+
 function applyFilters(): void {
   if ((filters.created_from && !isoDate(filters.created_from)) || (filters.created_to && !isoDate(filters.created_to))) {
     taskError.value = '筛选时间无效，请检查后重试。'
@@ -381,6 +466,8 @@ function changePage(page: number): void {
 }
 
 function openCreate(): void {
+  showManualPortal.value = false
+  manualPortalError.value = ''
   createGuard.capture()
   showCreate.value = true
 }
@@ -548,9 +635,16 @@ function platformName(platformCode: string): string {
   return platformCode
 }
 
+watch(selectedTaskId, () => { void refreshHandoff() })
+
 onMounted(() => {
   void loadCatalogs()
   void loadTasks()
+  handoffTimer = setInterval(() => { void refreshHandoff() }, 2000)
+})
+
+onUnmounted(() => {
+  if (handoffTimer) clearInterval(handoffTimer)
 })
 </script>
 
@@ -626,6 +720,27 @@ onMounted(() => {
           </select>
           <p>仅列出当前期刊已核验入口绑定的具体适配器版本；平台最终准入由服务端复核。</p>
         </div>
+      </div>
+      <div v-if="isAdmin && target.journal_id" class="manual-portal">
+        <button v-if="!showManualPortal" class="secondary-button" type="button" data-test="manual-portal-toggle" @click="showManualPortal = true">人工核验并添加入口</button>
+        <form v-else data-test="manual-portal-form" @submit.prevent="saveManualPortal">
+          <p>仅保存人工提供的资料，不访问目标网站。请确认入口及适配器已在受控人工流程中完成核验。</p>
+          <div class="form-grid">
+            <label>投稿入口 URL<input v-model="manualPortal.final_url" data-test="manual-portal-url" type="url" required></label>
+            <label>平台代码<input v-model="manualPortal.platform_code" data-test="manual-platform-code" required></label>
+            <label>适配器代码<input v-model="manualPortal.adapter_code" data-test="manual-adapter-code" required></label>
+            <label>适配器名称<input v-model="manualPortal.adapter_name" data-test="manual-adapter-name" required></label>
+            <label>适配器版本<input v-model="manualPortal.adapter_version" data-test="manual-adapter-version" required></label>
+            <label>允许域名（逗号分隔）<input v-model="manualPortal.allowed_domains" data-test="manual-allowed-domains" required></label>
+          </div>
+          <label>人工核验说明<textarea v-model="manualPortal.verification_notes" data-test="manual-verification-notes" rows="3" required></textarea></label>
+          <label class="confirmation-control"><input v-model="manualPortal.confirmed" data-test="manual-portal-confirm" type="checkbox">我确认已在不自动访问目标页面的情况下人工核验此入口及适配器配置。</label>
+          <p v-if="manualPortalError" class="form-error" data-test="manual-portal-error" role="alert">{{ manualPortalError }}</p>
+          <div class="create-step-actions">
+            <button class="secondary-button" type="button" :disabled="manualPortalSaving" @click="showManualPortal = false">取消</button>
+            <button class="primary-button" type="submit" :disabled="manualPortalSaving">{{ manualPortalSaving ? '正在保存…' : '保存人工核验入口' }}</button>
+          </div>
+        </form>
       </div>
       <p v-if="authorDataError" class="inline-alert" role="alert">{{ authorDataError }}</p>
 
@@ -768,6 +883,14 @@ onMounted(() => {
       @confirm="confirmCancel"
     />
 
+    <RegistrationHandoffDialog
+      v-if="handoff"
+      :handoff="handoff"
+      :busy="handoffBusy"
+      @resume="resumeHandoff"
+      @cancel="handoff = null"
+    />
+
     <section class="workbench-panel manual-panel" aria-labelledby="manual-center-title">
       <div class="section-heading"><div><p class="section-kicker">04 · 人工处理中心</p><h2 id="manual-center-title">需要人工关注的任务</h2></div><span>仅查看与定位，不执行外部操作</span></div>
       <div class="manual-grid">
@@ -816,6 +939,11 @@ h3 { font-size: 16px; }
 .target-card label { margin-top: 3px; font-size: 13px; font-weight: 650; }
 .target-card p { margin: 2px 0 0; color: var(--ink-secondary); font-size: 12px; line-height: 1.55; }
 .target-number { display: grid; place-items: center; width: 25px; height: 25px; color: #274f8f; font-size: 12px; font-weight: 700; background: #e8effb; border-radius: 6px; }
+.manual-portal { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
+.manual-portal .form-grid { margin: 14px 0; }
+.manual-portal form > label { display: block; margin-top: 12px; }
+.manual-portal .confirmation-control { display: flex; gap: 8px; align-items: flex-start; line-height: 1.6; }
+.manual-portal .confirmation-control input { width: auto; min-height: auto; margin-top: 4px; }
 select, input { width: 100%; min-height: 40px; padding: 8px 10px; color: var(--ink); background: #fff; border: 1px solid #bdc8d8; border-radius: 7px; }
 select:disabled, input:disabled { color: #59667b; background: #eef1f6; cursor: not-allowed; }
 .submission-review { display: grid; grid-template-columns: minmax(0, 2fr) minmax(230px, 1fr); gap: 18px; margin-top: 18px; }

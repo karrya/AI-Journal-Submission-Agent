@@ -623,9 +623,11 @@ def get_registration_handoff(
     principal: Annotated[Principal, Depends(get_principal)],
 ) -> RegistrationHandoffResponse:
     task, portal = registration_service(db, principal, request).get_handoff(str(task_id))
+    assert task.browser_handoff_id is not None
+    assert task.current_step is not None
     return RegistrationHandoffResponse(
-        task_id=task.id,
-        reason=task.error_message or task.current_step,
+        task_id=UUID(task.id),
+        reason=task.error_message or task.current_step or "需要人工接管",
         manual_url=portal.final_url,
         browser_handoff_id=task.browser_handoff_id,
         current_step=task.current_step,

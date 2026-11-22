@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from typing import Any, Callable, Protocol
 
 CheckpointCallback = Callable[[dict[str, Any]], None]
 
@@ -31,6 +31,10 @@ class RegistrationAutomationError(Exception):
         self.retryable = retryable
 
 
-@dataclass(frozen=True)
-class RegistrationAdapter:
-    execute: Callable[[RegistrationData, Any, CheckpointCallback], RegistrationReceipt]
+class RegistrationAdapter(Protocol):
+    def execute(
+        self,
+        data: RegistrationData,
+        browser: Any,
+        checkpoint: CheckpointCallback,
+    ) -> RegistrationReceipt: ...

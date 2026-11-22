@@ -12226,6 +12226,10 @@
           "current_step": {
             "type": "string",
             "title": "当前注册步骤"
+          },
+          "resumable": {
+            "type": "boolean",
+            "title": "是否可恢复执行"
           }
         },
         "additionalProperties": false,
@@ -12235,7 +12239,8 @@
           "reason",
           "manual_url",
           "browser_handoff_id",
-          "current_step"
+          "current_step",
+          "resumable"
         ],
         "title": "注册任务人工接管信息响应"
       },

@@ -1,5 +1,5 @@
 import os
-from urllib.parse import urlsplit
+from urllib.parse import urljoin, urlsplit
 from uuid import uuid4
 
 from playwright.sync_api import sync_playwright
@@ -8,9 +8,11 @@ from app.automation.registration_contracts import RegistrationAutomationError
 
 
 class VisibleRegistrationBrowser:
-    def __init__(self, *, allowed_hosts=(), headless=False):
+    def __init__(self, *, allowed_hosts=(), headless=False, url_checker=None):
         self.allowed_hosts = {host.lower().rstrip(".") for host in allowed_hosts}
         self.headless = headless
+        self.url_checker = url_checker
+        self.stage = ""
         self._playwright = None
         self._browser = None
         self._page = None
@@ -24,12 +26,15 @@ class VisibleRegistrationBrowser:
             channel=os.environ.get("PLAYWRIGHT_CHROMIUM_CHANNEL", "chrome"),
         )
         self._page = self._browser.new_page()
+        self._page.route("**/*", self._guard_request)
 
     def _assert_allowed(self, url):
         parsed = urlsplit(url)
         host = (parsed.hostname or "").lower().rstrip(".")
         if (
             parsed.scheme.lower() != "https"
+            or parsed.username is not None
+            or parsed.password is not None
             or parsed.port not in {None, 443}
             or host not in self.allowed_hosts
         ):
@@ -37,13 +42,24 @@ class VisibleRegistrationBrowser:
                 "PLATFORM_DOMAIN_NOT_ALLOWED", "目标域名不在适配器白名单"
             )
 
+    def _guard_request(self, route):
+        try:
+            self._assert_allowed(route.request.url)
+        except RegistrationAutomationError:
+            route.abort()
+            return
+        route.continue_()
+
     def open(self, url):
         self._assert_allowed(url)
         self._start()
         self._page.goto(url, wait_until="domcontentloaded")
         self._assert_allowed(self._page.url)
+        if self.url_checker is not None:
+            self.url_checker.assert_allowed(self._page.url)
 
     def fill(self, labels, value):
+        self._assert_allowed(self._page.url)
         for label in labels:
             field = self._page.get_by_label(label, exact=False)
             if field.count():
@@ -55,6 +71,12 @@ class VisibleRegistrationBrowser:
         for label in labels:
             button = self._page.get_by_role("button", name=label, exact=False)
             if button.count():
+                action = button.first.evaluate(
+                    """button => button.getAttribute('formaction')
+                        || button.form?.getAttribute('action')
+                        || window.location.href"""
+                )
+                self._assert_allowed(urljoin(self._page.url, action))
                 button.first.click()
                 return
         raise RegistrationAutomationError("FORM_ACTION_NOT_FOUND", labels[0])

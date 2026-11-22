@@ -93,7 +93,7 @@ def test_unknown_submission_does_not_replay_final_action():
     result = LabelFormRegistrationAdapter().execute(data(), browser, checkpoint=lambda value: None)
 
     assert result.status == "NEEDS_MANUAL_REVIEW"
-    assert result.checkpoint["current_step"] == "SUBMISSION_UNKNOWN"
+    assert result.checkpoint["current_step"] == "HANDOFF_SUBMISSION_UNKNOWN"
     assert browser.submit_calls == 1
 
 
@@ -114,7 +114,11 @@ def test_browser_uses_configured_chrome_channel(monkeypatch):
 
     class FakeBrowser:
         def new_page(self):
-            return object()
+            return FakePage()
+
+    class FakePage:
+        def route(self, pattern, handler):
+            pass
 
     class FakeChromium:
         def launch(self, **kwargs):

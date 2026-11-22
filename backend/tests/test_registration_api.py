@@ -608,3 +608,14 @@ def test_manual_portal_rejects_duplicate_configuration_and_unknown_journal(
         json=manual_portal_payload(),
     )
     assert_error(missing, 404, "RESOURCE_NOT_FOUND")
+
+
+def test_manual_portal_rejects_query_secrets(client, admin_context, registration_records):
+    response = client.post(
+        f"/api/v1/journals/{registration_records.journal.id}/submission-portals",
+        json=manual_portal_payload() | {
+            "final_url": "https://register.example/manual?token=classified-link"
+        },
+    )
+
+    assert_error(response, 422, "VALIDATION_ERROR")

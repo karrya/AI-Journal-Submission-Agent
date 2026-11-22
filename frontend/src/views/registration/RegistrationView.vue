@@ -160,7 +160,7 @@ const manualGroups = computed(() => [
   },
   {
     id: 'submit', title: '等待提交确认', statuses: ['READY_TO_SUBMIT', 'SUBMISSION_UNKNOWN'],
-    consequence: '后果：提交会改变平台账号状态；请先核对只读摘要，本页面不执行外部提交。',
+    consequence: '后果：提交会改变平台账号状态；自动执行仅限规则允许的目标，异常或未知结果需人工核查。',
     tasks: tasks.value.filter((item) => ['READY_TO_SUBMIT', 'SUBMISSION_UNKNOWN'].includes(item.task_status)),
   },
   {
@@ -385,10 +385,10 @@ async function onFilterPublisherChange(): Promise<void> {
   }
 }
 
-async function loadTasks(): Promise<void> {
+async function loadTasks(background = false): Promise<void> {
   const sequence = ++taskLoadSequence
-  tasksLoading.value = true
-  taskError.value = ''
+  if (!background) tasksLoading.value = true
+  if (!background) taskError.value = ''
   try {
     const result = await getRegistrationTasks({
       page: filters.page,
@@ -409,22 +409,34 @@ async function loadTasks(): Promise<void> {
     if (!result.items.some((item) => item.id === evidenceTaskId.value)) evidenceTaskId.value = null
     if (!result.items.some((item) => item.id === cancelTargetId.value)) cancelTargetId.value = null
   } catch (error) {
-    if (sequence === taskLoadSequence) {
+    if (sequence === taskLoadSequence && !background) {
       taskError.value = safeError(error, '无法加载注册任务，当前数据已保留。')
     }
   } finally {
-    if (sequence === taskLoadSequence) tasksLoading.value = false
+    if (!background && sequence === taskLoadSequence) tasksLoading.value = false
   }
 }
 
 async function refreshHandoff(): Promise<void> {
   const task = selectedTask.value
-  if (!task || !(task.current_step ?? '').startsWith('HANDOFF_')) {
+  if (
+    !task
+    || task.task_status !== 'NEEDS_MANUAL_REVIEW'
+    || !(task.current_step ?? '').startsWith('HANDOFF_')
+  ) {
     handoff.value = null
     return
   }
   try {
-    handoff.value = await getRegistrationHandoff(task.id)
+    const response = await getRegistrationHandoff(task.id)
+    const current = selectedTask.value
+    if (
+      current?.id === task.id
+      && current.task_status === 'NEEDS_MANUAL_REVIEW'
+      && (current.current_step ?? '').startsWith('HANDOFF_')
+    ) {
+      handoff.value = response
+    }
   } catch {
     handoff.value = null
   }
@@ -498,7 +510,7 @@ async function submitRegistrationTask(): Promise<void> {
     total.value += 1
     selectedTaskId.value = created.id
     showCreate.value = false
-    actionMessage.value = `注册任务 ${created.id} 已创建；工作器仅复核授权与入口并转人工复核，不执行外部注册。`
+    actionMessage.value = `注册任务 ${created.id} 已创建；规则允许时将在可见浏览器中自动执行，卡点会请求人工接管。`
   } catch (error) {
     taskError.value = safeError(error, '无法创建注册任务，请核对授权与支持状态后重试。')
   } finally {
@@ -556,7 +568,7 @@ async function retryTask(item: RegistrationTask): Promise<void> {
   actionMessage.value = ''
   try {
     replaceTask(await retryRegistrationTask(item.id))
-    actionMessage.value = '任务已转入待执行状态；阶段一只重新核验授权和入口准入，不执行外部动作。'
+    actionMessage.value = '任务已转入待执行状态；规则允许时将继续自动执行，必要时请求人工接管。'
   } catch (error) {
     taskError.value = safeError(error, '无法重试任务，当前状态已保留。')
   } finally {
@@ -640,7 +652,9 @@ watch(selectedTaskId, () => { void refreshHandoff() })
 onMounted(() => {
   void loadCatalogs()
   void loadTasks()
-  handoffTimer = setInterval(() => { void refreshHandoff() }, 2000)
+  handoffTimer = setInterval(() => {
+    void loadTasks(true).then(refreshHandoff)
+  }, 2000)
 })
 
 onUnmounted(() => {
@@ -657,7 +671,7 @@ onUnmounted(() => {
         <h1 id="registration-title">注册任务工作台</h1>
         <p class="page-intro">集中核对授权目标、跟踪任务状态并处理人工介入。仅支持已核验的出版社与平台。</p>
       </div>
-      <span class="scope-note">阶段一不执行外部注册、邮箱读取或提交；不展示密码、凭据引用或完整验证链接</span>
+      <span class="scope-note">规则允许时自动执行注册；必要时人工接管；不展示密码、凭据引用或完整验证链接</span>
     </header>
 
     <p v-if="catalogError" class="inline-alert" role="alert">
@@ -757,7 +771,7 @@ onUnmounted(() => {
           </dl>
         </section>
         <div class="submission-action">
-          <p>创建任务仅代表进入受控队列。本页面不会直接执行外部注册或跳过人工确认。</p>
+          <p>创建后将按规则自动执行；需要验证码、授权或人工判断时会暂停并请求接管。</p>
           <button type="button" class="primary-button" data-test="create-registration-task" :disabled="!canCreate" @click="submitRegistrationTask">
             {{ creating ? '正在创建…' : '创建注册任务' }}
           </button>
@@ -774,7 +788,7 @@ onUnmounted(() => {
           <div><p class="section-kicker">02 · 任务队列</p><h2 id="registration-tasks-title">注册任务</h2></div>
           <div class="section-heading__actions">
             <button type="button" class="primary-button" data-test="open-create-registration" @click="openCreate">创建注册任务</button>
-            <button type="button" class="secondary-button" data-test="refresh-tasks" :disabled="tasksLoading" @click="loadTasks">刷新</button>
+            <button type="button" class="secondary-button" data-test="refresh-tasks" :disabled="tasksLoading" @click="loadTasks()">刷新</button>
           </div>
         </div>
         <form class="task-filters" aria-label="注册任务筛选" @submit.prevent="applyFilters">
@@ -803,7 +817,7 @@ onUnmounted(() => {
         </form>
 
         <p v-if="taskError" class="inline-alert" data-test="task-error" role="alert">
-          {{ taskError }} <button type="button" class="text-button" data-test="retry-task-load" @click="loadTasks">安全重试</button>
+          {{ taskError }} <button type="button" class="text-button" data-test="retry-task-load" @click="loadTasks()">安全重试</button>
         </p>
         <div v-if="tasksLoading" class="task-skeleton" data-test="task-skeleton" role="status" aria-label="正在加载注册任务">
           <span /><span /><span /><span class="sr-only">正在加载注册任务…</span>

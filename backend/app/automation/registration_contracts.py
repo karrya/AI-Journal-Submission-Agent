@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from typing import Any, Callable, Protocol
+from uuid import uuid4
 
 CheckpointCallback = Callable[[dict[str, Any]], None]
 
@@ -38,3 +39,27 @@ class RegistrationAdapter(Protocol):
         browser: Any,
         checkpoint: CheckpointCallback,
     ) -> RegistrationReceipt: ...
+
+    def resume(
+        self,
+        data: RegistrationData,
+        browser: Any,
+        checkpoint: CheckpointCallback,
+    ) -> RegistrationReceipt: ...
+
+
+def registration_handoff(
+    step: str,
+    manual_url: str,
+    *,
+    browser_handoff_id: str | None = None,
+    last_external_action: str | None = None,
+) -> RegistrationReceipt:
+    checkpoint: dict[str, Any] = {
+        "current_step": step,
+        "manual_url": manual_url,
+        "browser_handoff_id": browser_handoff_id or str(uuid4()),
+    }
+    if last_external_action is not None:
+        checkpoint["last_external_action"] = last_external_action
+    return RegistrationReceipt("NEEDS_MANUAL_REVIEW", checkpoint)

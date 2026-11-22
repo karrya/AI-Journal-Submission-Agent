@@ -76,6 +76,7 @@ export interface RegistrationHandoff {
   manual_url: string
   browser_handoff_id: string
   current_step: string
+  resumable: boolean
 }
 
 export async function getRegistrationHandoff(taskId: string): Promise<RegistrationHandoff> {

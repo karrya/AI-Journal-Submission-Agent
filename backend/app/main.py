@@ -357,6 +357,7 @@ _OPENAPI_FIELD_TITLES = {
     "verification_confirmed": "已人工核验确认",
     "browser_handoff_id": "浏览器人工接管 ID",
     "manual_url": "人工处理页面 URL",
+    "resumable": "是否可恢复执行",
 }
 _OPENAPI_COMPONENT_TITLES = {
     "AlternateName": "作者别名",

@@ -16,7 +16,7 @@ const handoffTask = {
 }
 const handoff = {
   task_id: 'task-1', reason: '需要完成验证码', manual_url: 'https://register.example/start',
-  browser_handoff_id: 'handoff-1', current_step: 'HANDOFF_CAPTCHA',
+  browser_handoff_id: 'handoff-1', current_step: 'HANDOFF_CAPTCHA', resumable: true,
 }
 
 function success(config: InternalAxiosRequestConfig, data: unknown, status = 200): AxiosResponse {
@@ -28,13 +28,13 @@ describe('Registration handoff flow', () => {
     vi.useFakeTimers()
     setActivePinia(createPinia())
     useAuthStore().setSession(operator, 'csrf')
-    let currentTask = { ...handoffTask }
+    let currentTask = { ...handoffTask, task_status: 'PENDING', current_step: 'PROCESSING' }
     const adapter = vi.fn<AxiosAdapter>(async (config) => {
       if (config.url === '/registration/publishers') return success(config, { items: [] })
       if (config.url === '/registration/tasks') return success(config, { items: [currentTask], page: 1, page_size: 20, total: 1 })
       if (config.url === '/registration/tasks/task-1/handoff') return success(config, handoff)
       if (config.method === 'post' && config.url === '/registration/tasks/task-1/resume') {
-        currentTask = { ...handoffTask, task_status: 'PENDING', current_step: 'HANDOFF_RESUMED' }
+        currentTask = { ...handoffTask, task_status: 'PENDING', current_step: 'RESUMING' }
         return success(config, currentTask)
       }
       if (config.url === '/author-authorizations/options') return success(config, { authors: [], users: [] })
@@ -47,6 +47,8 @@ describe('Registration handoff flow', () => {
       global: { stubs: { teleport: true, transition: false } },
     })
     await flushPromises()
+    expect(wrapper.find('[data-test="registration-handoff-dialog"]').exists()).toBe(false)
+    currentTask = { ...handoffTask }
     await vi.advanceTimersByTimeAsync(2000)
     await flushPromises()
 
@@ -60,6 +62,9 @@ describe('Registration handoff flow', () => {
     expect(wrapper.find('[data-test="registration-handoff-dialog"]').exists()).toBe(false)
     expect(wrapper.find('[data-test="open-create-registration"]').exists()).toBe(true)
     expect(wrapper.text()).toContain('待执行')
+    await vi.advanceTimersByTimeAsync(2000)
+    await flushPromises()
+    expect(wrapper.find('[data-test="registration-handoff-dialog"]').exists()).toBe(false)
     const callsAfterResume = adapter.mock.calls.length
     wrapper.unmount()
     await vi.advanceTimersByTimeAsync(5000)

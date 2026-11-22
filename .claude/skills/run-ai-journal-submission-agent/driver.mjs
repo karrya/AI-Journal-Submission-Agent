@@ -279,17 +279,22 @@ async function checkManualPortal(page) {
 }
 
 async function checkRegistrationHandoff(page) {
+  const apecRequests = []
+  const captureApec = (request) => {
+    if (request.url().includes('wiley.atyponrex.com/journal/APEC')) apecRequests.push(request.url())
+  }
+  page.on('request', captureApec)
   registrationTasks = [handoffTask]
   await page.goto(`${baseUrl}/registration`)
   await page.getByRole('dialog', { name: '需要人工接管' }).waitFor()
   await waitForDialogAnimation(page)
   assert.equal(await page.locator('[data-test="manual-portal-form"]').count(), 0)
   await page.screenshot({ path: resolve(outputDir, 'registration-handoff.png') })
-  await page.locator('[data-test="resume-registration"]').click()
-  await page.getByRole('dialog', { name: '需要人工接管' }).waitFor({ state: 'detached' })
-  assert.equal(handoffTask.task_status, 'PENDING')
+  assert.equal(await page.locator('[data-test="resume-registration"]').count(), 0)
+  page.off('request', captureApec)
+  assert.equal(apecRequests.length, 0)
   registrationTasks = []
-  return { handoffShown: true, automaticApecClick: false, resumedTaskId: handoffTask.id }
+  return { handoffShown: true, apecRequestCount: 0, resumeOffered: false }
 }
 
 async function checkAuthorizationErrorRecovery(page) {

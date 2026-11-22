@@ -192,6 +192,31 @@ def _not_found() -> AppError:
     return AppError(404, "RESOURCE_NOT_FOUND", "资源不存在")
 
 
+_HANDOFF_REASONS = {
+    "HANDOFF_ROBOTS": "目标站点禁止自动访问，请使用官方人工页面",
+    "HANDOFF_ADAPTER_NOT_REGISTERED": "平台适配器尚未注册，请使用官方人工页面",
+    "HANDOFF_DATA_INCOMPLETE": "作者资料不完整，请在受控页面补齐",
+    "HANDOFF_CAPTCHA": "需要完成验证码或人工挑战",
+    "HANDOFF_MFA": "需要完成多因素认证",
+    "HANDOFF_FORM_CHANGED": "页面结构已变化，请人工核对后继续",
+    "HANDOFF_BROWSER_ERROR": "浏览器步骤异常，请人工处理",
+    "HANDOFF_SUBMISSION_UNKNOWN": "提交结果未知，请核查平台实际状态",
+    "HANDOFF_SESSION_EXPIRED": "浏览器会话已失效，请使用官方人工页面",
+}
+
+
+def _safe_manual_url(value: str) -> str:
+    try:
+        parsed = urlsplit(value)
+        host = (parsed.hostname or "").lower().rstrip(".")
+        port = parsed.port
+    except ValueError:
+        raise AppError(409, "INVALID_TASK_STATE", "人工入口 URL 不安全") from None
+    if parsed.scheme.lower() != "https" or not host or port not in {None, 443}:
+        raise AppError(409, "INVALID_TASK_STATE", "人工入口 URL 不安全")
+    return urlunsplit(("https", host, parsed.path or "/", "", ""))
+
+
 def _utc_filter(value: datetime | None) -> datetime | None:
     if value is None:
         return None
@@ -237,9 +262,10 @@ def _normalized_manual_url(value: str) -> tuple[str, str]:
         or parsed.username is not None
         or parsed.password is not None
         or parsed.fragment
+        or parsed.query
         or port not in {None, 443}
     ):
-        raise AppError(422, "VALIDATION_ERROR", "投稿入口必须使用默认端口的 HTTPS URL")
+        raise AppError(422, "VALIDATION_ERROR", "投稿入口必须使用不含查询参数或片段的 HTTPS URL")
     return urlunsplit(("https", host, parsed.path or "/", parsed.query, "")), host
 
 
@@ -622,15 +648,17 @@ def get_registration_handoff(
     db: Annotated[Session, Depends(get_db)],
     principal: Annotated[Principal, Depends(get_principal)],
 ) -> RegistrationHandoffResponse:
-    task, portal = registration_service(db, principal, request).get_handoff(str(task_id))
+    service = registration_service(db, principal, request)
+    task, portal = service.get_handoff(str(task_id))
     assert task.browser_handoff_id is not None
     assert task.current_step is not None
     return RegistrationHandoffResponse(
         task_id=UUID(task.id),
-        reason=task.error_message or task.current_step or "需要人工接管",
-        manual_url=portal.final_url,
+        reason=_HANDOFF_REASONS.get(task.current_step, "需要人工接管"),
+        manual_url=_safe_manual_url(portal.final_url),
         browser_handoff_id=task.browser_handoff_id,
         current_step=task.current_step,
+        resumable=service.can_resume_handoff(task),
     )
 
 

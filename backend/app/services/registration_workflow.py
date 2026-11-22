@@ -285,18 +285,30 @@ class RegistrationWorkflowService:
         task.last_activity_at = now
         return task
 
+    def can_resume_handoff(self, task: RegistrationTask) -> bool:
+        nonresumable = {
+            "HANDOFF_ROBOTS",
+            "HANDOFF_ADAPTER_NOT_REGISTERED",
+            "HANDOFF_DATA_INCOMPLETE",
+            "HANDOFF_SESSION_EXPIRED",
+            "HANDOFF_SUBMISSION_UNKNOWN",
+            "HANDOFF_PREFLIGHT",
+        }
+        return (
+            task.task_status == "NEEDS_MANUAL_REVIEW"
+            and (task.current_step or "").startswith("HANDOFF_")
+            and task.current_step not in nonresumable
+            and task.last_external_action in {None, "SUBMITTING"}
+        )
+
     def resume_handoff(self, task: RegistrationTask, *, actor_id: str) -> RegistrationTask:
-        if (
-            task.task_status != "NEEDS_MANUAL_REVIEW"
-            or not (task.current_step or "").startswith("HANDOFF_")
-            or task.last_external_action is not None
-        ):
+        if not self.can_resume_handoff(task):
             raise AppError(
                 409,
                 "INVALID_TASK_STATE",
                 "只有未产生外部最终动作的人工接管任务可以恢复",
             )
-        self._transition(task, "PENDING", reason="HANDOFF_RESUMED")
+        self._transition(task, "PENDING", reason="RESUMING")
         now = utc_now()
         task.cancel_requested = False
         task.retryable = False

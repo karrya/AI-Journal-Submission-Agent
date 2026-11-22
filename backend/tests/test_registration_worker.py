@@ -1,5 +1,6 @@
 from datetime import timedelta
 from types import SimpleNamespace
+from uuid import uuid4
 
 import pytest
 
@@ -466,3 +467,199 @@ def test_executor_saves_steps_and_never_replays_unknown_result(db_session, task)
     assert registry.submit_calls == 1
     assert "secret" not in result.checkpoint
     assert "classified-secret" not in str(result.checkpoint)
+
+
+def test_worker_executes_real_browser_adapter_without_external_network(db_engine, db_session, task):
+    from playwright.sync_api import sync_playwright
+    from app.automation.registration_adapters import LabelFormRegistrationAdapter
+    from app.automation.registration_browser import VisibleRegistrationBrowser
+    from app.automation.registration_executor import RegistrationAutomationExecutor
+
+    html = '''<!doctype html><form>
+    <label>First Name <input name="first" /></label>
+    <label>Last Name <input name="last" /></label>
+    <label>Email <input name="email" /></label>
+    <label>Password <input name="password" type="password" /></label>
+    <label>Confirm Password <input name="confirm" type="password" /></label>
+    <button type="submit">Register</button></form>
+    <script>document.querySelector('form').addEventListener('submit', (event) => {
+      event.preventDefault();
+      const receipt = document.createElement('div');
+      receipt.dataset.accountId = 'worker-account-1';
+      document.body.appendChild(receipt);
+    });</script>'''
+    manager = sync_playwright().start()
+    chrome = manager.chromium.launch(headless=True, channel="chrome")
+    page = chrome.new_page()
+    requests = []
+    page.on("request", lambda request: requests.append(request.url))
+    page.route("https://register.example/**", lambda route: route.fulfill(
+        status=200, content_type="text/html", body=html
+    ))
+    browser = VisibleRegistrationBrowser(allowed_hosts=("register.example",), headless=True)
+    browser._playwright = manager
+    browser._browser = chrome
+    browser._page = page
+    adapter = LabelFormRegistrationAdapter()
+
+    class Provider:
+        def load(self, claimed, session):
+            return RegistrationData(
+                task_id=claimed.id,
+                login_name="synthetic-login",
+                secret="synthetic-password",
+                profile={"given_name": "Ada", "family_name": "Lovelace"},
+                portal_url="https://register.example/start",
+                allowed_hosts=("register.example",),
+                adapter_code="TEST_ADAPTER",
+                adapter_version="1.2.3",
+            )
+
+    executor = RegistrationAutomationExecutor(
+        preflight=SimpleNamespace(evaluate=lambda portal: adapter),
+        provider=Provider(),
+        adapters=SimpleNamespace(),
+        browser_factory=lambda **kwargs: browser,
+    )
+    worker = RegistrationWorker(db_engine, worker_id="worker-browser-integration")
+    observed = {}
+
+    def record_checkpoint(checkpoint):
+        if checkpoint["current_step"] == "SUBMITTING_REGISTRATION":
+            observed["first"] = page.locator('input[name="first"]').input_value()
+            observed["last"] = page.locator('input[name="last"]').input_value()
+        worker.save_checkpoint(task.id, checkpoint)
+
+    worker.executor = lambda claimed, session: executor.execute(
+        claimed, session, record_checkpoint
+    )
+
+    try:
+        assert worker.run_once() is True
+        completed = refresh_task(db_session, task.id)
+        assert completed.task_status == "REGISTERED", (
+            completed.current_step,
+            completed.error_code,
+            completed.error_message,
+        )
+        assert completed.current_step == "COMPLETED"
+        assert completed.last_external_action == "SUBMITTING"
+        assert completed.external_evidence_ref == "worker-account-1"
+        assert observed == {"first": "Ada", "last": "Lovelace"}
+        assert requests
+        assert all(url.startswith("https://register.example/") for url in requests)
+    finally:
+        if browser._page is not None:
+            browser.close()
+
+
+def test_unknown_final_action_is_persisted_and_never_reclaimed(db_engine, db_session, task):
+    class UnknownBrowser:
+        def __init__(self):
+            self.stage = ""
+            self.intervene_on = None
+            self.clicks = 0
+            self.closed = False
+
+        def open(self, url):
+            pass
+
+        def fill(self, labels, value):
+            pass
+
+        def click(self, labels):
+            self.clicks += 1
+
+        def intervene(self, kind, checkpoint):
+            return {"current_step": f"HANDOFF_{kind}", "browser_handoff_id": str(uuid4()), **checkpoint}
+
+        def registration_account_id(self):
+            return None
+
+        def close(self):
+            self.closed = True
+
+    from app.automation.registration_adapters import LabelFormRegistrationAdapter
+    from app.automation.registration_executor import RegistrationAutomationExecutor
+
+    browser = UnknownBrowser()
+    adapter = LabelFormRegistrationAdapter()
+    provider = SimpleNamespace(load=lambda claimed, session: RegistrationData(
+        task_id=claimed.id,
+        login_name="synthetic-login",
+        secret="synthetic-password",
+        profile={"given_name": "Ada", "family_name": "Lovelace"},
+        portal_url="https://register.example/start",
+        allowed_hosts=("register.example",),
+        adapter_code="TEST_ADAPTER",
+        adapter_version="1.2.3",
+    ))
+    executor = RegistrationAutomationExecutor(
+        preflight=SimpleNamespace(evaluate=lambda portal: adapter),
+        provider=provider,
+        adapters=SimpleNamespace(),
+        browser_factory=lambda **kwargs: browser,
+    )
+    worker = RegistrationWorker(db_engine, worker_id="worker-unknown-action")
+    worker.executor = lambda claimed, session: executor.execute(
+        claimed, session, lambda checkpoint: worker.save_checkpoint(claimed.id, checkpoint)
+    )
+
+    assert worker.run_once() is True
+    completed = refresh_task(db_session, task.id)
+    assert completed.task_status == "NEEDS_MANUAL_REVIEW"
+    assert completed.current_step == "HANDOFF_SUBMISSION_UNKNOWN"
+    assert completed.last_external_action == "SUBMISSION_UNKNOWN"
+    assert browser.clicks == 1
+
+    second = RegistrationWorker(
+        db_engine,
+        worker_id="worker-must-not-replay",
+        executor=lambda claimed, session: pytest.fail("unknown final action was replayed"),
+    )
+    assert second.run_once() is False
+    assert browser.clicks == 1
+
+def test_robots_preflight_reaches_handoff_api_without_browser(
+    client, operator_context, db_engine, db_session, task
+):
+    from app.automation.registration_adapters import LabelFormRegistrationAdapter
+    from app.automation.registration_executor import RegistrationAutomationExecutor
+    from app.automation.registration_preflight import RegistrationAdapterRegistry, RegistrationPreflight
+
+    class RejectRobots:
+        def assert_allowed(self, url):
+            from app.crawlers.url_security import UrlSecurityError
+            raise UrlSecurityError("robots 规则禁止访问该路径")
+
+    registry = RegistrationAdapterRegistry()
+    registry.register("TEST_ADAPTER", "1.2.3", LabelFormRegistrationAdapter())
+    provider = SimpleNamespace(load=lambda claimed, session: RegistrationData(
+        task_id=claimed.id,
+        login_name="synthetic-login",
+        secret="synthetic-password",
+        profile={"given_name": "Ada", "family_name": "Lovelace"},
+        portal_url="https://register.example/start",
+        allowed_hosts=("register.example",),
+        adapter_code="TEST_ADAPTER",
+        adapter_version="1.2.3",
+    ))
+    executor = RegistrationAutomationExecutor(
+        preflight=RegistrationPreflight(adapters=registry, url_checker=RejectRobots()),
+        provider=provider,
+        adapters=registry,
+        browser_factory=lambda **kwargs: pytest.fail("robots rejection opened a browser"),
+    )
+    worker = RegistrationWorker(db_engine, worker_id="worker-robots-handoff")
+    worker.executor = lambda claimed, session: executor.execute(
+        claimed, session, lambda checkpoint: worker.save_checkpoint(claimed.id, checkpoint)
+    )
+
+    assert worker.run_once() is True
+    response = client.get(f"/api/v1/registration/tasks/{task.id}/handoff")
+
+    assert response.status_code == 200, response.text
+    assert response.json()["manual_url"] == "https://register.example/register"
+    assert response.json()["current_step"] == "HANDOFF_ROBOTS"
+    assert response.json()["browser_handoff_id"]
+    assert response.json()["resumable"] is False

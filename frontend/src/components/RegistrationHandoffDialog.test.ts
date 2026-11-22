@@ -7,6 +7,7 @@ const handoff = {
   manual_url: 'https://register.example/start',
   browser_handoff_id: 'handoff-1',
   current_step: 'HANDOFF_CAPTCHA',
+  resumable: true,
 }
 
 describe('RegistrationHandoffDialog', () => {

@@ -28,21 +28,25 @@ def main() -> None:
     signal.signal(signal.SIGINT, request_stop)
     signal.signal(signal.SIGTERM, request_stop)
     registry = RegistrationAdapterRegistry()
+    url_checker = SafeHttpClient()
     registry.register("LABEL_FORM", "1.0.0", LabelFormRegistrationAdapter())
     automation_executor = RegistrationAutomationExecutor(
         preflight=RegistrationPreflight(
             adapters=registry,
-            url_checker=SafeHttpClient(),
+            url_checker=url_checker,
         ),
         provider=RegistrationDataProvider(),
         adapters=registry,
+        url_checker=url_checker,
     )
     worker = RegistrationWorker(
         engine,
         worker_id=os.environ.get("REGISTRATION_WORKER_ID", default_worker_id()),
     )
     worker.executor = lambda task, session: automation_executor.execute(
-        task, session, worker.save_checkpoint
+        task,
+        session,
+        lambda checkpoint: worker.save_checkpoint(task.id, checkpoint),
     )
     try:
         worker.run_forever(

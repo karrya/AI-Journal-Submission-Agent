@@ -33,7 +33,7 @@ function openManualPage(): void {
       <button class="text-button" type="button" data-test="open-manual-page" @click="openManualPage">打开人工处理页面</button>
     </div>
     <template #footer>
-      <button class="action-button action-button--create" type="button" data-test="resume-registration" :disabled="busy" @click="emit('resume', handoff.task_id)">
+      <button v-if="handoff.resumable" class="action-button action-button--create" type="button" data-test="resume-registration" :disabled="busy" @click="emit('resume', handoff.task_id)">
         {{ busy ? '正在恢复…' : '处理完毕，继续执行' }}
       </button>
     </template>

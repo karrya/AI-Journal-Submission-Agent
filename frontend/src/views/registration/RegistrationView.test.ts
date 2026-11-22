@@ -524,7 +524,7 @@ describe('RegistrationView', () => {
 
     expect(wrapper.get('[data-test="selected-task-status"]').text()).toContain('正在处理')
     expect(wrapper.get('[data-test="registration-workflow"]').text()).toContain('当前阶段')
-    expect(wrapper.text()).toContain('阶段一不执行外部注册')
+    expect(wrapper.text()).toContain('规则允许时自动执行注册')
   })
 
 })

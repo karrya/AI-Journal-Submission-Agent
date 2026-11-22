@@ -3,7 +3,7 @@ from urllib.parse import urlsplit
 from app.automation.registration_contracts import (
     RegistrationAdapter,
     RegistrationAutomationError,
-    RegistrationReceipt,
+    registration_handoff,
 )
 from app.crawlers.url_security import UrlSecurityError
 
@@ -55,11 +55,5 @@ class RegistrationPreflight:
         try:
             self.url_checker.assert_allowed(portal.final_url)
         except UrlSecurityError:
-            return RegistrationReceipt(
-                "NEEDS_MANUAL_REVIEW",
-                {
-                    "current_step": "HANDOFF_ROBOTS",
-                    "manual_url": portal.final_url,
-                },
-            )
+            return registration_handoff("HANDOFF_ROBOTS", portal.final_url)
         return adapter

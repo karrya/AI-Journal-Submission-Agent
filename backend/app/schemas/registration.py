@@ -42,6 +42,7 @@ class RegistrationHandoffResponse(OutputModel):
     manual_url: str
     browser_handoff_id: str
     current_step: str
+    resumable: bool
 
 
 class PublisherSupportResponse(OutputModel):

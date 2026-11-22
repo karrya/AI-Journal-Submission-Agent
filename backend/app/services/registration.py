@@ -268,12 +268,18 @@ class RegistrationService:
 
     def get_handoff(self, task_id: str) -> tuple[RegistrationTask, JournalSubmissionPortal]:
         task = self.get_task(task_id)
-        if not (task.current_step or "").startswith("HANDOFF_"):
+        if (
+            task.task_status != "NEEDS_MANUAL_REVIEW"
+            or not (task.current_step or "").startswith("HANDOFF_")
+        ):
             raise AppError(404, "RESOURCE_NOT_FOUND", "资源不存在")
         portal = self.db.get(JournalSubmissionPortal, task.portal_id)
         if portal is None:
             raise AppError(404, "RESOURCE_NOT_FOUND", "资源不存在")
         return task, portal
+
+    def can_resume_handoff(self, task: RegistrationTask) -> bool:
+        return self.workflow.can_resume_handoff(task)
 
     def resume_handoff(self, task_id: str) -> RegistrationTask:
         try:

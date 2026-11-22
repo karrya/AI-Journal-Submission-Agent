@@ -2,7 +2,11 @@ import { mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import AppConfirmDialog from './AppConfirmDialog.vue'
 
-async function mountConfirm(props: Record<string, unknown> = {}, slots = {}) {
+async function mountConfirm(
+  props: Record<string, unknown> = {},
+  slots = {},
+  options: { attachTo?: HTMLElement; teleport?: boolean } = {},
+) {
   const wrapper = mount(AppConfirmDialog, {
     props: {
       modelValue: true,
@@ -12,8 +16,8 @@ async function mountConfirm(props: Record<string, unknown> = {}, slots = {}) {
       ...props,
     },
     slots,
-    global: { stubs: { teleport: true, transition: false } },
-    attachTo: document.body,
+    global: { stubs: { teleport: options.teleport ?? true, transition: false } },
+    attachTo: options.attachTo ?? document.body,
   })
   await nextTick()
   return wrapper
@@ -32,6 +36,18 @@ describe('AppConfirmDialog', () => {
     await wrapper.setProps({ confirmed: true })
     await wrapper.get('[data-test="confirm-danger"]').trigger('click')
     expect(wrapper.emitted('confirm')).toHaveLength(1)
+  })
+
+  it('appends the overlay to body instead of an animated page container', async () => {
+    const page = document.createElement('div')
+    page.className = 'management-page'
+    document.body.appendChild(page)
+
+    await mountConfirm({}, {}, { attachTo: page, teleport: false })
+
+    const overlay = document.body.querySelector('.el-overlay')
+    expect(overlay?.parentElement).toBe(document.body)
+    expect(page.querySelector('.el-overlay')).toBeNull()
   })
 
   it('resets confirmation and closes through cancel', async () => {

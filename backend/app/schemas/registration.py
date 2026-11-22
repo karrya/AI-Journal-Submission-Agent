@@ -36,6 +36,15 @@ class RegistrationTaskResponse(OutputModel):
 RegistrationTaskPage = Page[RegistrationTaskResponse]
 
 
+class RegistrationHandoffResponse(OutputModel):
+    task_id: UUID
+    reason: str
+    manual_url: str
+    browser_handoff_id: str
+    current_step: str
+    resumable: bool
+
+
 class PublisherSupportResponse(OutputModel):
     id: UUID
     publisher_id: UUID

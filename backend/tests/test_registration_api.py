@@ -7,12 +7,16 @@ from uuid import uuid4
 import pytest
 from sqlalchemy import select
 
+from app.crawlers.browser import PlaywrightBrowserClient
+from app.crawlers.url_security import SafeHttpClient, UrlSecurityPolicy
+from app.services.registration_admission import require_supported_registration_target
 from app.models import (
     Author,
     AuthorAuthorization,
     Journal,
     JournalSubmissionPortal,
     Publisher,
+    RegistrationTask,
     OperationLog,
     utc_now,
 )
@@ -88,6 +92,19 @@ def approved_input(registration_records):
         "authorization_id": registration_records.grant.id,
         "platform_code": "TEST_PLATFORM",
         "idempotency_key": "registration-api-key-0001",
+    }
+
+
+def manual_portal_payload():
+    return {
+        "final_url": "https://register.example/manual",
+        "platform_code": "TEST_PLATFORM",
+        "adapter_code": "TEST_ADAPTER",
+        "adapter_name": "Test Adapter",
+        "adapter_version": "1.0.0",
+        "adapter_allowed_domains": ["register.example"],
+        "adapter_verification_notes": "Manually verified without automated page access",
+        "verification_confirmed": True,
     }
 
 
@@ -308,6 +325,7 @@ def test_registration_openapi_documents_routes_in_chinese_with_standard_errors(c
         "/api/v1/registration/tasks/{task_id}/cancel": {"post"},
         "/api/v1/registration/tasks/{task_id}/retry": {"post"},
         "/api/v1/registration/submission-portals/{portal_id}": {"patch"},
+        "/api/v1/journals/{journal_id}/submission-portals": {"post"},
     }
     for path, methods in expected.items():
         assert path in document["paths"]
@@ -363,6 +381,12 @@ def registration_write_request(kind, approved_input, registration_records):
                 "support_level": "V0_1",
             },
         )
+    if kind == "portal_create":
+        return (
+            "post",
+            f"/api/v1/journals/{registration_records.journal.id}/submission-portals",
+            manual_portal_payload(),
+        )
     return (
         "patch",
         f"/api/v1/registration/submission-portals/{registration_records.portal.id}",
@@ -371,7 +395,7 @@ def registration_write_request(kind, approved_input, registration_records):
 
 
 @pytest.mark.parametrize(
-    "kind", ["create", "cancel", "retry", "publisher_config", "portal_config"]
+    "kind", ["create", "cancel", "retry", "publisher_config", "portal_config", "portal_create"]
 )
 @pytest.mark.parametrize(
     "mode", ["missing_csrf", "wrong_csrf", "untrusted_origin", "missing_origin"]
@@ -403,7 +427,7 @@ def test_all_registration_writes_reject_negative_csrf_and_origin(
 
 
 @pytest.mark.parametrize(
-    "kind", ["create", "cancel", "retry", "publisher_config", "portal_config"]
+    "kind", ["create", "cancel", "retry", "publisher_config", "portal_config", "portal_create"]
 )
 def test_ordinary_users_cannot_use_registration_write_or_config_routes(
     client,
@@ -470,3 +494,128 @@ def test_registration_configuration_success_and_failure_are_audited(
     )
     assert failure is not None, response.text
     assert failure.error_code == "VALIDATION_ERROR"
+
+
+def test_manual_portal_creation_is_admin_audited_admissible_and_offline(
+    client,
+    db_session,
+    admin_context,
+    registration_records,
+    monkeypatch,
+):
+    def fail_external_call(*args, **kwargs):
+        raise AssertionError("Manual portal creation must not access external resources")
+
+    monkeypatch.setattr(SafeHttpClient, "get", fail_external_call)
+    monkeypatch.setattr(PlaywrightBrowserClient, "get", fail_external_call)
+    monkeypatch.setattr(UrlSecurityPolicy, "resolve", fail_external_call)
+    task_count = db_session.query(RegistrationTask).count()
+
+    response = client.post(
+        f"/api/v1/journals/{registration_records.journal.id}/submission-portals",
+        json=manual_portal_payload(),
+    )
+
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert body["original_url"] == body["final_url"] == "https://register.example/manual"
+    assert body["redirect_chain"] == []
+    assert body["verification_status"] == "VERIFIED"
+    assert body["access_status"] == "MANUALLY_VERIFIED"
+    assert body["support_status"] == "SUPPORTED"
+    assert body["adapter_support_status"] == "SUPPORTED"
+    assert body["confidence"] == 1
+    assert body["evidence_summary"] == []
+    assert "adapter_verification_notes" not in body
+    assert "adapter_capability_config" not in body
+    assert "verification_evidence_ref" not in body
+    assert db_session.query(RegistrationTask).count() == task_count
+
+    db_session.rollback()
+    portal = db_session.get(JournalSubmissionPortal, body["id"])
+    assert portal is not None
+    assert portal.task_id is None
+    assert portal.verified_by == admin_context.user.id
+    assert portal.created_by == admin_context.user.id
+    assert portal.normalized_host == "register.example"
+    assert portal.adapter_last_verified_at is not None
+    assert portal.last_checked_at is not None
+    admitted = require_supported_registration_target(
+        db_session,
+        registration_records.publisher.id,
+        registration_records.journal.id,
+        portal.id,
+        "TEST_PLATFORM",
+    )
+    assert admitted.portal.id == portal.id
+
+    audit = db_session.scalar(
+        select(OperationLog).where(
+            OperationLog.action == "registration.portal.create",
+            OperationLog.result == "success",
+        )
+    )
+    assert audit is not None
+    assert audit.after_summary["adapter_code"] == "TEST_ADAPTER"
+    assert audit.after_summary["verification_status"] == "VERIFIED"
+    assert "final_url" not in audit.after_summary
+    assert "adapter_verification_notes" not in audit.after_summary
+
+
+def test_manual_portal_requires_confirmation_and_exact_allowed_host(
+    client, db_session, admin_context, registration_records
+):
+    path = f"/api/v1/journals/{registration_records.journal.id}/submission-portals"
+    portal_count = db_session.query(JournalSubmissionPortal).count()
+
+    unconfirmed = client.post(
+        path, json=manual_portal_payload() | {"verification_confirmed": False}
+    )
+    assert_error(unconfirmed, 422, "VALIDATION_ERROR")
+
+    wrong_host = client.post(
+        path,
+        json=manual_portal_payload() | {"final_url": "https://outside.example/manual"},
+    )
+    assert_error(wrong_host, 403, "PLATFORM_DOMAIN_NOT_ALLOWED")
+    db_session.rollback()
+    assert db_session.query(JournalSubmissionPortal).count() == portal_count
+    failure = db_session.scalar(
+        select(OperationLog).where(
+            OperationLog.action == "registration.portal.create",
+            OperationLog.result == "failure",
+        )
+    )
+    assert failure is not None
+    assert failure.error_code == "PLATFORM_DOMAIN_NOT_ALLOWED"
+
+
+def test_manual_portal_rejects_duplicate_configuration_and_unknown_journal(
+    client, admin_context, registration_records
+):
+    path = f"/api/v1/journals/{registration_records.journal.id}/submission-portals"
+    first = client.post(path, json=manual_portal_payload())
+    assert first.status_code == 201, first.text
+
+    duplicate = client.post(
+        path,
+        json=manual_portal_payload() | {"final_url": "HTTPS://REGISTER.EXAMPLE.:443/manual"},
+    )
+    assert_error(duplicate, 409, "CONFLICT")
+
+    missing = client.post(
+        f"/api/v1/journals/{uuid4()}/submission-portals",
+        json=manual_portal_payload(),
+    )
+    assert_error(missing, 404, "RESOURCE_NOT_FOUND")
+
+
+def test_manual_portal_rejects_query_secrets(client, admin_context, registration_records):
+    response = client.post(
+        f"/api/v1/journals/{registration_records.journal.id}/submission-portals",
+        json=manual_portal_payload() | {
+            "final_url": "https://register.example/manual?token=classified-link"
+        },
+    )
+
+    assert_error(response, 422, "VALIDATION_ERROR")

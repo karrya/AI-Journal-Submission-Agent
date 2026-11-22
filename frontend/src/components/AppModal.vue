@@ -91,9 +91,10 @@ watch(() => props.modelValue, (open) => {
     class="app-dialog"
     :class="{ 'app-dialog--wide': wide }"
     :model-value="modelValue"
+    append-to-body
+    align-center
     :title="title"
     :width="width"
-    top="6vh"
     :close-on-click-modal="false"
     :close-on-press-escape="busy !== true"
     :show-close="busy !== true"

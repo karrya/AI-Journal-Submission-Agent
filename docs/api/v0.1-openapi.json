@@ -4533,6 +4533,132 @@
         }
       }
     },
+    "/api/v1/journals/{journal_id}/submission-portals": {
+      "post": {
+        "tags": [
+          "registration"
+        ],
+        "summary": "人工核验并创建投稿入口",
+        "operationId": "create_registration_portal_api_v1_journals__journal_id__submission_portals_post",
+        "parameters": [
+          {
+            "name": "journal_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "期刊 ID"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "请求来源"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "CSRF 防护令牌"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegistrationPortalCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "创建成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmissionPortalResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "请求参数校验失败"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "identification"
+        ],
+        "summary": "获取期刊投稿入口与证据",
+        "operationId": "list_submission_portals_api_v1_journals__journal_id__submission_portals_get",
+        "parameters": [
+          {
+            "name": "journal_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "期刊 ID"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmissionPortalListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "请求参数校验失败"
+          }
+        }
+      }
+    },
     "/api/v1/registration/submission-portals/{portal_id}": {
       "patch": {
         "tags": [
@@ -4832,6 +4958,124 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Page_RegistrationTaskResponse_"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "请求参数校验失败"
+          }
+        }
+      }
+    },
+    "/api/v1/registration/tasks/{task_id}/handoff": {
+      "get": {
+        "tags": [
+          "registration"
+        ],
+        "summary": "获取注册任务人工接管信息",
+        "operationId": "get_registration_handoff_api_v1_registration_tasks__task_id__handoff_get",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "任务 ID"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationHandoffResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "请求参数校验失败"
+          }
+        }
+      }
+    },
+    "/api/v1/registration/tasks/{task_id}/resume": {
+      "post": {
+        "tags": [
+          "registration"
+        ],
+        "summary": "恢复人工接管后的注册任务",
+        "operationId": "resume_registration_task_api_v1_registration_tasks__task_id__resume_post",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "任务 ID"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "请求来源"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "CSRF 防护令牌"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationTaskResponse"
                 }
               }
             }
@@ -5463,49 +5707,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TaskResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "请求参数校验失败"
-          }
-        }
-      }
-    },
-    "/api/v1/journals/{journal_id}/submission-portals": {
-      "get": {
-        "tags": [
-          "identification"
-        ],
-        "summary": "获取期刊投稿入口与证据",
-        "operationId": "list_submission_portals_api_v1_journals__journal_id__submission_portals_get",
-        "parameters": [
-          {
-            "name": "journal_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "期刊 ID"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "请求成功",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SubmissionPortalListResponse"
                 }
               }
             }
@@ -12002,6 +12203,113 @@
           "created_at"
         ],
         "title": "近期操作"
+      },
+      "RegistrationHandoffResponse": {
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "任务 ID"
+          },
+          "reason": {
+            "type": "string",
+            "title": "原因"
+          },
+          "manual_url": {
+            "type": "string",
+            "title": "人工处理页面 URL"
+          },
+          "browser_handoff_id": {
+            "type": "string",
+            "title": "浏览器人工接管 ID"
+          },
+          "current_step": {
+            "type": "string",
+            "title": "当前注册步骤"
+          },
+          "resumable": {
+            "type": "boolean",
+            "title": "是否可恢复执行"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "task_id",
+          "reason",
+          "manual_url",
+          "browser_handoff_id",
+          "current_step",
+          "resumable"
+        ],
+        "title": "注册任务人工接管信息响应"
+      },
+      "RegistrationPortalCreate": {
+        "properties": {
+          "final_url": {
+            "type": "string",
+            "maxLength": 2048,
+            "minLength": 1,
+            "title": "最终 URL"
+          },
+          "platform_code": {
+            "type": "string",
+            "maxLength": 50,
+            "minLength": 1,
+            "title": "平台代码"
+          },
+          "adapter_code": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "适配器代码"
+          },
+          "adapter_name": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "适配器名称"
+          },
+          "adapter_version": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "适配器版本"
+          },
+          "adapter_allowed_domains": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "适配器允许的域名列表"
+          },
+          "adapter_verification_notes": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "适配器验收说明"
+          },
+          "verification_confirmed": {
+            "type": "boolean",
+            "const": true,
+            "title": "已人工核验确认"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "final_url",
+          "platform_code",
+          "adapter_code",
+          "adapter_name",
+          "adapter_version",
+          "adapter_allowed_domains",
+          "adapter_verification_notes",
+          "verification_confirmed"
+        ],
+        "title": "人工核验投稿入口创建请求"
       },
       "RegistrationPortalUpdate": {
         "properties": {

@@ -3,12 +3,16 @@ import { ElMessageBox } from 'element-plus'
 import { nextTick } from 'vue'
 import AppModal from './AppModal.vue'
 
-async function mountModal(props: Record<string, unknown>, slots = {}) {
+async function mountModal(
+  props: Record<string, unknown>,
+  slots = {},
+  options: { attachTo?: HTMLElement; teleport?: boolean } = {},
+) {
   const wrapper = mount(AppModal, {
     props: { modelValue: true, title: '编辑期刊', ...props },
     slots,
-    global: { stubs: { teleport: true, transition: false } },
-    attachTo: document.body,
+    global: { stubs: { teleport: options.teleport ?? true, transition: false } },
+    attachTo: options.attachTo ?? document.body,
   })
   await nextTick()
   return wrapper
@@ -32,6 +36,24 @@ describe('AppModal', () => {
     await wrapper.get('.el-dialog__close').trigger('click')
     expect(wrapper.emitted('update:modelValue')).toEqual([[false]])
     expect(wrapper.emitted('cancel')).toHaveLength(1)
+  })
+
+  it('appends the overlay to body instead of an animated page container', async () => {
+    const page = document.createElement('div')
+    page.className = 'management-page'
+    document.body.appendChild(page)
+
+    await mountModal({}, {}, { attachTo: page, teleport: false })
+
+    const overlay = document.body.querySelector('.el-overlay')
+    expect(overlay?.parentElement).toBe(document.body)
+    expect(page.querySelector('.el-overlay')).toBeNull()
+  })
+
+  it('centers the dialog vertically in the viewport', async () => {
+    const wrapper = await mountModal({ wide: true })
+
+    expect(wrapper.get('.el-overlay-dialog').attributes('style')).toContain('display: flex')
   })
 
   it('blocks accidental close when dirty and closes after explicit discard', async () => {

@@ -125,6 +125,28 @@ export async function getSubmissionPortals(journalId: string): Promise<Submissio
   return response.data.items
 }
 
+export interface ManualSubmissionPortalCreate {
+  final_url: string
+  platform_code: string
+  adapter_code: string
+  adapter_name: string
+  adapter_version: string
+  adapter_allowed_domains: string[]
+  adapter_verification_notes: string
+  verification_confirmed: boolean
+}
+
+export async function createSubmissionPortal(
+  journalId: string,
+  payload: ManualSubmissionPortalCreate,
+): Promise<SubmissionPortal> {
+  const response = await api.post<SubmissionPortal>(
+    `/journals/${encodeURIComponent(journalId)}/submission-portals`,
+    payload,
+  )
+  return response.data
+}
+
 export async function identifyJournal(payload: IdentifyRequest): Promise<IdentifyResponse> {
   const response = await api.post<IdentifyResponse>('/journals/identify', payload)
   return response.data

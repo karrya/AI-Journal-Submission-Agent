@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import {
   getAuthorizationOptions,
   listAuthorizations,
@@ -9,6 +9,7 @@ import {
 } from '../../api/authors'
 import { getSafeRequestId } from '../../api/client'
 import {
+  createSubmissionPortal,
   getSubmissionPortals,
   type JournalOption,
   type SubmissionPortal,
@@ -17,15 +18,23 @@ import {
   cancelRegistrationTask,
   createRegistrationTask,
   getRegistrationJournals,
+  getRegistrationHandoff,
   getRegistrationPublishers,
   getRegistrationTasks,
+  resumeRegistrationTask,
   retryRegistrationTask,
+  type RegistrationHandoff,
   type RegistrationPublisher,
   type RegistrationTask,
 } from '../../api/registration'
 import AppModal from '../../components/AppModal.vue'
 import AppConfirmDialog from '../../components/AppConfirmDialog.vue'
+import RegistrationHandoffDialog from '../../components/RegistrationHandoffDialog.vue'
 import { useDirtyGuard } from '../../composables/useDirtyGuard'
+import { useAuthStore } from '../../stores/auth'
+
+const auth = useAuthStore()
+const isAdmin = computed(() => auth.user?.roles.includes('system_admin') ?? false)
 
 const TASK_STATUS_LABELS: Record<string, string> = {
   PENDING: '待执行',
@@ -88,7 +97,23 @@ const filters = reactive({
   created_to: '',
 })
 const selectedTaskId = ref('')
+const handoff = ref<RegistrationHandoff | null>(null)
+const handoffBusy = ref(false)
+let handoffTimer: ReturnType<typeof setInterval> | undefined
 const showCreate = ref(false)
+const showManualPortal = ref(false)
+const manualPortalSaving = ref(false)
+const manualPortalError = ref('')
+const manualPortal = reactive({
+  final_url: '',
+  platform_code: '',
+  adapter_code: '',
+  adapter_name: '',
+  adapter_version: '',
+  allowed_domains: '',
+  verification_notes: '',
+  confirmed: false,
+})
 const createGuard = useDirtyGuard(() => target)
 const cancelTargetId = ref<string | null>(null)
 const cancelDialogOpen = computed({
@@ -135,7 +160,7 @@ const manualGroups = computed(() => [
   },
   {
     id: 'submit', title: '等待提交确认', statuses: ['READY_TO_SUBMIT', 'SUBMISSION_UNKNOWN'],
-    consequence: '后果：提交会改变平台账号状态；请先核对只读摘要，本页面不执行外部提交。',
+    consequence: '后果：提交会改变平台账号状态；自动执行仅限规则允许的目标，异常或未知结果需人工核查。',
     tasks: tasks.value.filter((item) => ['READY_TO_SUBMIT', 'SUBMISSION_UNKNOWN'].includes(item.task_status)),
   },
   {
@@ -284,6 +309,8 @@ async function onPublisherChange(): Promise<void> {
 
 async function onJournalChange(): Promise<void> {
   const sequence = ++platformLoadSequence
+  showManualPortal.value = false
+  manualPortalError.value = ''
   target.portal_id = ''
   journalPortals.value = []
   authorDataError.value = ''
@@ -301,6 +328,39 @@ async function onJournalChange(): Promise<void> {
     }
   } finally {
     if (sequence === platformLoadSequence) platformsLoading.value = false
+  }
+}
+
+async function saveManualPortal(): Promise<void> {
+  if (manualPortalSaving.value || !target.journal_id) return
+  manualPortalError.value = ''
+  if (!manualPortal.confirmed) {
+    manualPortalError.value = '请确认已人工核验该入口及适配器配置。'
+    return
+  }
+  manualPortalSaving.value = true
+  try {
+    const created = await createSubmissionPortal(target.journal_id, {
+      final_url: manualPortal.final_url.trim(),
+      platform_code: manualPortal.platform_code.trim(),
+      adapter_code: manualPortal.adapter_code.trim(),
+      adapter_name: manualPortal.adapter_name.trim(),
+      adapter_version: manualPortal.adapter_version.trim(),
+      adapter_allowed_domains: manualPortal.allowed_domains.split(/[,，\s]+/).filter(Boolean),
+      adapter_verification_notes: manualPortal.verification_notes.trim(),
+      verification_confirmed: true,
+    })
+    journalPortals.value = [...journalPortals.value.filter((item) => item.id !== created.id), created]
+    target.portal_id = created.id
+    showManualPortal.value = false
+    Object.assign(manualPortal, {
+      final_url: '', platform_code: '', adapter_code: '', adapter_name: '', adapter_version: '',
+      allowed_domains: '', verification_notes: '', confirmed: false,
+    })
+  } catch (error) {
+    manualPortalError.value = safeError(error, '无法保存人工核验入口。')
+  } finally {
+    manualPortalSaving.value = false
   }
 }
 
@@ -325,10 +385,10 @@ async function onFilterPublisherChange(): Promise<void> {
   }
 }
 
-async function loadTasks(): Promise<void> {
+async function loadTasks(background = false): Promise<void> {
   const sequence = ++taskLoadSequence
-  tasksLoading.value = true
-  taskError.value = ''
+  if (!background) tasksLoading.value = true
+  if (!background) taskError.value = ''
   try {
     const result = await getRegistrationTasks({
       page: filters.page,
@@ -349,11 +409,48 @@ async function loadTasks(): Promise<void> {
     if (!result.items.some((item) => item.id === evidenceTaskId.value)) evidenceTaskId.value = null
     if (!result.items.some((item) => item.id === cancelTargetId.value)) cancelTargetId.value = null
   } catch (error) {
-    if (sequence === taskLoadSequence) {
+    if (sequence === taskLoadSequence && !background) {
       taskError.value = safeError(error, '无法加载注册任务，当前数据已保留。')
     }
   } finally {
-    if (sequence === taskLoadSequence) tasksLoading.value = false
+    if (!background && sequence === taskLoadSequence) tasksLoading.value = false
+  }
+}
+
+async function refreshHandoff(): Promise<void> {
+  const task = selectedTask.value
+  if (
+    !task
+    || task.task_status !== 'NEEDS_MANUAL_REVIEW'
+    || !(task.current_step ?? '').startsWith('HANDOFF_')
+  ) {
+    handoff.value = null
+    return
+  }
+  try {
+    const response = await getRegistrationHandoff(task.id)
+    const current = selectedTask.value
+    if (
+      current?.id === task.id
+      && current.task_status === 'NEEDS_MANUAL_REVIEW'
+      && (current.current_step ?? '').startsWith('HANDOFF_')
+    ) {
+      handoff.value = response
+    }
+  } catch {
+    handoff.value = null
+  }
+}
+
+async function resumeHandoff(taskId: string): Promise<void> {
+  if (handoffBusy.value) return
+  handoffBusy.value = true
+  try {
+    await resumeRegistrationTask(taskId)
+    handoff.value = null
+    await loadTasks()
+  } finally {
+    handoffBusy.value = false
   }
 }
 
@@ -381,6 +478,8 @@ function changePage(page: number): void {
 }
 
 function openCreate(): void {
+  showManualPortal.value = false
+  manualPortalError.value = ''
   createGuard.capture()
   showCreate.value = true
 }
@@ -411,7 +510,7 @@ async function submitRegistrationTask(): Promise<void> {
     total.value += 1
     selectedTaskId.value = created.id
     showCreate.value = false
-    actionMessage.value = `注册任务 ${created.id} 已创建；工作器仅复核授权与入口并转人工复核，不执行外部注册。`
+    actionMessage.value = `注册任务 ${created.id} 已创建；规则允许时将在可见浏览器中自动执行，卡点会请求人工接管。`
   } catch (error) {
     taskError.value = safeError(error, '无法创建注册任务，请核对授权与支持状态后重试。')
   } finally {
@@ -469,7 +568,7 @@ async function retryTask(item: RegistrationTask): Promise<void> {
   actionMessage.value = ''
   try {
     replaceTask(await retryRegistrationTask(item.id))
-    actionMessage.value = '任务已转入待执行状态；阶段一只重新核验授权和入口准入，不执行外部动作。'
+    actionMessage.value = '任务已转入待执行状态；规则允许时将继续自动执行，必要时请求人工接管。'
   } catch (error) {
     taskError.value = safeError(error, '无法重试任务，当前状态已保留。')
   } finally {
@@ -548,9 +647,18 @@ function platformName(platformCode: string): string {
   return platformCode
 }
 
+watch(selectedTaskId, () => { void refreshHandoff() })
+
 onMounted(() => {
   void loadCatalogs()
   void loadTasks()
+  handoffTimer = setInterval(() => {
+    void loadTasks(true).then(refreshHandoff)
+  }, 2000)
+})
+
+onUnmounted(() => {
+  if (handoffTimer) clearInterval(handoffTimer)
 })
 </script>
 
@@ -563,7 +671,7 @@ onMounted(() => {
         <h1 id="registration-title">注册任务工作台</h1>
         <p class="page-intro">集中核对授权目标、跟踪任务状态并处理人工介入。仅支持已核验的出版社与平台。</p>
       </div>
-      <span class="scope-note">阶段一不执行外部注册、邮箱读取或提交；不展示密码、凭据引用或完整验证链接</span>
+      <span class="scope-note">规则允许时自动执行注册；必要时人工接管；不展示密码、凭据引用或完整验证链接</span>
     </header>
 
     <p v-if="catalogError" class="inline-alert" role="alert">
@@ -627,6 +735,27 @@ onMounted(() => {
           <p>仅列出当前期刊已核验入口绑定的具体适配器版本；平台最终准入由服务端复核。</p>
         </div>
       </div>
+      <div v-if="isAdmin && target.journal_id" class="manual-portal">
+        <button v-if="!showManualPortal" class="secondary-button" type="button" data-test="manual-portal-toggle" @click="showManualPortal = true">人工核验并添加入口</button>
+        <form v-else data-test="manual-portal-form" @submit.prevent="saveManualPortal">
+          <p>仅保存人工提供的资料，不访问目标网站。请确认入口及适配器已在受控人工流程中完成核验。</p>
+          <div class="form-grid">
+            <label>投稿入口 URL<input v-model="manualPortal.final_url" data-test="manual-portal-url" type="url" required></label>
+            <label>平台代码<input v-model="manualPortal.platform_code" data-test="manual-platform-code" required></label>
+            <label>适配器代码<input v-model="manualPortal.adapter_code" data-test="manual-adapter-code" required></label>
+            <label>适配器名称<input v-model="manualPortal.adapter_name" data-test="manual-adapter-name" required></label>
+            <label>适配器版本<input v-model="manualPortal.adapter_version" data-test="manual-adapter-version" required></label>
+            <label>允许域名（逗号分隔）<input v-model="manualPortal.allowed_domains" data-test="manual-allowed-domains" required></label>
+          </div>
+          <label>人工核验说明<textarea v-model="manualPortal.verification_notes" data-test="manual-verification-notes" rows="3" required></textarea></label>
+          <label class="confirmation-control"><input v-model="manualPortal.confirmed" data-test="manual-portal-confirm" type="checkbox">我确认已在不自动访问目标页面的情况下人工核验此入口及适配器配置。</label>
+          <p v-if="manualPortalError" class="form-error" data-test="manual-portal-error" role="alert">{{ manualPortalError }}</p>
+          <div class="create-step-actions">
+            <button class="secondary-button" type="button" :disabled="manualPortalSaving" @click="showManualPortal = false">取消</button>
+            <button class="primary-button" type="submit" :disabled="manualPortalSaving">{{ manualPortalSaving ? '正在保存…' : '保存人工核验入口' }}</button>
+          </div>
+        </form>
+      </div>
       <p v-if="authorDataError" class="inline-alert" role="alert">{{ authorDataError }}</p>
 
       <div class="submission-review">
@@ -642,7 +771,7 @@ onMounted(() => {
           </dl>
         </section>
         <div class="submission-action">
-          <p>创建任务仅代表进入受控队列。本页面不会直接执行外部注册或跳过人工确认。</p>
+          <p>创建后将按规则自动执行；需要验证码、授权或人工判断时会暂停并请求接管。</p>
           <button type="button" class="primary-button" data-test="create-registration-task" :disabled="!canCreate" @click="submitRegistrationTask">
             {{ creating ? '正在创建…' : '创建注册任务' }}
           </button>
@@ -659,7 +788,7 @@ onMounted(() => {
           <div><p class="section-kicker">02 · 任务队列</p><h2 id="registration-tasks-title">注册任务</h2></div>
           <div class="section-heading__actions">
             <button type="button" class="primary-button" data-test="open-create-registration" @click="openCreate">创建注册任务</button>
-            <button type="button" class="secondary-button" data-test="refresh-tasks" :disabled="tasksLoading" @click="loadTasks">刷新</button>
+            <button type="button" class="secondary-button" data-test="refresh-tasks" :disabled="tasksLoading" @click="loadTasks()">刷新</button>
           </div>
         </div>
         <form class="task-filters" aria-label="注册任务筛选" @submit.prevent="applyFilters">
@@ -688,7 +817,7 @@ onMounted(() => {
         </form>
 
         <p v-if="taskError" class="inline-alert" data-test="task-error" role="alert">
-          {{ taskError }} <button type="button" class="text-button" data-test="retry-task-load" @click="loadTasks">安全重试</button>
+          {{ taskError }} <button type="button" class="text-button" data-test="retry-task-load" @click="loadTasks()">安全重试</button>
         </p>
         <div v-if="tasksLoading" class="task-skeleton" data-test="task-skeleton" role="status" aria-label="正在加载注册任务">
           <span /><span /><span /><span class="sr-only">正在加载注册任务…</span>
@@ -768,6 +897,14 @@ onMounted(() => {
       @confirm="confirmCancel"
     />
 
+    <RegistrationHandoffDialog
+      v-if="handoff"
+      :handoff="handoff"
+      :busy="handoffBusy"
+      @resume="resumeHandoff"
+      @cancel="handoff = null"
+    />
+
     <section class="workbench-panel manual-panel" aria-labelledby="manual-center-title">
       <div class="section-heading"><div><p class="section-kicker">04 · 人工处理中心</p><h2 id="manual-center-title">需要人工关注的任务</h2></div><span>仅查看与定位，不执行外部操作</span></div>
       <div class="manual-grid">
@@ -816,6 +953,11 @@ h3 { font-size: 16px; }
 .target-card label { margin-top: 3px; font-size: 13px; font-weight: 650; }
 .target-card p { margin: 2px 0 0; color: var(--ink-secondary); font-size: 12px; line-height: 1.55; }
 .target-number { display: grid; place-items: center; width: 25px; height: 25px; color: #274f8f; font-size: 12px; font-weight: 700; background: #e8effb; border-radius: 6px; }
+.manual-portal { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
+.manual-portal .form-grid { margin: 14px 0; }
+.manual-portal form > label { display: block; margin-top: 12px; }
+.manual-portal .confirmation-control { display: flex; gap: 8px; align-items: flex-start; line-height: 1.6; }
+.manual-portal .confirmation-control input { width: auto; min-height: auto; margin-top: 4px; }
 select, input { width: 100%; min-height: 40px; padding: 8px 10px; color: var(--ink); background: #fff; border: 1px solid #bdc8d8; border-radius: 7px; }
 select:disabled, input:disabled { color: #59667b; background: #eef1f6; cursor: not-allowed; }
 .submission-review { display: grid; grid-template-columns: minmax(0, 2fr) minmax(230px, 1fr); gap: 18px; margin-top: 18px; }

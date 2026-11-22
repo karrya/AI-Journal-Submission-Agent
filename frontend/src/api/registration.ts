@@ -70,6 +70,29 @@ export async function getRegistrationTasks(
   return response.data
 }
 
+export interface RegistrationHandoff {
+  task_id: string
+  reason: string
+  manual_url: string
+  browser_handoff_id: string
+  current_step: string
+  resumable: boolean
+}
+
+export async function getRegistrationHandoff(taskId: string): Promise<RegistrationHandoff> {
+  const response = await api.get<RegistrationHandoff>(
+    `/registration/tasks/${encodeURIComponent(taskId)}/handoff`,
+  )
+  return response.data
+}
+
+export async function resumeRegistrationTask(taskId: string): Promise<RegistrationTask> {
+  const response = await api.post<RegistrationTask>(
+    `/registration/tasks/${encodeURIComponent(taskId)}/resume`,
+  )
+  return response.data
+}
+
 export async function createRegistrationTask(payload: RegistrationTaskCreate): Promise<RegistrationTask> {
   const response = await api.post<RegistrationTask>('/registration/tasks', payload)
   return response.data

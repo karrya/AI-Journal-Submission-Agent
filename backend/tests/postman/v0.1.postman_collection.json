@@ -1325,6 +1325,173 @@
           ]
         }
       ]
+    },
+    {
+      "name": "07 Manual registration portal",
+      "item": [
+        {
+          "name": "Admin login for manual portal verification",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{admin_username}}\",\n  \"password\": \"{{NEW_ADMIN_PASSWORD}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.environment.set(\"CSRF_TOKEN\", body.csrf_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create publisher for manual portal",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/publishers",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Manual Portal Publisher\",\n  \"aliases\": []\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set(\"manual_publisher_id\", body.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create journal for manual portal",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/journals",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"publisher_id\": \"{{manual_publisher_id}}\",\n  \"name\": \"Manual Portal Journal\",\n  \"subject_categories\": [],\n  \"article_types\": [],\n  \"requirements\": [],\n  \"aliases\": []\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set(\"manual_journal_id\", body.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create manually verified submission portal",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/journals/{{manual_journal_id}}/submission-portals",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"final_url\": \"https://register.example/manual\",\n  \"platform_code\": \"TEST_PLATFORM\",\n  \"adapter_code\": \"TEST_ADAPTER\",\n  \"adapter_name\": \"Test Adapter\",\n  \"adapter_version\": \"1.0.0\",\n  \"adapter_allowed_domains\": [\n    \"register.example\"\n  ],\n  \"adapter_verification_notes\": \"Manually verified without automated page access\",\n  \"verification_confirmed\": true\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"manual verification is derived by the server\", function () {",
+                  "    pm.expect(body.original_url).to.eql(body.final_url);",
+                  "    pm.expect(body.verification_status).to.eql(\"VERIFIED\");",
+                  "    pm.expect(body.access_status).to.eql(\"MANUALLY_VERIFIED\");",
+                  "    pm.expect(body.support_status).to.eql(\"SUPPORTED\");",
+                  "    pm.expect(body.adapter_support_status).to.eql(\"SUPPORTED\");",
+                  "    pm.expect(body.redirect_chain).to.eql([]);",
+                  "    pm.expect(body.evidence_summary).to.eql([]);",
+                  "    pm.expect(body).to.not.have.property(\"adapter_verification_notes\");",
+                  "    pm.expect(body).to.not.have.property(\"adapter_capability_config\");",
+                  "});",
+                  "pm.collectionVariables.set(\"manual_portal_id\", body.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Duplicate manual portal is rejected",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/journals/{{manual_journal_id}}/submission-portals",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"final_url\": \"https://register.example/manual\",\n  \"platform_code\": \"TEST_PLATFORM\",\n  \"adapter_code\": \"TEST_ADAPTER\",\n  \"adapter_name\": \"Test Adapter\",\n  \"adapter_version\": \"1.0.0\",\n  \"adapter_allowed_domains\": [\n    \"register.example\"\n  ],\n  \"adapter_verification_notes\": \"Manually verified without automated page access\",\n  \"verification_confirmed\": true\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 409\", function () { pm.response.to.have.status(409); });",
+                  "pm.test(\"conflict uses the standard error code\", function () {",
+                  "    pm.expect(pm.response.json().code).to.eql(\"CONFLICT\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
     }
   ]
 }

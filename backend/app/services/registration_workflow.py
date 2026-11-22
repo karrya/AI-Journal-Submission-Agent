@@ -61,7 +61,7 @@ _ALLOWED_TRANSITIONS = {
         {"REGISTERED", "WAITING_EMAIL_CONFIRM", "FAILED", "CANCELLED"}
     ),
     "REGISTERED": frozenset(),
-    "NEEDS_MANUAL_REVIEW": frozenset({"CANCELLED"}),
+    "NEEDS_MANUAL_REVIEW": frozenset({"PENDING", "CANCELLED"}),
     "FAILED": frozenset({"PENDING"}),
     "CANCELLED": frozenset({"PENDING"}),
     "EXPIRED": frozenset(),
@@ -283,4 +283,28 @@ class RegistrationWorkflowService:
         task.lease_expires_at = None
         task.available_at = now
         task.last_activity_at = now
+        return task
+
+    def resume_handoff(self, task: RegistrationTask, *, actor_id: str) -> RegistrationTask:
+        if (
+            task.task_status != "NEEDS_MANUAL_REVIEW"
+            or not (task.current_step or "").startswith("HANDOFF_")
+            or task.last_external_action is not None
+        ):
+            raise AppError(
+                409,
+                "INVALID_TASK_STATE",
+                "只有未产生外部最终动作的人工接管任务可以恢复",
+            )
+        self._transition(task, "PENDING", reason="HANDOFF_RESUMED")
+        now = utc_now()
+        task.cancel_requested = False
+        task.retryable = False
+        task.worker_id = None
+        task.lease_expires_at = None
+        task.available_at = now
+        task.last_activity_at = now
+        task.completed_at = None
+        task.error_code = None
+        task.error_message = None
         return task

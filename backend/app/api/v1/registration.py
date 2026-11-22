@@ -2,8 +2,8 @@
 
 from datetime import UTC, datetime
 from typing import Annotated, Any, Literal
-from urllib.parse import urlsplit
-from uuid import UUID
+from urllib.parse import urlsplit, urlunsplit
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, Query, Request
 from pydantic import Field, field_validator, model_validator
@@ -20,6 +20,7 @@ from app.models import (
     Publisher,
     Role,
     UserRole,
+    utc_now,
 )
 from app.repositories.registration import RegistrationRepository
 from app.schemas.common import ErrorResponse, InputModel
@@ -27,6 +28,7 @@ from app.schemas.identification import JournalOption, JournalOptionsResponse, Su
 from app.schemas.registration import (
     PublisherSupportListResponse,
     PublisherSupportResponse,
+    RegistrationHandoffResponse,
     RegistrationTaskCreate,
     RegistrationTaskPage,
     RegistrationTaskResponse,
@@ -39,6 +41,11 @@ VALIDATION_RESPONSE: dict[int | str, dict[str, Any]] = {422: {"model": ErrorResp
 _CONFIG_AUDIT_FIELDS = frozenset(
     {
         "publisher_code",
+        "journal_id",
+        "platform_code",
+        "normalized_host",
+        "verification_status",
+        "access_status",
         "support_status",
         "support_level",
         "adapter_code",
@@ -63,6 +70,17 @@ class PublisherSupportConfig(InputModel):
     support_level: Literal["V0_1", "V0_2"]
     official_domains: list[str] | None = Field(default=None, max_length=100)
     notes: str | None = Field(default=None, max_length=2000)
+
+
+class RegistrationPortalCreate(InputModel):
+    final_url: str = Field(min_length=1, max_length=2048)
+    platform_code: str = Field(min_length=1, max_length=50)
+    adapter_code: str = Field(min_length=1, max_length=100)
+    adapter_name: str = Field(min_length=1, max_length=255)
+    adapter_version: str = Field(min_length=1, max_length=64)
+    adapter_allowed_domains: list[str] = Field(min_length=1, max_length=100)
+    adapter_verification_notes: str = Field(min_length=1, max_length=2000)
+    verification_confirmed: Literal[True]
 
 
 class RegistrationPortalUpdate(InputModel):
@@ -204,6 +222,27 @@ def _normalized_domains(domains: list[str]) -> list[str]:
     return list(dict.fromkeys(normalized))
 
 
+def _normalized_manual_url(value: str) -> tuple[str, str]:
+    if any(ord(character) < 32 or ord(character) == 127 for character in value):
+        raise AppError(422, "VALIDATION_ERROR", "投稿入口 URL 包含无效控制字符")
+    try:
+        parsed = urlsplit(value)
+        host = (parsed.hostname or "").encode("idna").decode("ascii").lower().rstrip(".")
+        port = parsed.port
+    except (ValueError, UnicodeError):
+        raise AppError(422, "VALIDATION_ERROR", "投稿入口 URL 格式无效") from None
+    if (
+        parsed.scheme.lower() != "https"
+        or not host
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.fragment
+        or port not in {None, 443}
+    ):
+        raise AppError(422, "VALIDATION_ERROR", "投稿入口必须使用默认端口的 HTTPS URL")
+    return urlunsplit(("https", host, parsed.path or "/", parsed.query, "")), host
+
+
 @router.get(
     "/registration/publishers",
     response_model=PublisherSupportListResponse,
@@ -340,6 +379,114 @@ def configure_registration_publisher(
         raise error from None
 
 
+@router.post(
+    "/journals/{journal_id}/submission-portals",
+    response_model=SubmissionPortalResponse,
+    status_code=201,
+    responses=VALIDATION_RESPONSE,
+)
+def create_registration_portal(
+    journal_id: UUID,
+    payload: RegistrationPortalCreate,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    principal: Annotated[Principal, Depends(require_admin_csrf)],
+) -> JournalSubmissionPortal:
+    action = "registration.portal.create"
+    portal_id = str(uuid4())
+    try:
+        journal = db.scalar(
+            select(Journal)
+            .where(Journal.id == str(journal_id), Journal.deleted_at.is_(None))
+            .with_for_update()
+        )
+        if journal is None:
+            raise _not_found()
+        final_url, host = _normalized_manual_url(payload.final_url)
+        allowed_domains = _normalized_domains(payload.adapter_allowed_domains)
+        if host not in allowed_domains:
+            raise AppError(
+                403, "PLATFORM_DOMAIN_NOT_ALLOWED", "目标域名不在适配器白名单"
+            )
+        duplicate = db.scalar(
+            select(JournalSubmissionPortal).where(
+                JournalSubmissionPortal.journal_id == str(journal_id),
+                JournalSubmissionPortal.final_url == final_url,
+                JournalSubmissionPortal.platform_code == payload.platform_code,
+                JournalSubmissionPortal.adapter_code == payload.adapter_code,
+                JournalSubmissionPortal.adapter_version == payload.adapter_version,
+            )
+        )
+        if duplicate is not None:
+            raise AppError(409, "CONFLICT", "相同的人工核验入口已存在")
+
+        verified_at = utc_now()
+        portal = JournalSubmissionPortal(
+            id=portal_id,
+            journal_id=journal.id,
+            task_id=None,
+            original_url=final_url,
+            final_url=final_url,
+            redirect_chain=[],
+            verification_status="VERIFIED",
+            access_status="MANUALLY_VERIFIED",
+            platform_code=payload.platform_code,
+            confidence=1.0,
+            evidence_summary=[],
+            normalized_host=host,
+            adapter_code=payload.adapter_code,
+            adapter_name=payload.adapter_name,
+            adapter_version=payload.adapter_version,
+            adapter_support_status="SUPPORTED",
+            adapter_allowed_domains=allowed_domains,
+            adapter_last_verified_at=verified_at,
+            adapter_verification_notes=payload.adapter_verification_notes,
+            support_status="SUPPORTED",
+            verified_by=principal.user.id,
+            verification_evidence_ref=None,
+            last_checked_at=verified_at,
+            created_by=principal.user.id,
+        )
+        db.add(portal)
+        db.flush()
+        _config_audit(
+            db,
+            principal,
+            request,
+            action=action,
+            target_type="journal_submission_portal",
+            target_id=portal_id,
+            result="success",
+            after={
+                "journal_id": portal.journal_id,
+                "platform_code": portal.platform_code,
+                "normalized_host": portal.normalized_host,
+                "verification_status": portal.verification_status,
+                "access_status": portal.access_status,
+                "adapter_code": portal.adapter_code,
+                "adapter_name": portal.adapter_name,
+                "adapter_version": portal.adapter_version,
+                "adapter_support_status": portal.adapter_support_status,
+                "adapter_allowed_domains": portal.adapter_allowed_domains,
+                "adapter_last_verified_at": verified_at.isoformat(),
+                "support_status": portal.support_status,
+            },
+        )
+        db.commit()
+        return portal
+    except AppError as exc:
+        _failed_config(
+            db,
+            principal,
+            request,
+            action=action,
+            target_type="journal_submission_portal",
+            target_id=portal_id,
+            error=exc,
+        )
+        raise
+
+
 @router.patch(
     "/registration/submission-portals/{portal_id}",
     response_model=SubmissionPortalResponse,
@@ -462,6 +609,42 @@ def list_registration_tasks(
         page_size=page_size,
         total=total,
     )
+
+
+@router.get(
+    "/registration/tasks/{task_id}/handoff",
+    response_model=RegistrationHandoffResponse,
+    responses=VALIDATION_RESPONSE,
+)
+def get_registration_handoff(
+    task_id: UUID,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    principal: Annotated[Principal, Depends(get_principal)],
+) -> RegistrationHandoffResponse:
+    task, portal = registration_service(db, principal, request).get_handoff(str(task_id))
+    return RegistrationHandoffResponse(
+        task_id=task.id,
+        reason=task.error_message or task.current_step,
+        manual_url=portal.final_url,
+        browser_handoff_id=task.browser_handoff_id,
+        current_step=task.current_step,
+    )
+
+
+@router.post(
+    "/registration/tasks/{task_id}/resume",
+    response_model=RegistrationTaskResponse,
+    responses=VALIDATION_RESPONSE,
+)
+def resume_registration_task(
+    task_id: UUID,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    principal: Annotated[Principal, Depends(require_csrf)],
+) -> RegistrationTaskResponse:
+    task = registration_service(db, principal, request).resume_handoff(str(task_id))
+    return RegistrationTaskResponse.model_validate(task)
 
 
 @router.get(

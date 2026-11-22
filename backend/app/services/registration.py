@@ -266,6 +266,47 @@ class RegistrationService:
         self._require_consent(task.author_id, task.authorization_id)
         return task
 
+    def get_handoff(self, task_id: str) -> tuple[RegistrationTask, JournalSubmissionPortal]:
+        task = self.get_task(task_id)
+        if not (task.current_step or "").startswith("HANDOFF_"):
+            raise AppError(404, "RESOURCE_NOT_FOUND", "资源不存在")
+        portal = self.db.get(JournalSubmissionPortal, task.portal_id)
+        if portal is None:
+            raise AppError(404, "RESOURCE_NOT_FOUND", "资源不存在")
+        return task, portal
+
+    def resume_handoff(self, task_id: str) -> RegistrationTask:
+        try:
+            task = self._task_for_update(task_id)
+            before = {"task_status": task.task_status, "retryable": task.retryable}
+            self.workflow.resume_handoff(task, actor_id=self.user.id)
+            self._audit(
+                action="registration.task.resume",
+                target_id=task.id,
+                author_id=task.author_id,
+                result="success",
+                before=before,
+                after={
+                    "task_status": task.task_status,
+                    "current_step": task.current_step,
+                    "retryable": task.retryable,
+                },
+            )
+            self.db.commit()
+            return task
+        except AppError as exc:
+            self.db.rollback()
+            failed_task = self.db.get(RegistrationTask, str(task_id))
+            self._audit(
+                action="registration.task.resume",
+                target_id=str(task_id),
+                author_id=failed_task.author_id if failed_task else None,
+                result="failure",
+                error=exc,
+            )
+            self.db.commit()
+            raise
+
     def _authorized_grant_ids(self) -> list[str]:
         active_grants = AuthorizationRepository.active_grant_query(
             user_id=self.user.id,
